@@ -1,0 +1,6 @@
+{
+  "name": "Dealer Management System",
+  "description": "A comprehensive, localized Dealer Management System (DMS) for managing distributors, dealer tiers, inventory, orders, sales tracking, and insights, fully designed in Khmer and English.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
