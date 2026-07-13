@@ -1,0 +1,32 @@
+{
+  "collections": [
+    {
+      "name": "users",
+      "fields": [
+        { "name": "username", "type": "string" },
+        { "name": "password", "type": "string" },
+        { "name": "role", "type": "string" },
+        { "name": "createdAt", "type": "string" }
+      ],
+      "rules": [
+        { "action": "read", "condition": "true" },
+        { "action": "write", "condition": "true" }
+      ]
+    },
+    {
+      "name": "transactions",
+      "fields": [
+        { "name": "userId", "type": "string" },
+        { "name": "type", "type": "string" },
+        { "name": "productName", "type": "string" },
+        { "name": "quantity", "type": "number" },
+        { "name": "date", "type": "string" },
+        { "name": "note", "type": "string" }
+      ],
+      "rules": [
+        { "action": "read", "condition": "true" },
+        { "action": "write", "condition": "true" }
+      ]
+    }
+  ]
+}

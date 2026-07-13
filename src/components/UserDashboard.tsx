@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { User, Transaction, TransactionType } from '../types';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface UserDashboardProps {
   currentUser: User;
@@ -15,7 +17,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
   const userTransactions = transactions.filter(t => t.userId === currentUser.id);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productName || !quantity) return;
 
@@ -35,10 +37,15 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
       note
     };
 
-    setTransactions([...transactions, newTransaction]);
-    setProductName('');
-    setQuantity('');
-    setNote('');
+    try {
+      await setDoc(doc(db, 'transactions', newTransaction.id), newTransaction);
+      setProductName('');
+      setQuantity('');
+      setNote('');
+    } catch (error) {
+      console.error("Error adding transaction: ", error);
+      alert("មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យ");
+    }
   };
 
   return (

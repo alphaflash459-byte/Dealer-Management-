@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { User, Transaction } from '../types';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface AdminDashboardProps {
   users: User[];
@@ -12,7 +14,7 @@ export default function AdminDashboard({ users, setUsers, transactions }: AdminD
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (users.find(u => u.username === newUsername)) {
       alert('ឈ្មោះនេះមានរួចហើយ!');
@@ -27,14 +29,24 @@ export default function AdminDashboard({ users, setUsers, transactions }: AdminD
       createdAt: new Date().toISOString()
     };
     
-    setUsers([...users, newUser]);
-    setNewUsername('');
-    setNewPassword('');
+    try {
+      await setDoc(doc(db, 'users', newUser.id), newUser);
+      setNewUsername('');
+      setNewPassword('');
+    } catch (error) {
+      console.error("Error adding user: ", error);
+      alert('មានបញ្ហាក្នុងការបង្កើតអ្នកប្រើប្រាស់');
+    }
   };
 
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
     if (confirm('តើអ្នកពិតជាចង់លុបអ្នកប្រើប្រាស់នេះមែនទេ?')) {
-      setUsers(users.filter(u => u.id !== id));
+      try {
+        await deleteDoc(doc(db, 'users', id));
+      } catch (error) {
+        console.error("Error deleting user: ", error);
+        alert('មានបញ្ហាក្នុងការលុបអ្នកប្រើប្រាស់');
+      }
     }
   };
 

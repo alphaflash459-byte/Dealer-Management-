@@ -3,54 +3,59 @@ import { User, Transaction } from './types';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import UserDashboard from './components/UserDashboard';
+import { onSnapshot, setDoc, doc } from 'firebase/firestore';
+import { usersCollection, transactionsCollection, db } from './lib/firebase';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Initial load
   useEffect(() => {
-    const cachedUsers = localStorage.getItem('stock_users');
-    const cachedTransactions = localStorage.getItem('stock_transactions');
+    // Check if there are any users, if not create default Admin
+    const unsubscribeUsers = onSnapshot(usersCollection, (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+      
+      if (usersData.length === 0) {
+        // Create default Admin
+        const defaultAdmin: User = {
+          id: 'admin-1',
+          username: 'Admin',
+          password: '12345678',
+          role: 'Admin',
+          createdAt: new Date().toISOString()
+        };
+        setDoc(doc(db, 'users', defaultAdmin.id), defaultAdmin);
+      } else {
+        setUsers(usersData);
+      }
+      setLoading(false);
+    });
 
-    if (cachedUsers) {
-      setUsers(JSON.parse(cachedUsers));
-    } else {
-      // Default Admin
-      const defaultAdmin: User = {
-        id: 'admin-1',
-        username: 'Admin',
-        password: '12345678',
-        role: 'Admin',
-        createdAt: new Date().toISOString()
-      };
-      setUsers([defaultAdmin]);
-      localStorage.setItem('stock_users', JSON.stringify([defaultAdmin]));
-    }
+    const unsubscribeTransactions = onSnapshot(transactionsCollection, (snapshot) => {
+      const txData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+      setTransactions(txData);
+    });
 
-    if (cachedTransactions) {
-      setTransactions(JSON.parse(cachedTransactions));
-    }
+    return () => {
+      unsubscribeUsers();
+      unsubscribeTransactions();
+    };
   }, []);
-
-  // Sync users
-  useEffect(() => {
-    if (users.length > 0) {
-      localStorage.setItem('stock_users', JSON.stringify(users));
-    }
-  }, [users]);
-
-  // Sync transactions
-  useEffect(() => {
-    if (transactions.length > 0) {
-      localStorage.setItem('stock_transactions', JSON.stringify(transactions));
-    }
-  }, [transactions]);
 
   const handleLogout = () => {
     setCurrentUser(null);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex justify-center items-center">
+        <div className="text-slate-500">កំពុងផ្ទុកទិន្នន័យ...</div>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <Login users={users} onLogin={setCurrentUser} />;
