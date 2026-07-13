@@ -1,69 +1,21 @@
-export type DealerTier = 'Gold' | 'Silver' | 'Bronze';
-export type DealerStatus = 'Active' | 'Inactive';
-export type OrderStatus = 'Pending' | 'Approved' | 'Shipped' | 'Delivered' | 'Cancelled';
-export type PaymentStatus = 'Paid' | 'Unpaid' | 'Partial';
+export type Role = 'Admin' | 'User';
 
-export interface Dealer {
+export interface User {
   id: string;
-  name: string;
-  businessName: string;
-  phone: string;
-  email: string;
-  province: string;
-  address: string;
-  tier: DealerTier;
-  status: DealerStatus;
-  balance: number; // in USD
-  creditLimit: number; // in USD
-  joinDate: string;
-  totalPurchased: number; // lifetime orders sum
+  username: string;
+  password?: string; // only for Admin to see/manage, usually we wouldn't store plaintext but this is local
+  role: Role;
+  createdAt: string;
 }
 
-export interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  price: number; // in USD
-  stock: number;
-  minStock: number; // low stock alert threshold
-  unit: string;
-}
+export type TransactionType = 'Stock Out' | 'Stock Sold' | 'Stock Return';
 
-export interface OrderItem {
-  productId: string;
+export interface Transaction {
+  id: string;
+  userId: string;
+  type: TransactionType;
   productName: string;
   quantity: number;
-  unitPrice: number;
-  total: number;
-}
-
-export interface Order {
-  id: string;
-  dealerId: string;
-  dealerName: string;
-  items: OrderItem[];
-  subtotal: number;
-  discount: number; // tier-based or manual
-  total: number;
   date: string;
-  status: OrderStatus;
-  paymentStatus: PaymentStatus;
-  deliveryDate?: string;
   note?: string;
-}
-
-export interface ActivityLog {
-  id: string;
-  timestamp: string;
-  descriptionKh: string;
-  descriptionEn: string;
-  type: 'dealer' | 'order' | 'inventory' | 'billing';
-  amount?: number;
-}
-
-export interface ProvinceStat {
-  province: string;
-  dealerCount: number;
-  totalSales: number;
 }
