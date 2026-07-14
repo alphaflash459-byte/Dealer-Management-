@@ -144,31 +144,31 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             <div className="px-5 md:px-6 py-5 border-b border-slate-50">
               <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
             </div>
-            <div className="overflow-x-auto p-2">
+            <div className="w-full overflow-x-auto md:overflow-visible p-1 md:p-2">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider">
-                    <th className="px-4 py-3 border-b border-slate-100">ឈ្មោះអ្នកប្រើប្រាស់</th>
-                    <th className="px-4 py-3 border-b border-slate-100">លេខសម្ងាត់</th>
-                    <th className="px-4 py-3 border-b border-slate-100">តួនាទី</th>
-                    <th className="px-4 py-3 border-b border-slate-100 text-right">សកម្មភាព</th>
+                  <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះអ្នកប្រើប្រាស់</th>
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">លេខសម្ងាត់</th>
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">តួនាទី</th>
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100 text-right">សកម្មភាព</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50 text-xs md:text-sm">
+                <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
                   {users.map(user => (
                     <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-4 font-bold text-slate-800">{user.username}</td>
-                      <td className="px-4 py-4 font-mono font-medium text-slate-500">{user.password}</td>
-                      <td className="px-4 py-4">
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] md:text-xs font-bold ${user.role === 'Admin' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      <td className="px-2 md:px-4 py-2.5 sm:py-4 font-bold text-slate-800">{user.username}</td>
+                      <td className="px-2 md:px-4 py-2.5 sm:py-4 font-mono font-medium text-slate-500">{user.password}</td>
+                      <td className="px-2 md:px-4 py-2.5 sm:py-4">
+                        <span className={`px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] md:text-xs font-bold ${user.role === 'Admin' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {user.role}
                         </span>
                       </td>
-                      <td className="px-4 py-4 text-right">
+                      <td className="px-2 md:px-4 py-2.5 sm:py-4 text-right">
                         {user.role !== 'Admin' && (
                           <button
                             onClick={() => setUserToDelete(user)}
-                            className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors"
+                            className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] sm:text-[11px] md:text-xs font-bold transition-colors"
                           >
                             លុប
                           </button>
@@ -220,22 +220,22 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             <div className="px-5 md:px-6 py-5 border-b border-slate-50">
               <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីទំនិញ</h3>
             </div>
-            <div className="overflow-x-auto p-2">
+            <div className="w-full overflow-x-auto md:overflow-visible p-1 md:p-2">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider">
-                    <th className="px-4 py-3 border-b border-slate-100">ឈ្មោះទំនិញ</th>
-                    <th className="px-4 py-3 border-b border-slate-100 text-right">សកម្មភាព</th>
+                  <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញ</th>
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100 text-right">សកម្មភាព</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50 text-xs md:text-sm">
+                <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
                   {products.map(product => (
                     <tr key={product.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-4 font-bold text-slate-800">{product.name}</td>
-                      <td className="px-4 py-4 text-right">
+                      <td className="px-2 md:px-4 py-2.5 sm:py-4 font-bold text-slate-800">{product.name}</td>
+                      <td className="px-2 md:px-4 py-2.5 sm:py-4 text-right">
                         <button
                           onClick={() => setProductToDelete(product)}
-                          className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors"
+                          className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] sm:text-[11px] md:text-xs font-bold transition-colors"
                         >
                           លុប
                         </button>
@@ -259,19 +259,19 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           <div className="px-5 md:px-6 py-5 border-b border-slate-50 shrink-0">
             <h3 className="text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
           </div>
-          <div className="flex-1 overflow-x-auto overflow-y-auto custom-scroll p-2">
+          <div className="flex-1 overflow-x-auto md:overflow-y-auto custom-scroll p-1 md:p-2">
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                <tr className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider">
-                  <th className="px-4 py-3 border-b border-slate-100">កាលបរិច្ឆេទ</th>
-                  <th className="px-4 py-3 border-b border-slate-100">អ្នកប្រើប្រាស់</th>
-                  <th className="px-4 py-3 border-b border-slate-100">ប្រភេទប្រតិបត្តិការ</th>
-                  <th className="px-4 py-3 border-b border-slate-100">ឈ្មោះទំនិញ</th>
-                  <th className="px-4 py-3 border-b border-slate-100 text-right">ចំនួន</th>
-                  <th className="px-4 py-3 border-b border-slate-100">ចំណាំ</th>
+                <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
+                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">កាលបរិច្ឆេទ</th>
+                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">អ្នកប្រើប្រាស់</th>
+                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">ប្រភេទប្រតិបត្តិការ</th>
+                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញ</th>
+                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100 text-right">ចំនួន</th>
+                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">ចំណាំ</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 text-xs md:text-sm">
+              <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
                 {transactions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(t => {
                   const user = users.find(u => u.id === t.userId);
                   let colorClass = 'text-slate-600';
@@ -287,18 +287,32 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
                   return (
                     <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-4 font-medium text-slate-500 whitespace-nowrap">{new Date(t.date).toLocaleString('km-KH')}</td>
-                      <td className="px-4 py-4 font-bold text-slate-800">{user?.username || 'Unknown'}</td>
-                      <td className="px-4 py-4">
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] md:text-xs font-bold ${bgClass} whitespace-nowrap`}>
-                          {t.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : t.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : 'ស្តុកត្រឡប់'}
+                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 font-medium text-slate-500 whitespace-nowrap">
+                        {(() => {
+                          const d = new Date(t.date);
+                          const h = String(d.getHours()).padStart(2, '0');
+                          const m = String(d.getMinutes()).padStart(2, '0');
+                          const day = String(d.getDate()).padStart(2, '0');
+                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                          return (
+                            <div className="leading-tight">
+                              <div className="font-bold text-slate-700">{day}/{month}</div>
+                              <div className="text-[9px] text-slate-400">{h}:{m}</div>
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 font-bold text-slate-800">{user?.username || 'Unknown'}</td>
+                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4">
+                        <span className={`px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] md:text-xs font-bold ${bgClass} whitespace-nowrap`}>
+                          {t.type === 'Stock Sold' ? 'លក់ចេញ' : t.type === 'Stock Out' ? 'ឡើងឡាន' : 'ត្រឡប់'}
                         </span>
                       </td>
-                      <td className="px-4 py-4 font-bold text-slate-700">{t.productName}</td>
-                      <td className={`px-4 py-4 text-right font-black ${colorClass}`}>
+                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 font-bold text-slate-700">{t.productName}</td>
+                      <td className={`px-1.5 md:px-4 py-2.5 sm:py-4 text-right font-black ${colorClass}`}>
                         {t.quantity}
                       </td>
-                      <td className="px-4 py-4 text-slate-500 font-medium truncate max-w-[150px]">{t.note || '-'}</td>
+                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 text-slate-500 font-medium truncate max-w-[60px] sm:max-w-[150px]">{t.note || '-'}</td>
                     </tr>
                   )
                 })}

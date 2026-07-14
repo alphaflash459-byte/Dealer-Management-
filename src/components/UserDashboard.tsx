@@ -10,7 +10,7 @@ interface UserDashboardProps {
   setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
   products: Product[];
   stockOrders: StockOrder[];
-  activeTab: TransactionType | 'Report';
+  activeTab: TransactionType | 'Report' | 'Stock Order';
 }
 
 export default function UserDashboard({ currentUser, transactions, setTransactions, products, stockOrders, activeTab }: UserDashboardProps) {
@@ -42,8 +42,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   // Stock Order Specific States
   const [reportSubTab, setReportSubTab] = useState<'total' | 'orders'>('total');
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [orderProductName, setOrderProductName] = useState('');
-  const [orderQuantity, setOrderQuantity] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<StockOrder | null>(null);
+  const [orderItems, setOrderItems] = useState<StockItemInput[]>([{ productName: '', quantity: '' }]);
   const [orderNote, setOrderNote] = useState('');
   const [orderDate, setOrderDate] = useState(() => {
     const today = new Date();
@@ -52,37 +52,82 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     const dd = String(today.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
+  const [orderFilter, setOrderFilter] = useState<'all' | 'pending' | 'delivered'>('all');
+
+  const addOrderItemRow = () => {
+    setOrderItems(prev => [...prev, { productName: '', quantity: '' }]);
+  };
+
+  const removeOrderItemRow = (index: number) => {
+    if (orderItems.length <= 1) return;
+    setOrderItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateOrderItemRow = (index: number, field: keyof StockItemInput, value: string) => {
+    setOrderItems(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const openOrderModal = () => {
+    setOrderItems([{ productName: '', quantity: '' }]);
+    setOrderNote('');
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    setOrderDate(`${yyyy}-${mm}-${dd}`);
+    setIsOrderModalOpen(true);
+  };
 
   const handleCreateStockOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orderProductName || !orderQuantity) {
-      alert("សូមជ្រើសរើសទំនិញ និងបញ្ចូលបរិមាណ");
+    const validItems = orderItems.filter(item => item.productName || item.quantity);
+    if (validItems.length === 0) {
+      alert("សូមជ្រើសរើសទំនិញយ៉ាងហោចណាស់មួយ និងបញ្ចូលចំនួន");
       return;
     }
-    const qty = parseInt(orderQuantity);
-    if (isNaN(qty) || qty <= 0) {
-      alert("បរិមាណត្រូវតែជាលេខធំជាង ០");
-      return;
+
+    // Validate
+    for (let i = 0; i < validItems.length; i++) {
+      const item = validItems[i];
+      if (!item.productName) {
+        alert(`សូមជ្រើសរើសឈ្មោះទំនិញនៅជួរទី ${i + 1}`);
+        return;
+      }
+      if (!item.quantity) {
+        alert(`សូមបំពេញចំនួនទំនិញនៅជួរទី ${i + 1}`);
+        return;
+      }
+      const qty = parseInt(item.quantity);
+      if (isNaN(qty) || qty <= 0) {
+        alert(`ចំនួនសម្រាប់ទំនិញ "${item.productName}" ត្រូវតែជាលេខវិជ្ជមាន!`);
+        return;
+      }
     }
 
     setLoading(true);
     try {
-      const newOrder: StockOrder = {
-        id: `order-${Date.now()}`,
-        userId: currentUser.id,
-        username: currentUser.username,
-        productName: orderProductName,
-        quantity: qty,
-        date: orderDate,
-        note: orderNote,
-        delivered: false
-      };
+      await Promise.all(validItems.map(async (item, index) => {
+        const qty = parseInt(item.quantity);
+        const newOrder: StockOrder = {
+          id: `order-${Date.now()}-${index}`,
+          userId: currentUser.id,
+          username: currentUser.username,
+          productName: item.productName,
+          quantity: qty,
+          date: orderDate,
+          note: orderNote,
+          delivered: false
+        };
 
-      await setDoc(doc(db, 'stock_orders', newOrder.id), newOrder);
+        await setDoc(doc(db, 'stock_orders', newOrder.id), newOrder);
+      }));
+
       setIsOrderModalOpen(false);
-      // Reset inputs
-      setOrderProductName('');
-      setOrderQuantity('');
+      setOrderItems([{ productName: '', quantity: '' }]);
       setOrderNote('');
     } catch (error) {
       console.error("Error creating stock order: ", error);
@@ -507,16 +552,20 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           <div>
             <h3 className="text-base md:text-lg font-black text-slate-800">
               {activeTab === 'Report' 
-                ? (reportSubTab === 'total' ? 'របាយការណ៍ស្តុកសរុប' : 'តាមដានស្តុកកម្មង់') 
+                ? 'របាយការណ៍ស្តុកសរុប'
+                : activeTab === 'Stock Order'
+                ? 'តាមដានស្តុកកម្មង់'
                 : `ប្រវត្តិប្រតិបត្តិការ${activeTab === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : activeTab === 'Stock Out' ? 'ស្តុកឡើងឡាន' : 'ស្តុកត្រឡប់'}`}
             </h3>
             <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">
               {activeTab === 'Report' 
-                ? (reportSubTab === 'total' ? 'ព័ត៌មាននិងចំនួនស្តុកលម្អិតសម្រាប់ទំនិញនីមួយៗ' : 'បញ្ជីកម្មង់ទំនិញទាំងអស់របស់សមាជិក') 
+                ? 'ព័ត៌មាននិងចំនួនស្តុកលម្អិតសម្រាប់ទំនិញនីមួយៗ'
+                : activeTab === 'Stock Order'
+                ? 'បញ្ជីកម្មង់ទំនិញទាំងអស់របស់សមាជិក'
                 : `តាមដានទិន្នន័យ${activeTab === 'Stock Sold' ? 'លក់ទំនិញចេញ' : activeTab === 'Stock Out' ? 'ទំនិញឡើងឡាន' : 'ទំនិញត្រឡប់ចូលស្តុកវិញ'}`}
             </p>
           </div>
-          {activeTab !== 'Report' ? (
+          {activeTab !== 'Report' && activeTab !== 'Stock Order' ? (
             <button
               onClick={openModal}
               className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm px-4 py-2.5 rounded-2xl font-black shadow-md shadow-emerald-600/20 active:scale-95 transition cursor-pointer"
@@ -527,9 +576,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <span>បញ្ចូលទិន្នន័យ</span>
             </button>
           ) : (
-            reportSubTab === 'orders' && (
+            activeTab === 'Stock Order' && (
               <button
-                onClick={() => setIsOrderModalOpen(true)}
+                onClick={openOrderModal}
                 className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm px-4 py-2.5 rounded-2xl font-black shadow-md shadow-indigo-600/20 active:scale-95 transition cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -542,31 +591,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         </div>
 
         {activeTab === 'Report' && (
-          <div className="flex bg-slate-100 p-1 rounded-2xl mb-4 self-start shrink-0">
-            <button
-              onClick={() => setReportSubTab('total')}
-              className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                reportSubTab === 'total'
-                  ? 'bg-white text-emerald-700 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              📦 ស្តុកសរុប
-            </button>
-            <button
-              onClick={() => setReportSubTab('orders')}
-              className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                reportSubTab === 'orders'
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              📝 ស្តុកកម្មង់
-            </button>
-          </div>
-        )}
-
-        {activeTab === 'Report' && reportSubTab === 'total' && (
           <div className="bg-slate-50 p-3.5 rounded-2xl mb-4 border border-slate-100 flex flex-col sm:flex-row sm:items-end gap-3 shrink-0">
             <div className="flex-1 grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -605,7 +629,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
         <div className="flex-1 overflow-y-auto custom-scroll pr-2">
           {activeTab === 'Report' ? (
-            reportSubTab === 'total' ? (
               products.length === 0 ? (
                 <div className="text-center py-24 text-slate-400 text-xs md:text-sm flex flex-col items-center justify-center space-y-3">
                   <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center text-2xl">
@@ -614,18 +637,18 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   <span className="font-bold text-slate-400">មិនទាន់មានទំនិញក្នុងប្រព័ន្ធឡើយ</span>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="w-full overflow-x-auto md:overflow-visible">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100 text-center">
-                        <th className="px-3 py-3 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
-                        <th className="px-3 py-3 font-bold text-rose-600 whitespace-nowrap">ឡើងឡាន</th>
-                        <th className="px-3 py-3 font-bold text-emerald-600 whitespace-nowrap">លក់ចេញ</th>
-                        <th className="px-3 py-3 font-bold text-amber-600 whitespace-nowrap">ត្រឡប់</th>
-                        <th className="px-3 py-3 text-right font-bold text-indigo-600 whitespace-nowrap">បញ្ជាក់</th>
+                      <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100 text-center">
+                        <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
+                        <th className="px-1.5 md:px-3 py-2.5 font-bold text-rose-600 whitespace-nowrap">ឡើងឡាន</th>
+                        <th className="px-1.5 md:px-3 py-2.5 font-bold text-emerald-600 whitespace-nowrap">លក់ចេញ</th>
+                        <th className="px-1.5 md:px-3 py-2.5 font-bold text-amber-600 whitespace-nowrap">ត្រឡប់</th>
+                        <th className="px-1.5 md:px-3 py-2.5 text-right font-bold text-indigo-600 whitespace-nowrap">បញ្ជាក់</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50 text-xs md:text-sm">
+                    <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
                       {(() => {
                         const activeProducts = products.map(product => {
                           const loaded = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Out').reduce((sum, t) => sum + t.quantity, 0);
@@ -648,7 +671,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                           const balance = loaded - sold - returned;
 
                           let badgeColorClass = "bg-emerald-50 text-emerald-700 border border-emerald-100";
-                          let statusText = `ត្រឹមត្រូវ ${balance}`;
+                          let statusText = `ត្រូវ ${balance}`;
                           if (balance < 0) {
                             badgeColorClass = "bg-amber-50 text-amber-700 border border-amber-100";
                             statusText = `លើស ${Math.abs(balance)}`;
@@ -659,12 +682,12 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
                           return (
                             <tr key={product.id} className="hover:bg-slate-50/70 transition-colors">
-                              <td className="px-3 py-4 font-black text-slate-800 text-left">{product.name}</td>
-                              <td className="px-3 py-4 text-center font-bold text-rose-600 text-sm">{loaded}</td>
-                              <td className="px-3 py-4 text-center font-bold text-emerald-600 text-sm">{sold}</td>
-                              <td className="px-3 py-4 text-center font-bold text-amber-600 text-sm">{returned}</td>
-                              <td className="px-3 py-4 text-right">
-                                <span className={`${badgeColorClass} px-3 py-1.5 rounded-xl font-black text-xs md:text-sm whitespace-nowrap`}>
+                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 font-black text-slate-800 text-left">{product.name}</td>
+                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-bold text-rose-600 text-xs sm:text-sm">{loaded}</td>
+                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-bold text-emerald-600 text-xs sm:text-sm">{sold}</td>
+                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-bold text-amber-600 text-xs sm:text-sm">{returned}</td>
+                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-right">
+                                <span className={`${badgeColorClass} px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-xl font-black text-[9px] sm:text-xs md:text-sm whitespace-nowrap`}>
                                   {statusText}
                                 </span>
                               </td>
@@ -676,82 +699,104 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   </table>
                 </div>
               )
-            ) : (
-              stockOrders.length === 0 ? (
-                <div className="text-center py-24 text-slate-400 text-xs md:text-sm flex flex-col items-center justify-center space-y-3">
-                  <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center text-2xl">
-                    📝
-                  </div>
-                  <span className="font-bold text-slate-400">មិនទាន់មានការកម្មង់ទំនិញឡើយ</span>
+            ) : activeTab === 'Stock Order' ? (
+              <div className="flex flex-col h-full">
+                <div className="flex bg-slate-100 p-1 rounded-2xl mb-4 self-start shrink-0">
+                  <button
+                    onClick={() => setOrderFilter('all')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      orderFilter === 'all'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    ទាំងអស់
+                  </button>
+                  <button
+                    onClick={() => setOrderFilter('pending')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      orderFilter === 'pending'
+                        ? 'bg-white text-amber-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    មិនទាន់ដឹក
+                  </button>
+                  <button
+                    onClick={() => setOrderFilter('delivered')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      orderFilter === 'delivered'
+                        ? 'bg-white text-emerald-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    ដឹករួច
+                  </button>
                 </div>
-              ) : (
-                <div className="overflow-x-auto animate-in fade-in duration-200">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
-                        <th className="px-3 py-3 text-left font-bold text-slate-500">អ្នកកម្មង់</th>
-                        <th className="px-3 py-3 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
-                        <th className="px-3 py-3 text-center font-bold text-slate-500">ចំនួន</th>
-                        <th className="px-3 py-3 text-left font-bold text-slate-500">ព័ត៌មានអតិថិជន / ចំណាំ</th>
-                        <th className="px-3 py-3 text-center font-bold text-slate-500">ថ្ងៃកម្មង់</th>
-                        <th className="px-3 py-3 text-right font-bold text-indigo-600">ស្ថានភាព / សកម្មភាព</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 text-xs md:text-sm">
-                      {[...stockOrders]
-                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                        .map(order => {
-                          return (
-                            <tr key={order.id} className="hover:bg-slate-50/70 transition-colors">
-                              <td className="px-3 py-4 font-bold text-slate-800 text-left">
-                                <div className="flex items-center space-x-2">
-                                  <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-600 border border-slate-200">
-                                    {order.username.charAt(0).toUpperCase()}
+                {stockOrders.filter(o => orderFilter === 'all' ? true : orderFilter === 'pending' ? !o.delivered : o.delivered).length === 0 ? (
+                  <div className="text-center py-24 text-slate-400 text-xs md:text-sm flex flex-col items-center justify-center space-y-3">
+                    <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center text-2xl">
+                      📝
+                    </div>
+                    <span className="font-bold text-slate-400">មិនទាន់មានការកម្មង់ទំនិញឡើយ</span>
+                  </div>
+                ) : (
+                  <div className="w-full overflow-x-auto md:overflow-visible animate-in fade-in duration-200">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
+                          <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកកម្មង់</th>
+                          <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ទំនិញ</th>
+                          <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">ចំនួន</th>
+                          <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អតិថិជន / ចំណាំ</th>
+                          <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
+                        {[...stockOrders]
+                          .filter(o => orderFilter === 'all' ? true : orderFilter === 'pending' ? !o.delivered : o.delivered)
+                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                          .map(order => {
+                            return (
+                              <tr 
+                                key={order.id} 
+                                onClick={() => setSelectedOrder(order)}
+                                className="hover:bg-indigo-50/40 active:bg-indigo-50/80 transition-all cursor-pointer group"
+                                title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
+                              >
+                                <td className="px-1.5 md:px-3 py-2.5 sm:py-4 font-bold text-slate-800 text-left">
+                                  <span className="text-[10px] sm:text-xs font-black group-hover:text-indigo-600 transition-colors">{order.username}</span>
+                                </td>
+                                <td className="px-1.5 md:px-3 py-2.5 sm:py-4 font-black text-slate-800 text-left">
+                                  <div className="flex items-center space-x-1">
+                                    <span>{order.productName}</span>
                                   </div>
-                                  <span className="text-xs font-black">{order.username}</span>
-                                </div>
-                              </td>
-                              <td className="px-3 py-4 font-black text-slate-800 text-left">{order.productName}</td>
-                              <td className="px-3 py-4 text-center font-bold text-indigo-600 text-sm">{order.quantity}</td>
-                              <td className="px-3 py-4 text-left text-xs text-slate-500 max-w-xs break-all whitespace-pre-wrap">
-                                {order.note || <span className="text-slate-300">គ្មានចំណាំ</span>}
-                              </td>
-                              <td className="px-3 py-4 text-center text-xs text-slate-500 whitespace-nowrap">
-                                {order.date}
-                              </td>
-                              <td className="px-3 py-4 text-right">
-                                {order.delivered ? (
-                                  <div className="flex flex-col items-end">
-                                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-xl font-black text-xs whitespace-nowrap flex items-center gap-1">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                      </svg>
-                                      <span>ដឹកឲ្យអតិថិជនរួច</span>
-                                    </span>
-                                    {order.deliveredBy && (
-                                      <span className="text-[9px] text-slate-400 mt-1 font-bold">
-                                        ដោយ {order.deliveredBy}
+                                </td>
+                                <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-bold text-indigo-600 text-xs sm:text-sm">{order.quantity}</td>
+                                <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left text-[10px] sm:text-xs text-slate-500 max-w-[80px] sm:max-w-xs truncate" title={order.note || ''}>
+                                  {order.note || <span className="text-slate-300">គ្មានចំណាំ</span>}
+                                </td>
+                                <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">
+                                  <div className="flex items-center justify-center space-x-1.5">
+                                    <span>{order.date}</span>
+                                    {order.delivered ? (
+                                      <span className="w-4 h-4 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full flex items-center justify-center text-[8px] font-black" title="បានដឹកជញ្ជូនរួចរាល់">
+                                        ✓
                                       </span>
+                                    ) : (
+                                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="កំពុងរង់ចាំ"></span>
                                     )}
                                   </div>
-                                ) : (
-                                  <button
-                                    onClick={() => handleConfirmDelivery(order.id)}
-                                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 border border-indigo-100 px-3 py-1.5 rounded-xl text-xs font-black transition whitespace-nowrap active:scale-95 cursor-pointer inline-flex items-center space-x-1 animate-pulse"
-                                  >
-                                    <span>ដឹកឲ្យរួច</span>
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-              )
-            )
-          ) : userTransactions.length === 0 ? (
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : userTransactions.length === 0 ? (
             <div className="text-center py-24 text-slate-400 text-xs md:text-sm flex flex-col items-center justify-center space-y-3">
               <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center text-2xl">
                 📁
@@ -759,21 +804,21 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <span className="font-bold text-slate-400">មិនទាន់មានប្រតិបត្តិការណាមួយក្នុងប្រភេទនេះទេ</span>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="w-full overflow-x-auto md:overflow-visible">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
-                    <th className="px-3 py-3 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
-                    <th className="px-3 py-3 text-left font-bold text-slate-500">ចំណាំ</th>
-                    <th className="px-3 py-3 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
-                    <th className={`px-3 py-3 text-center font-bold ${
+                  <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ចំណាំ</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
+                    <th className={`px-1.5 md:px-3 py-2.5 text-center font-bold ${
                       activeTab === 'Stock Out' ? 'text-rose-600' :
                       activeTab === 'Stock Sold' ? 'text-emerald-600' :
                       activeTab === 'Stock Return' ? 'text-amber-600' : 'text-slate-600'
                     }`}>បរិមាណ</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50 text-xs md:text-sm">
+                <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
                   {paginatedTransactions.map(t => {
                     let colorClass = 'text-slate-600';
                     if (t.type === 'Stock Sold') {
@@ -791,26 +836,26 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                         className="hover:bg-slate-50/70 transition-colors cursor-pointer"
                         title="ចុចដើម្បីមើលលម្អិត"
                       >
-                        <td className="px-3 py-4 text-left">
-                          <span className="font-black text-slate-800 block">{t.productName}</span>
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                          <span className="font-black text-slate-800 block text-[11px] sm:text-xs md:text-sm">{t.productName}</span>
                         </td>
-                        <td className="px-3 py-4 text-left max-w-[200px] truncate">
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left max-w-[70px] sm:max-w-[200px] truncate">
                           {t.note ? (
-                            <span className="text-slate-700 font-medium">{t.note}</span>
+                            <span className="text-slate-700 font-medium text-[10px] sm:text-xs">{t.note}</span>
                           ) : (
                             <span className="text-slate-300">—</span>
                           )}
                         </td>
-                        <td className="px-3 py-4 text-center font-medium text-slate-500 whitespace-nowrap">
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
                           {(() => {
                             const d = new Date(t.date);
                             const day = String(d.getDate()).padStart(2, '0');
                             const month = String(d.getMonth() + 1).padStart(2, '0');
-                            const year = d.getFullYear();
-                            return `${day}/${month}/${year}`;
+                            const shortYear = String(d.getFullYear()).slice(-2);
+                            return `${day}/${month}/${shortYear}`;
                           })()}
                         </td>
-                        <td className={`px-3 py-4 text-center font-black text-sm md:text-base ${colorClass}`}>
+                        <td className={`px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-black text-xs sm:text-sm md:text-base ${colorClass}`}>
                           {t.quantity}
                         </td>
                       </tr>
@@ -1315,41 +1360,74 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 />
               </div>
 
-              {/* Product selection */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1 font-black">ទំនិញដែលត្រូវកម្មង់</label>
-                <div className="relative">
-                  <select
-                    value={orderProductName}
-                    onChange={e => setOrderProductName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-indigo-400 outline-none font-bold text-slate-800 appearance-none"
-                    required
+              {/* Multi-Stock List */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center px-1">
+                  <label className="text-[11px] md:text-xs font-bold text-slate-500">មុខទំនិញ និងចំនួនទំនិញ</label>
+                  <button
+                    type="button"
+                    onClick={addOrderItemRow}
+                    className="text-xs text-indigo-600 hover:text-indigo-700 font-bold flex items-center space-x-1 hover:underline"
                   >
-                    <option value="" disabled>-- ជ្រើសរើសទំនិញ --</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                     </svg>
-                  </div>
+                    <span>បន្ថែមទំនិញ</span>
+                  </button>
                 </div>
-              </div>
 
-              {/* Quantity */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1 font-black">ចំនួនទំនិញ</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={orderQuantity}
-                  onChange={e => setOrderQuantity(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-indigo-400 outline-none font-bold text-slate-800"
-                  placeholder="ឧ. ៥"
-                  required
-                />
+                <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1 custom-scroll">
+                  {orderItems.map((item, index) => (
+                    <div key={index} className="flex items-center space-x-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                      {/* Product Name Dropdown */}
+                      <div className="flex-1 relative">
+                        <select
+                          value={item.productName}
+                          onChange={e => updateOrderItemRow(index, 'productName', e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs md:text-sm focus:bg-white focus:border-indigo-400 outline-none font-bold text-slate-800 appearance-none"
+                          required
+                        >
+                          <option value="" disabled>-- ជ្រើសរើសទំនិញ --</option>
+                          {products.map(p => (
+                            <option key={p.id} value={p.name}>{p.name}</option>
+                          ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                          <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                          </svg>
+                        </div>
+                      </div>
+
+                      {/* Quantity Input */}
+                      <div className="w-24 md:w-32">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={e => updateOrderItemRow(index, 'quantity', e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs md:text-sm focus:bg-white focus:border-indigo-400 outline-none font-black text-slate-800"
+                          required
+                          min="1"
+                          placeholder="ចំនួន"
+                        />
+                      </div>
+
+                      {/* Delete Row button */}
+                      {orderItems.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeOrderItemRow(index)}
+                          className="p-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition shrink-0"
+                          title="លុបជួរនេះ"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Note / Customer Info */}
@@ -1381,6 +1459,112 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 </button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Selected Order Detail Modal */}
+      {selectedOrder && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[28px] w-full max-w-md shadow-2xl overflow-hidden p-6 relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            {/* Close button */}
+            <button
+              onClick={() => setSelectedOrder(null)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 p-2 rounded-full transition cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl text-indigo-600">
+                📦
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-800">ព័ត៌មានលម្អិតនៃការកម្មង់</h3>
+                <p className="text-xs text-slate-400 font-bold">ព័ត៌មានលម្អិត និងស្ថានភាពនៃការដឹកជញ្ជូន</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 border-t border-b border-slate-100 py-4 mb-6">
+              <div className="grid grid-cols-3 gap-2 items-center">
+                <span className="text-xs font-bold text-slate-400 font-black">អ្នកកម្មង់៖</span>
+                <span className="text-xs font-black text-slate-800 col-span-2">{selectedOrder.username}</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-xs font-bold text-slate-400 font-black">ទំនិញ៖</span>
+                <span className="text-xs font-black text-slate-800 col-span-2">{selectedOrder.productName}</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-xs font-bold text-slate-400 font-black">ចំនួន៖</span>
+                <span className="text-sm font-black text-indigo-600 col-span-2">{selectedOrder.quantity}</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-xs font-bold text-slate-400 font-black">កាលបរិច្ឆេទ៖</span>
+                <span className="text-xs font-bold text-slate-500 col-span-2">{selectedOrder.date}</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-xs font-bold text-slate-400 font-black">អតិថិជន / ចំណាំ៖</span>
+                <div className="text-xs font-medium text-slate-700 col-span-2 bg-slate-50 border border-slate-100 rounded-xl p-3 max-h-24 overflow-y-auto whitespace-pre-wrap break-all custom-scroll">
+                  {selectedOrder.note || <span className="text-slate-300 font-bold">គ្មានចំណាំ</span>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 items-center">
+                <span className="text-xs font-bold text-slate-400 font-black">ស្ថានភាព៖</span>
+                <div className="col-span-2">
+                  {selectedOrder.delivered ? (
+                    <div className="flex flex-col">
+                      <span className="inline-flex bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-xl font-black text-xs whitespace-nowrap items-center gap-1 w-fit">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span>បានដឹកជញ្ជូនរួចរាល់</span>
+                      </span>
+                      {selectedOrder.deliveredBy && (
+                        <span className="text-[10px] text-slate-400 mt-1 font-bold">
+                          ដឹកដោយ៖ {selectedOrder.deliveredBy}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="inline-flex bg-amber-50 text-amber-700 border border-amber-100 px-2.5 py-1 rounded-xl font-black text-xs whitespace-nowrap items-center gap-1 w-fit">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      <span>មិនទាន់ដឹកជញ្ជូន</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="flex-1 hover:bg-slate-50 border border-slate-200 text-slate-500 font-bold text-xs md:text-sm py-3 rounded-2xl transition active:scale-95 cursor-pointer"
+              >
+                បិទផ្ទាំងនេះ
+              </button>
+              {!selectedOrder.delivered && (
+                <button
+                  onClick={async () => {
+                    await handleConfirmDelivery(selectedOrder.id);
+                    setSelectedOrder(prev => prev ? { ...prev, delivered: true, deliveredBy: currentUser.username } : null);
+                  }}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs md:text-sm py-3 rounded-2xl transition shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer flex items-center justify-center space-x-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span>បញ្ជាក់ការដឹករួច</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>,
         document.body

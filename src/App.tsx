@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Transaction, Product, StockOrder } from './types';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
@@ -14,7 +14,9 @@ export default function App() {
   const [stockOrders, setStockOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions'>('users');
-  const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return' | 'Report'>('Stock Out');
+  const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return' | 'Report' | 'Stock Order'>('Stock Out');
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
 
   // Initial load
   useEffect(() => {
@@ -64,6 +66,11 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
   };
+
+  // Reset mobile header visibility when switching tabs
+  useEffect(() => {
+    setIsHeaderVisible(true);
+  }, [activeAdminView, activeUserView]);
 
   if (loading) {
     return (
@@ -134,6 +141,14 @@ export default function App() {
                     </div>
                     <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">ស្តុកត្រឡប់</span>
                 </button>
+                <button onClick={() => setActiveUserView('Stock Order')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeUserView === 'Stock Order' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                    <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeUserView === 'Stock Order' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                    </div>
+                    <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">ស្តុកកម្មង់</span>
+                </button>
                 <button onClick={() => setActiveUserView('Report')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeUserView === 'Report' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
                     <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeUserView === 'Report' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -161,24 +176,44 @@ export default function App() {
       {/* MAIN RIGHT AREA (Header + Content) */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#f1f5f9] md:order-2 relative">
           {/* Sleek Mobile Header */}
-          <header className="md:hidden bg-white border-b border-slate-200/50 px-5 py-4 flex justify-between items-center shrink-0 relative z-20 shadow-sm">
+          <header className={`md:hidden bg-emerald-600 border-b border-emerald-700 px-5 flex justify-between items-center shrink-0 relative z-20 shadow-md transition-all duration-300 ease-in-out ${
+            isHeaderVisible 
+              ? 'h-[72px] py-4 opacity-100 translate-y-0' 
+              : 'h-0 py-0 opacity-0 -translate-y-full overflow-hidden border-b-0'
+          }`}>
               <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 flex items-center justify-center font-black text-sm shadow-sm">
+                  <div className="w-10 h-10 rounded-full bg-white/20 border border-white/30 text-white flex items-center justify-center font-black text-sm shadow-sm backdrop-blur-sm">
                       {currentUser.username.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                      <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">គណនី</h4>
-                      <h2 className="text-sm font-bold text-slate-800 mt-1">{currentUser.username}</h2>
+                      <h4 className="text-[10px] text-emerald-100/80 font-bold uppercase tracking-wider leading-none">គណនី</h4>
+                      <h2 className="text-sm font-bold text-white mt-1">{currentUser.username}</h2>
                   </div>
               </div>
-              <button onClick={handleLogout} className="flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 border border-rose-100/50">
+              <button onClick={handleLogout} className="flex items-center space-x-1.5 bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 border border-white/20 backdrop-blur-sm">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                   <span>ចាកចេញ</span>
               </button>
           </header>
 
-          <main className="flex-1 overflow-y-auto custom-scroll relative z-10 w-full px-4 md:px-8 pt-5 pb-24 md:pb-8">
-            <div className="max-w-7xl mx-auto w-full">
+          <main 
+            className="flex-1 overflow-y-auto custom-scroll relative z-10 w-full px-2 md:px-4 pt-5 pb-24 md:pb-8"
+            onScroll={(e) => {
+              const currentScrollY = e.currentTarget.scrollTop;
+              // If we are close to the top, show header
+              if (currentScrollY <= 15) {
+                setIsHeaderVisible(true);
+              } else if (currentScrollY > lastScrollY.current + 10) {
+                // Scrolling down - show header
+                setIsHeaderVisible(true);
+              } else if (currentScrollY < lastScrollY.current - 10) {
+                // Scrolling up - hide header
+                setIsHeaderVisible(false);
+              }
+              lastScrollY.current = currentScrollY;
+            }}
+          >
+            <div className="w-full animate-in fade-in duration-300">
                 {currentUser.role === 'Admin' ? (
                   <AdminDashboard 
                     users={users} 
