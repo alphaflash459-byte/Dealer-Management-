@@ -265,6 +265,15 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   };
 
   // Divide the transaction history according to different menus/tabs (e.g. Stock Sold, Stock Out, Stock Return)
+  // Stock Order Pagination Logic
+  const filteredStockOrders = stockOrders.filter(o => orderFilter === 'all' ? true : orderFilter === 'pending' ? !o.delivered : o.delivered);
+  const sortedStockOrders = [...filteredStockOrders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const totalStockOrderItems = sortedStockOrders.length;
+  const totalStockOrderPages = Math.ceil(totalStockOrderItems / pageSize);
+  const activeStockOrderPage = Math.min(Math.max(1, currentPage), totalStockOrderPages || 1);
+  const startStockOrderIndex = (activeStockOrderPage - 1) * pageSize;
+  const paginatedStockOrders = sortedStockOrders.slice(startStockOrderIndex, startStockOrderIndex + pageSize);
+
   const userTransactions = transactions.filter(t => t.userId === currentUser.id && (activeTab === 'Report' ? true : t.type === activeTab));
 
   const sortedTransactions = [...userTransactions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -273,6 +282,12 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   const activePage = Math.min(Math.max(1, currentPage), totalPages || 1);
   const startIndex = (activePage - 1) * pageSize;
   const paginatedTransactions = sortedTransactions.slice(startIndex, startIndex + pageSize);
+
+  const isStockOrderTab = activeTab === 'Stock Order';
+  const displayTotalItems = isStockOrderTab ? totalStockOrderItems : totalItems;
+  const displayTotalPages = isStockOrderTab ? totalStockOrderPages : totalPages;
+  const displayActivePage = isStockOrderTab ? activeStockOrderPage : activePage;
+  const displayStartIndex = isStockOrderTab ? startStockOrderIndex : startIndex;
 
   const filteredReportTransactions = transactions.filter(t => {
     if (t.userId !== currentUser.id) return false;
@@ -753,9 +768,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
-                        {[...stockOrders]
-                          .filter(o => orderFilter === 'all' ? true : orderFilter === 'pending' ? !o.delivered : o.delivered)
-                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        {paginatedStockOrders
                           .map(order => {
                             return (
                               <tr 
@@ -868,9 +881,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         </div>
 
         {/* Pagination Section */}
-        {activeTab !== 'Report' && totalItems > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-slate-100 mt-3 shrink-0">
-            <div className="flex items-center space-x-2 text-xs md:text-sm text-slate-500 font-medium">
+        {activeTab !== 'Report' && displayTotalItems > 0 && (
+          <div className="flex justify-between items-center pt-3 border-t border-slate-100 mt-2 shrink-0">
+            <div className="hidden sm:flex items-center space-x-2 text-xs md:text-sm text-slate-500 font-medium">
               <span>បង្ហាញ</span>
               <select
                 value={pageSize}
@@ -878,7 +891,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   setPageSize(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-bold text-slate-700 outline-none focus:border-emerald-400 transition cursor-pointer"
+                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 font-bold text-slate-700 outline-none focus:border-emerald-400 transition cursor-pointer"
               >
                 <option value={5}>5</option>
                 <option value={10}>10</option>
@@ -887,18 +900,18 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <span>ជួរ</span>
               <span className="text-slate-300">|</span>
               <span>
-                បង្ហាញពី {startIndex + 1} ដល់ {Math.min(startIndex + pageSize, totalItems)} នៃ {totalItems}
+                បង្ហាញពី {displayStartIndex + 1} ដល់ {Math.min(displayStartIndex + pageSize, displayTotalItems)} នៃ {displayTotalItems}
               </span>
             </div>
 
-            <div className="flex items-center space-x-1.5">
+            <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end space-x-1.5">
               <button
                 type="button"
-                disabled={activePage === 1}
+                disabled={displayActivePage === 1}
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                className="flex items-center justify-center space-x-1 px-3.5 py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-xs md:text-sm text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
+                className="flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                 </svg>
                 <span>មុន</span>
@@ -908,15 +921,15 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 {(() => {
                   const pages = [];
                   const maxVisible = 5;
-                  if (totalPages <= maxVisible) {
-                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  if (displayTotalPages <= maxVisible) {
+                    for (let i = 1; i <= displayTotalPages; i++) pages.push(i);
                   } else {
-                    let start = Math.max(1, activePage - 2);
-                    let end = Math.min(totalPages, activePage + 2);
-                    if (activePage <= 3) {
+                    let start = Math.max(1, displayActivePage - 2);
+                    let end = Math.min(displayTotalPages, displayActivePage + 2);
+                    if (displayActivePage <= 3) {
                       end = 5;
-                    } else if (activePage >= totalPages - 2) {
-                      start = totalPages - 4;
+                    } else if (displayActivePage >= displayTotalPages - 2) {
+                      start = displayTotalPages - 4;
                     }
                     for (let i = start; i <= end; i++) pages.push(i);
                   }
@@ -926,8 +939,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                     key={pageNum}
                     type="button"
                     onClick={() => setCurrentPage(pageNum)}
-                    className={`w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-xl font-bold text-xs md:text-sm transition mx-0.5 cursor-pointer ${
-                      pageNum === activePage
+                    className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-xl font-bold text-[10px] sm:text-xs transition mx-0.5 cursor-pointer ${
+                      pageNum === displayActivePage
                         ? 'bg-emerald-600 text-white font-black shadow-md shadow-emerald-600/10'
                         : 'hover:bg-slate-50 text-slate-600 hover:text-slate-800'
                     }`}
@@ -939,12 +952,12 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
               <button
                 type="button"
-                disabled={activePage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                className="flex items-center justify-center space-x-1 px-3.5 py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-xs md:text-sm text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
+                disabled={displayActivePage === displayTotalPages}
+                onClick={() => setCurrentPage(prev => Math.min(displayTotalPages, prev + 1))}
+                className="flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
               >
                 <span>បន្ទាប់</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
