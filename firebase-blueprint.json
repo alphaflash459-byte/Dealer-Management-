@@ -38,6 +38,24 @@
         { "action": "read", "condition": "true" },
         { "action": "write", "condition": "true" }
       ]
+    },
+    {
+      "name": "stock_orders",
+      "fields": [
+        { "name": "userId", "type": "string" },
+        { "name": "username", "type": "string" },
+        { "name": "productName", "type": "string" },
+        { "name": "quantity", "type": "number" },
+        { "name": "date", "type": "string" },
+        { "name": "note", "type": "string" },
+        { "name": "delivered", "type": "boolean" },
+        { "name": "deliveredAt", "type": "string" },
+        { "name": "deliveredBy", "type": "string" }
+      ],
+      "rules": [
+        { "action": "read", "condition": "true" },
+        { "action": "write", "condition": "true" }
+      ]
     }
   ]
 }

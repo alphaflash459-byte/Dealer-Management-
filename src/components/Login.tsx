@@ -30,7 +30,7 @@ export default function Login({ users, onLogin }: LoginProps) {
             </div>
         </div>
         <h2 className="text-2xl font-black text-center text-slate-800 mb-2">ចូលប្រព័ន្ធស្តុក</h2>
-        <p className="text-slate-500 text-center mb-8 text-sm font-medium">ប្រព័ន្ធតាមដានស្តុក (Stock Tracking)</p>
+        <p className="text-slate-500 text-center mb-8 text-sm font-medium">ប្រព័ន្ធតាមដានស្តុក</p>
         
         {error && (
           <div className="bg-rose-50 text-rose-600 p-3 rounded-xl text-sm mb-4 border border-rose-100 text-center font-bold">
@@ -40,7 +40,7 @@ export default function Login({ users, onLogin }: LoginProps) {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1.5">
-            <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះអ្នកប្រើប្រាស់ (Username)</label>
+            <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះអ្នកប្រើប្រាស់</label>
             <input
               type="text"
               value={username}
@@ -51,7 +51,7 @@ export default function Login({ users, onLogin }: LoginProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">លេខសម្ងាត់ (Password)</label>
+            <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">លេខសម្ងាត់</label>
             <input
               type="password"
               value={password}

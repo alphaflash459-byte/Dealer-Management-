@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { User, Transaction, Product } from '../types';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -16,6 +17,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const [newPassword, setNewPassword] = useState('');
   const [newProductName, setNewProductName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,13 +49,15 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (confirm('តើអ្នកពិតជាចង់លុបអ្នកប្រើប្រាស់នេះមែនទេ?')) {
-      try {
-        await deleteDoc(doc(db, 'users', id));
-      } catch (error) {
-        console.error("Error deleting user: ", error);
-        alert('មានបញ្ហាក្នុងការលុបអ្នកប្រើប្រាស់');
-      }
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, 'users', id));
+      setUserToDelete(null);
+    } catch (error) {
+      console.error("Error deleting user: ", error);
+      alert('មានបញ្ហាក្នុងការលុបអ្នកប្រើប្រាស់');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -84,13 +89,15 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (confirm('តើអ្នកពិតជាចង់លុបទំនិញនេះមែនទេ?')) {
-      try {
-        await deleteDoc(doc(db, 'products', id));
-      } catch (error) {
-        console.error("Error deleting product: ", error);
-        alert('មានបញ្ហាក្នុងការលុបទំនិញ');
-      }
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, 'products', id));
+      setProductToDelete(null);
+    } catch (error) {
+      console.error("Error deleting product: ", error);
+      alert('មានបញ្ហាក្នុងការលុបទំនិញ');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -102,7 +109,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             <h3 className="text-base md:text-lg font-black text-slate-800 mb-5">បង្កើតអ្នកប្រើប្រាស់ថ្មី</h3>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">Username</label>
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះអ្នកប្រើប្រាស់</label>
                 <input
                   type="text"
                   value={newUsername}
@@ -112,7 +119,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">Password</label>
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">លេខសម្ងាត់</label>
                 <input
                   type="text"
                   value={newPassword}
@@ -127,7 +134,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     disabled={loading}
                     className="w-full hover:bg-emerald-700 bg-emerald-600 text-white font-bold text-sm md:text-base py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 active:scale-95 transition disabled:opacity-70"
                   >
-                    {loading ? 'កំពុងបង្កើត...' : 'បង្កើត (Create)'}
+                    {loading ? 'កំពុងបង្កើត...' : 'បង្កើត'}
                   </button>
               </div>
             </form>
@@ -141,9 +148,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider">
-                    <th className="px-4 py-3 border-b border-slate-100">Username</th>
-                    <th className="px-4 py-3 border-b border-slate-100">Password</th>
-                    <th className="px-4 py-3 border-b border-slate-100">Role</th>
+                    <th className="px-4 py-3 border-b border-slate-100">ឈ្មោះអ្នកប្រើប្រាស់</th>
+                    <th className="px-4 py-3 border-b border-slate-100">លេខសម្ងាត់</th>
+                    <th className="px-4 py-3 border-b border-slate-100">តួនាទី</th>
                     <th className="px-4 py-3 border-b border-slate-100 text-right">សកម្មភាព</th>
                   </tr>
                 </thead>
@@ -160,7 +167,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       <td className="px-4 py-4 text-right">
                         {user.role !== 'Admin' && (
                           <button
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => setUserToDelete(user)}
                             className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors"
                           >
                             លុប
@@ -203,7 +210,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     disabled={loading}
                     className="w-full hover:bg-emerald-700 bg-emerald-600 text-white font-bold text-sm md:text-base py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 active:scale-95 transition disabled:opacity-70"
                   >
-                    {loading ? 'កំពុងបង្កើត...' : 'បង្កើត (Create)'}
+                    {loading ? 'កំពុងបង្កើត...' : 'បង្កើត'}
                   </button>
               </div>
             </form>
@@ -227,7 +234,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       <td className="px-4 py-4 font-bold text-slate-800">{product.name}</td>
                       <td className="px-4 py-4 text-right">
                         <button
-                          onClick={() => handleDeleteProduct(product.id)}
+                          onClick={() => setProductToDelete(product)}
                           className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors"
                         >
                           លុប
@@ -250,7 +257,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       {activeTab === 'transactions' && (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden h-[700px] flex flex-col">
           <div className="px-5 md:px-6 py-5 border-b border-slate-50 shrink-0">
-            <h3 className="text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់ (All Transactions)</h3>
+            <h3 className="text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
           </div>
           <div className="flex-1 overflow-x-auto overflow-y-auto custom-scroll p-2">
             <table className="w-full text-left border-collapse">
@@ -304,6 +311,80 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             </table>
           </div>
         </div>
+      )}
+
+      {/* Custom Confirmation Modal for Deleting User */}
+      {userToDelete && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
+            <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            
+            <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុប</h3>
+            <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
+              តើអ្នកពិតជាចង់លុបអ្នកប្រើប្រាស់ <span className="font-bold text-slate-800">"{userToDelete.username}"</span> នេះមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+            </p>
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+              >
+                បោះបង់
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleDeleteUser(userToDelete.id)}
+                className="flex-1 hover:bg-rose-700 bg-rose-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-rose-600/30 transition disabled:opacity-70 cursor-pointer"
+              >
+                {loading ? 'កំពុងលុប...' : 'យល់ព្រម'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Custom Confirmation Modal for Deleting Product */}
+      {productToDelete && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
+            <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            
+            <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុប</h3>
+            <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
+              តើអ្នកពិតជាចង់លុបទំនិញ <span className="font-bold text-slate-800">"{productToDelete.name}"</span> នេះមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+            </p>
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setProductToDelete(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+              >
+                បោះបង់
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleDeleteProduct(productToDelete.id)}
+                className="flex-1 hover:bg-rose-700 bg-rose-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-rose-600/30 transition disabled:opacity-70 cursor-pointer"
+              >
+                {loading ? 'កំពុងលុប...' : 'យល់ព្រម'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

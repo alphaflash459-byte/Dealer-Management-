@@ -20,3 +20,4 @@ export const db = getFirestore(app, "ai-studio-dealermanagement-28b906f6-ad4c-46
 export const usersCollection = collection(db, 'users');
 export const transactionsCollection = collection(db, 'transactions');
 export const productsCollection = collection(db, 'products');
+export const stockOrdersCollection = collection(db, 'stock_orders');

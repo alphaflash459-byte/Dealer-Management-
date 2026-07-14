@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { User, Transaction, Product } from './types';
+import { User, Transaction, Product, StockOrder } from './types';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import UserDashboard from './components/UserDashboard';
 import { onSnapshot, setDoc, doc } from 'firebase/firestore';
-import { usersCollection, transactionsCollection, productsCollection, db } from './lib/firebase';
+import { usersCollection, transactionsCollection, productsCollection, stockOrdersCollection, db } from './lib/firebase';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [stockOrders, setStockOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions'>('users');
-  const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return'>('Stock Out');
+  const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return' | 'Report'>('Stock Out');
 
   // Initial load
   useEffect(() => {
@@ -47,10 +48,16 @@ export default function App() {
       setProducts(prodData);
     });
 
+    const unsubscribeStockOrders = onSnapshot(stockOrdersCollection, (snapshot) => {
+      const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockOrder));
+      setStockOrders(ordersData);
+    });
+
     return () => {
       unsubscribeUsers();
       unsubscribeTransactions();
       unsubscribeProducts();
+      unsubscribeStockOrders();
     };
   }, []);
 
@@ -127,6 +134,14 @@ export default function App() {
                     </div>
                     <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">ស្តុកត្រឡប់</span>
                 </button>
+                <button onClick={() => setActiveUserView('Report')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeUserView === 'Report' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                    <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeUserView === 'Report' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">របាយការណ៍ស្តុក</span>
+                </button>
               </>
             )}
         </div>
@@ -145,28 +160,24 @@ export default function App() {
 
       {/* MAIN RIGHT AREA (Header + Content) */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#f1f5f9] md:order-2 relative">
-          <header className="bg-gradient-to-r from-emerald-600 to-teal-800 text-white px-5 pt-10 md:pt-6 pb-24 md:pb-28 rounded-b-[32px] md:rounded-none shrink-0 relative z-0 shadow-lg md:shadow-md">
-                <div className="flex justify-between items-center max-w-7xl mx-auto w-full">
-                    <div className="flex items-center space-x-3 md:space-x-4">
-                        <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/30 text-xl font-black overflow-hidden shadow-sm">
-                            {currentUser.username.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                            <h4 className="text-xs md:text-sm text-emerald-100 font-medium opacity-90">សួស្តី, {currentUser.username}!</h4>
-                            <h1 className="text-lg md:text-2xl font-bold tracking-wide md:hidden">គ្រប់គ្រងស្តុក</h1>
-                            <h1 className="hidden md:block text-xl font-bold tracking-wide">ប្រព័ន្ធតាមដានស្តុក</h1>
-                        </div>
-                    </div>
-                    {/* Mobile logout */}
-                    <div className="md:hidden">
-                       <button onClick={handleLogout} className="bg-white/20 p-2 rounded-xl text-white active:scale-95 transition">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                       </button>
-                    </div>
-                </div>
+          {/* Sleek Mobile Header */}
+          <header className="md:hidden bg-white border-b border-slate-200/50 px-5 py-4 flex justify-between items-center shrink-0 relative z-20 shadow-sm">
+              <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 flex items-center justify-center font-black text-sm shadow-sm">
+                      {currentUser.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                      <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">គណនី</h4>
+                      <h2 className="text-sm font-bold text-slate-800 mt-1">{currentUser.username}</h2>
+                  </div>
+              </div>
+              <button onClick={handleLogout} className="flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 border border-rose-100/50">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                  <span>ចាកចេញ</span>
+              </button>
           </header>
 
-          <main className="flex-1 overflow-y-auto custom-scroll relative z-10 w-full px-4 md:px-8 -mt-16 md:-mt-20 pb-24 md:pb-8">
+          <main className="flex-1 overflow-y-auto custom-scroll relative z-10 w-full px-4 md:px-8 pt-5 pb-24 md:pb-8">
             <div className="max-w-7xl mx-auto w-full">
                 {currentUser.role === 'Admin' ? (
                   <AdminDashboard 
@@ -182,6 +193,7 @@ export default function App() {
                     transactions={transactions} 
                     setTransactions={setTransactions} 
                     products={products}
+                    stockOrders={stockOrders}
                     activeTab={activeUserView}
                   />
                 )}

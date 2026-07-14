@@ -25,3 +25,16 @@ export interface Transaction {
   date: string;
   note?: string;
 }
+
+export interface StockOrder {
+  id: string;
+  userId: string;
+  username: string;
+  productName: string;
+  quantity: number;
+  date: string;
+  note?: string;
+  delivered: boolean;
+  deliveredAt?: string;
+  deliveredBy?: string;
+}
