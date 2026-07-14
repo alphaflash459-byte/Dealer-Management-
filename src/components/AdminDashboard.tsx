@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Transaction } from '../types';
+import { User, Transaction, Product } from '../types';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -7,12 +7,15 @@ interface AdminDashboardProps {
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   transactions: Transaction[];
+  products: Product[];
+  activeTab: 'users' | 'products' | 'transactions';
 }
 
-export default function AdminDashboard({ users, setUsers, transactions }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'users' | 'transactions'>('users');
+export default function AdminDashboard({ users, setUsers, transactions, products, activeTab }: AdminDashboardProps) {
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newProductName, setNewProductName] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,6 +24,7 @@ export default function AdminDashboard({ users, setUsers, transactions }: AdminD
       return;
     }
     
+    setLoading(true);
     const newUser: User = {
       id: `user-${Date.now()}`,
       username: newUsername,
@@ -36,6 +40,8 @@ export default function AdminDashboard({ users, setUsers, transactions }: AdminD
     } catch (error) {
       console.error("Error adding user: ", error);
       alert('មានបញ្ហាក្នុងការបង្កើតអ្នកប្រើប្រាស់');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,90 +56,112 @@ export default function AdminDashboard({ users, setUsers, transactions }: AdminD
     }
   };
 
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProductName.trim()) return;
+    
+    if (products.find(p => p.name.toLowerCase() === newProductName.trim().toLowerCase())) {
+      alert('ឈ្មោះទំនិញនេះមានរួចហើយ!');
+      return;
+    }
+    
+    setLoading(true);
+    const newProduct: Product = {
+      id: `prod-${Date.now()}`,
+      name: newProductName.trim(),
+      createdAt: new Date().toISOString()
+    };
+    
+    try {
+      await setDoc(doc(db, 'products', newProduct.id), newProduct);
+      setNewProductName('');
+    } catch (error) {
+      console.error("Error adding product: ", error);
+      alert('មានបញ្ហាក្នុងការបង្កើតទំនិញ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (confirm('តើអ្នកពិតជាចង់លុបទំនិញនេះមែនទេ?')) {
+      try {
+        await deleteDoc(doc(db, 'products', id));
+      } catch (error) {
+        console.error("Error deleting product: ", error);
+        alert('មានបញ្ហាក្នុងការលុបទំនិញ');
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex space-x-4 border-b border-slate-200">
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`py-2 px-4 border-b-2 font-medium text-sm transition-colors ${
-            activeTab === 'users' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          គ្រប់គ្រងអ្នកប្រើប្រាស់ (Users)
-        </button>
-        <button
-          onClick={() => setActiveTab('transactions')}
-          className={`py-2 px-4 border-b-2 font-medium text-sm transition-colors ${
-            activeTab === 'transactions' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          តាមដានទិន្នន័យ (Transactions)
-        </button>
-      </div>
-
       {activeTab === 'users' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 md:col-span-1 h-fit">
-            <h3 className="text-lg font-semibold text-slate-800 mb-4">បង្កើតអ្នកប្រើប្រាស់ថ្មី</h3>
+          <div className="bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-slate-100 md:col-span-1 h-fit">
+            <h3 className="text-base md:text-lg font-black text-slate-800 mb-5">បង្កើតអ្នកប្រើប្រាស់ថ្មី</h3>
             <form onSubmit={handleCreateUser} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+              <div className="space-y-1.5">
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">Username</label>
                 <input
                   type="text"
                   value={newUsername}
                   onChange={e => setNewUsername(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+              <div className="space-y-1.5">
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">Password</label>
                 <input
                   type="text"
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                   required
                 />
               </div>
-              <button
-                type="submit"
-                className="w-full bg-blue-600 text-white font-medium py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
-              >
-                បង្កើត (Create)
-              </button>
+              <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full hover:bg-emerald-700 bg-emerald-600 text-white font-bold text-sm md:text-base py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 active:scale-95 transition disabled:opacity-70"
+                  >
+                    {loading ? 'កំពុងបង្កើត...' : 'បង្កើត (Create)'}
+                  </button>
+              </div>
             </form>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 md:col-span-2 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100">
-              <h3 className="text-lg font-semibold text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 md:col-span-2 overflow-hidden h-fit">
+            <div className="px-5 md:px-6 py-5 border-b border-slate-50">
+              <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto p-2">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-xs uppercase font-medium">
-                    <th className="px-6 py-3 border-b border-slate-200">Username</th>
-                    <th className="px-6 py-3 border-b border-slate-200">Password</th>
-                    <th className="px-6 py-3 border-b border-slate-200">Role</th>
-                    <th className="px-6 py-3 border-b border-slate-200 text-right">សកម្មភាព</th>
+                  <tr className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider">
+                    <th className="px-4 py-3 border-b border-slate-100">Username</th>
+                    <th className="px-4 py-3 border-b border-slate-100">Password</th>
+                    <th className="px-4 py-3 border-b border-slate-100">Role</th>
+                    <th className="px-4 py-3 border-b border-slate-100 text-right">សកម្មភាព</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
+                <tbody className="divide-y divide-slate-50 text-xs md:text-sm">
                   {users.map(user => (
-                    <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-3 font-medium text-slate-800">{user.username}</td>
-                      <td className="px-6 py-3 font-mono text-slate-600">{user.password}</td>
-                      <td className="px-6 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                    <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-4 font-bold text-slate-800">{user.username}</td>
+                      <td className="px-4 py-4 font-mono font-medium text-slate-500">{user.password}</td>
+                      <td className="px-4 py-4">
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] md:text-xs font-bold ${user.role === 'Admin' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {user.role}
                         </span>
                       </td>
-                      <td className="px-6 py-3 text-right">
+                      <td className="px-4 py-4 text-right">
                         {user.role !== 'Admin' && (
                           <button
                             onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
+                            className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors"
                           >
                             លុប
                           </button>
@@ -143,7 +171,73 @@ export default function AdminDashboard({ users, setUsers, transactions }: AdminD
                   ))}
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-slate-500">គ្មានទិន្នន័យ</td>
+                      <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-medium">គ្មានទិន្នន័យ</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'products' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-5 md:p-6 rounded-3xl shadow-sm border border-slate-100 md:col-span-1 h-fit">
+            <h3 className="text-base md:text-lg font-black text-slate-800 mb-5">បន្ថែមទំនិញថ្មី</h3>
+            <form onSubmit={handleCreateProduct} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះទំនិញ</label>
+                <input
+                  type="text"
+                  value={newProductName}
+                  onChange={e => setNewProductName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
+                  required
+                  placeholder="បញ្ចូលឈ្មោះទំនិញ"
+                />
+              </div>
+              <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full hover:bg-emerald-700 bg-emerald-600 text-white font-bold text-sm md:text-base py-3.5 rounded-2xl shadow-lg shadow-emerald-600/30 active:scale-95 transition disabled:opacity-70"
+                  >
+                    {loading ? 'កំពុងបង្កើត...' : 'បង្កើត (Create)'}
+                  </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 md:col-span-2 overflow-hidden h-fit">
+            <div className="px-5 md:px-6 py-5 border-b border-slate-50">
+              <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីទំនិញ</h3>
+            </div>
+            <div className="overflow-x-auto p-2">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider">
+                    <th className="px-4 py-3 border-b border-slate-100">ឈ្មោះទំនិញ</th>
+                    <th className="px-4 py-3 border-b border-slate-100 text-right">សកម្មភាព</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-xs md:text-sm">
+                  {products.map(product => (
+                    <tr key={product.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-4 font-bold text-slate-800">{product.name}</td>
+                      <td className="px-4 py-4 text-right">
+                        <button
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-colors"
+                        >
+                          លុប
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {products.length === 0 && (
+                    <tr>
+                      <td colSpan={2} className="px-6 py-12 text-center text-slate-400 font-medium">គ្មានទិន្នន័យ</td>
                     </tr>
                   )}
                 </tbody>
@@ -154,46 +248,56 @@ export default function AdminDashboard({ users, setUsers, transactions }: AdminD
       )}
 
       {activeTab === 'transactions' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h3 className="text-lg font-semibold text-slate-800">ប្រតិបត្តិការទាំងអស់ (All Transactions)</h3>
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden h-[700px] flex flex-col">
+          <div className="px-5 md:px-6 py-5 border-b border-slate-50 shrink-0">
+            <h3 className="text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់ (All Transactions)</h3>
           </div>
-          <div className="overflow-x-auto">
+          <div className="flex-1 overflow-x-auto overflow-y-auto custom-scroll p-2">
             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 text-xs uppercase font-medium">
-                  <th className="px-6 py-3 border-b border-slate-200">កាលបរិច្ឆេទ</th>
-                  <th className="px-6 py-3 border-b border-slate-200">អ្នកប្រើប្រាស់</th>
-                  <th className="px-6 py-3 border-b border-slate-200">ប្រភេទប្រតិបត្តិការ</th>
-                  <th className="px-6 py-3 border-b border-slate-200">ឈ្មោះទំនិញ</th>
-                  <th className="px-6 py-3 border-b border-slate-200 text-right">ចំនួន</th>
-                  <th className="px-6 py-3 border-b border-slate-200">ចំណាំ</th>
+              <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                <tr className="text-slate-400 text-[10px] md:text-xs uppercase font-bold tracking-wider">
+                  <th className="px-4 py-3 border-b border-slate-100">កាលបរិច្ឆេទ</th>
+                  <th className="px-4 py-3 border-b border-slate-100">អ្នកប្រើប្រាស់</th>
+                  <th className="px-4 py-3 border-b border-slate-100">ប្រភេទប្រតិបត្តិការ</th>
+                  <th className="px-4 py-3 border-b border-slate-100">ឈ្មោះទំនិញ</th>
+                  <th className="px-4 py-3 border-b border-slate-100 text-right">ចំនួន</th>
+                  <th className="px-4 py-3 border-b border-slate-100">ចំណាំ</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
+              <tbody className="divide-y divide-slate-50 text-xs md:text-sm">
                 {transactions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(t => {
                   const user = users.find(u => u.id === t.userId);
+                  let colorClass = 'text-slate-600';
+                  let bgClass = 'bg-slate-100 text-slate-700';
+                  
+                  if (t.type === 'Stock Sold') {
+                      colorClass = 'text-emerald-600'; bgClass = 'bg-emerald-100 text-emerald-700';
+                  } else if (t.type === 'Stock Out') {
+                      colorClass = 'text-rose-600'; bgClass = 'bg-rose-100 text-rose-700';
+                  } else if (t.type === 'Stock Return') {
+                      colorClass = 'text-amber-600'; bgClass = 'bg-amber-100 text-amber-700';
+                  }
+
                   return (
-                    <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-3 text-slate-500">{new Date(t.date).toLocaleString('km-KH')}</td>
-                      <td className="px-6 py-3 font-medium text-slate-800">{user?.username || 'Unknown'}</td>
-                      <td className="px-6 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium 
-                          ${t.type === 'Stock Sold' ? 'bg-green-100 text-green-700' : 
-                            t.type === 'Stock Return' ? 'bg-orange-100 text-orange-700' : 
-                            'bg-red-100 text-red-700'}`}>
-                          {t.type}
+                    <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-4 font-medium text-slate-500 whitespace-nowrap">{new Date(t.date).toLocaleString('km-KH')}</td>
+                      <td className="px-4 py-4 font-bold text-slate-800">{user?.username || 'Unknown'}</td>
+                      <td className="px-4 py-4">
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] md:text-xs font-bold ${bgClass} whitespace-nowrap`}>
+                          {t.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : t.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : 'ស្តុកត្រឡប់'}
                         </span>
                       </td>
-                      <td className="px-6 py-3 text-slate-700">{t.productName}</td>
-                      <td className="px-6 py-3 text-right font-mono font-medium text-slate-800">{t.quantity}</td>
-                      <td className="px-6 py-3 text-slate-500 truncate max-w-[150px]">{t.note || '-'}</td>
+                      <td className="px-4 py-4 font-bold text-slate-700">{t.productName}</td>
+                      <td className={`px-4 py-4 text-right font-black ${colorClass}`}>
+                        {t.quantity}
+                      </td>
+                      <td className="px-4 py-4 text-slate-500 font-medium truncate max-w-[150px]">{t.note || '-'}</td>
                     </tr>
                   )
                 })}
                 {transactions.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-slate-500">គ្មានប្រតិបត្តិការទេ</td>
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-medium">គ្មានប្រតិបត្តិការទេ</td>
                   </tr>
                 )}
               </tbody>

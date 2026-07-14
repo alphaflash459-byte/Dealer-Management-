@@ -27,6 +27,17 @@
         { "action": "read", "condition": "true" },
         { "action": "write", "condition": "true" }
       ]
+    },
+    {
+      "name": "products",
+      "fields": [
+        { "name": "name", "type": "string" },
+        { "name": "createdAt", "type": "string" }
+      ],
+      "rules": [
+        { "action": "read", "condition": "true" },
+        { "action": "write", "condition": "true" }
+      ]
     }
   ]
 }

@@ -10,6 +10,12 @@ export interface User {
 
 export type TransactionType = 'Stock Out' | 'Stock Sold' | 'Stock Return';
 
+export interface Product {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface Transaction {
   id: string;
   userId: string;

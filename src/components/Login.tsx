@@ -22,46 +22,53 @@ export default function Login({ users, onLogin }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
-        <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">ចូលប្រព័ន្ធ</h2>
-        <p className="text-slate-500 text-center mb-8 text-sm">ប្រព័ន្ធតាមដានស្តុក (Stock Tracking)</p>
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 font-sans">
+      <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-emerald-900/5 w-full max-w-md border border-slate-100">
+        <div className="flex justify-center mb-6">
+            <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-md shadow-emerald-600/30">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+        </div>
+        <h2 className="text-2xl font-black text-center text-slate-800 mb-2">ចូលប្រព័ន្ធស្តុក</h2>
+        <p className="text-slate-500 text-center mb-8 text-sm font-medium">ប្រព័ន្ធតាមដានស្តុក (Stock Tracking)</p>
         
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 border border-red-100 text-center">
+          <div className="bg-rose-50 text-rose-600 p-3 rounded-xl text-sm mb-4 border border-rose-100 text-center font-bold">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">ឈ្មោះអ្នកប្រើប្រាស់ (Username)</label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះអ្នកប្រើប្រាស់ (Username)</label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm md:text-base focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
               placeholder="បញ្ចូលឈ្មោះ"
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">លេខសម្ងាត់ (Password)</label>
+          <div className="space-y-1.5">
+            <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">លេខសម្ងាត់ (Password)</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm md:text-base focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
               placeholder="បញ្ចូលលេខសម្ងាត់"
               required
             />
           </div>
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white font-medium py-2.5 rounded-lg hover:bg-blue-700 transition-colors mt-2"
-          >
-            ចូលប្រើប្រាស់
-          </button>
+          <div className="pt-2">
+            <button
+              type="submit"
+              className="w-full hover:bg-emerald-700 bg-emerald-600 text-white font-bold text-sm md:text-base py-4 rounded-2xl shadow-lg shadow-emerald-600/30 active:scale-95 transition"
+            >
+              ចូលប្រើប្រាស់
+            </button>
+          </div>
         </form>
       </div>
     </div>
