@@ -141,7 +141,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   const [items, setItems] = useState<StockItemInput[]>([{ productName: '', quantity: '' }]);
   const [note, setNote] = useState('');
   const [customerName, setCustomerName] = useState('');
-    const [date, setDate] = useState(() => {
+  const [location, setLocation] = useState('');
+  const [date, setDate] = useState(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -514,11 +515,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
       const formattedNote = orderCustomerName && orderLocation ? `${orderCustomerName} (${orderLocation})` : orderCustomerName || orderLocation || '';
       await Promise.all(validItems.map(async (item, index) => {
         const qty = parseInt(item.quantity);
-        const product = products.find(p => p.name === item.productName);
-        let promoQty: number | undefined = undefined;
-        if (product) {
-          promoQty = calculatePromoQty(product, qty);
-        }
         
         const newOrder: StockOrder = {
           id: `order-${Date.now()}-${index}`,
@@ -526,7 +522,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           username: currentUser.username,
           productName: item.productName,
           quantity: qty,
-          promoQty: promoQty && promoQty > 0 ? promoQty : undefined,
           date: orderDate,
           note: formattedNote,
           delivered: false
@@ -674,6 +669,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     setItems([]);
     setNote('');
     setCustomerName('');
+    setLocation('');
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -1194,7 +1190,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           promoQty: promoQty && promoQty > 0 ? promoQty : undefined,
           price: txPrice,
           date: offsetDate,
-          note: customerName || note
+          note: (customerName && location) ? `${customerName} (${location})` : customerName || location || note
         };
         await setDoc(doc(db, 'transactions', newTransaction.id), cleanUndefined(newTransaction));
       }));
@@ -1443,7 +1439,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                               <tr 
                                 key={orderGroup.id} 
                                 onClick={() => setSelectedOrder(orderGroup)}
-                                className="hover:bg-indigo-50/40 active:bg-indigo-50/80 transition-all cursor-pointer group"
+                                className={`${orderGroup.delivered ? 'bg-emerald-50/50 hover:bg-emerald-50' : 'bg-amber-50/50 hover:bg-amber-50'} transition-all cursor-pointer group`}
                                 title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
                               >
                                 <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
@@ -1469,13 +1465,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                         return `${day}/${month}/${shortYear}`;
                                       })()}
                                     </span>
-                                    {orderGroup.delivered ? (
-                                      <span className="w-4 h-4 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full flex items-center justify-center text-[8px] font-black" title="បានដឹកជញ្ជូនរួចរាល់">
-                                        ✓
-                                      </span>
-                                    ) : (
-                                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="កំពុងរង់ចាំ"></span>
-                                    )}
                                   </div>
                                 </td>
                                 <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
@@ -1493,9 +1482,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                       <div key={idx} className="h-6 flex items-center justify-center">
                                         <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap">
                                           {item.quantity}
-                                          {item.promoQty && item.promoQty > 0 ? (
-                                            <span className="text-amber-500 ml-1 font-bold">+{item.promoQty}</span>
-                                          ) : null}
                                         </span>
                                       </div>
                                     ))}
@@ -1746,7 +1732,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           <div className="bg-white w-full max-w-xl rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center pb-4 border-b border-slate-100">
               <div>
-                                <h3 className="text-lg font-black text-slate-800">
+                <h3 className="text-lg font-black text-slate-800">
                   បញ្ចូលទិន្នន័យ {activeTab === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : activeTab === 'Stock Out' ? 'ស្តុកឡើងឡាន' : activeTab === 'Stock Return' ? 'ស្តុកត្រឡប់' : ' '}
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">បំពេញព័ត៌មានខាងក្រោមដើម្បីរក្សាទុក</p>
@@ -1763,6 +1749,20 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             
             <form onSubmit={handleSubmit} className="space-y-4 pt-4">
               <div className="space-y-4">
+                {activeTab === 'Stock Sold' && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">
+                      ឈ្មោះអតិថិជន
+                    </label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={e => setCustomerName(e.target.value)}
+                      placeholder="ឈ្មោះ..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">កាលបរិច្ឆេទ</label>
@@ -1774,18 +1774,31 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                       required
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">
-                      {activeTab === 'Stock Out' ? 'អ្នកដឹកជញ្ជូន/ឡាន' : activeTab === 'Stock Return' ? 'អ្នកប្រគល់/អតិថិជន' : 'ឈ្មោះអតិថិជន'}
-                    </label>
-                    <input
-                      type="text"
-                      value={customerName}
-                      onChange={e => setCustomerName(e.target.value)}
-                      placeholder="ឈ្មោះ..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
-                    />
-                  </div>
+                  {activeTab === 'Stock Sold' ? (
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ទីតាំង</label>
+                      <input
+                        type="text"
+                        value={location}
+                        onChange={e => setLocation(e.target.value)}
+                        placeholder="ទីតាំង..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">
+                        {activeTab === 'Stock Out' ? 'អ្នកដឹកជញ្ជូន/ឡាន' : 'អ្នកប្រគល់/អតិថិជន'}
+                      </label>
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={e => setCustomerName(e.target.value)}
+                        placeholder="ឈ្មោះ..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1817,8 +1830,12 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 </div>
 
                 {/* Invoice Lines list */}
-                {items.length > 0 && (
-                  <div className="space-y-1.5">
+                <div className="space-y-1.5">
+                  {items.length === 0 ? (
+                    <div className="border border-dashed border-slate-200 rounded-2xl py-8 px-4 text-center text-xs text-slate-400 font-bold bg-slate-50/30">
+                      📦 សូមជ្រើសរើសទំនិញខាងលើ ដើម្បីបន្ថែមចូលក្នុងបញ្ជី
+                    </div>
+                  ) : (
                     <div className="border border-slate-100 rounded-2xl bg-slate-50/30 p-2 sm:p-3 space-y-1">
                       {/* Column Headers */}
                       <div className="grid grid-cols-12 gap-2 px-2 pb-2 border-b border-slate-200 text-[10px] font-bold text-slate-400">
@@ -1917,8 +1934,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                         })}
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Grand Total */}
                 {(() => {
@@ -2512,6 +2529,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 <p className="text-xs text-slate-500 font-medium">បំពេញព័ត៌មានអតិថិជន និងចំនួនទំនិញកម្មង់ខាងក្រោម</p>
               </div>
               <button 
+                type="button"
                 onClick={() => setIsOrderModalOpen(false)} 
                 className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
               >
@@ -2522,9 +2540,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             </div>
             
             <form onSubmit={handleCreateStockOrder} className="space-y-4 pt-4">
-              {/* Customer, Date, and Location layout matching Stock Sold */}
               <div className="space-y-4">
-                {/* Customer Name at the top */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះអតិថិជន</label>
                   <input
@@ -2536,7 +2552,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   />
                 </div>
 
-                {/* Date and Location in the same Row */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">កាលបរិច្ឆេទ</label>
@@ -2561,21 +2576,19 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 </div>
               </div>
 
-              {/* Product Selection and Cart List */}
               <div className="space-y-4">
-                {/* Select product to add */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ជ្រើសរើសទំនិញកម្មង់</label>
                   <div className="relative">
                     <select
                       onChange={handleProductSelectToOrder}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-indigo-400 outline-none font-bold text-slate-800 appearance-none cursor-pointer"
-                      defaultValue=""
+                      value=""
                     >
-                      <option value="">-- ជ្រើសរើសទំនិញដើម្បីកម្មង់ --</option>
+                      <option value="" disabled>-- ជ្រើសរើសទំនិញដើម្បីកម្មង់ --</option>
                       {products.map(p => (
                         <option key={p.id} value={p.name}>
-                          {p.name} {p.price ? `($${p.price.toFixed(2)})` : ''}
+                          {p.name}
                         </option>
                       ))}
                     </select>
@@ -2587,7 +2600,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   </div>
                 </div>
 
-                {/* Cart list matching Stock Sold */}
                 <div className="space-y-1.5">
                   {orderItems.length === 0 ? (
                     <div className="border border-dashed border-slate-200 rounded-2xl py-8 px-4 text-center text-xs text-slate-400 font-bold bg-slate-50/30">
@@ -2595,43 +2607,20 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                     </div>
                   ) : (
                     <div className="border border-slate-100 rounded-2xl bg-slate-50/30 p-2 sm:p-3 space-y-1">
-                      {/* Column Headers */}
                       <div className="grid grid-cols-12 gap-2 px-2 pb-2 border-b border-slate-200 text-[10px] font-bold text-slate-400">
-                        <div className="col-span-5">ទំនិញ</div>
+                        <div className="col-span-8">ទំនិញ</div>
                         <div className="col-span-3 text-center">បរិមាណ</div>
-                        <div className="col-span-3 text-right">តម្លៃសរុប</div>
                         <div className="col-span-1"></div>
                       </div>
-
-                      {/* List Rows */}
                       <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto pr-1 custom-scroll">
                         {orderItems.map((item, index) => {
-                          const product = products.find(p => p.name === item.productName);
-                          const qtyVal = parseInt(item.quantity) || 0;
-                          const hasPrice = product && product.price !== undefined && product.price !== null;
-                          const subtotal = hasPrice && qtyVal > 0 ? product.price * qtyVal : 0;
-
                           return (
                             <div key={index} className="grid grid-cols-12 gap-2 py-2 items-center px-2 hover:bg-slate-50 rounded-lg transition animate-in fade-in duration-150">
-                              {/* Product Name & Promo Label */}
-                              <div className="col-span-5 flex flex-col min-w-0">
+                              <div className="col-span-8 flex flex-col min-w-0">
                                 <span className="font-bold text-slate-800 text-xs truncate" title={item.productName}>
                                   {item.productName}
                                 </span>
-                                {(() => {
-                                  const freeQty = qtyVal > 0 ? calculatePromoQty(product, qtyVal) : 0;
-                                  if (freeQty > 0) {
-                                    return (
-                                      <span className="text-[9px] font-black text-emerald-600 animate-pulse mt-0.5">
-                                        ថែម +{freeQty}
-                                      </span>
-                                    );
-                                  }
-                                  return null;
-                                })()}
                               </div>
-
-                              {/* Quantity Input */}
                               <div className="col-span-3">
                                 <input
                                   type="number"
@@ -2643,20 +2632,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                   placeholder="ចំនួន"
                                 />
                               </div>
-
-                              {/* Price / Subtotal */}
-                              <div className="col-span-3 text-right flex flex-col justify-center">
-                                <span className="font-black text-xs text-indigo-600">
-                                  {hasPrice && qtyVal > 0 ? `$${subtotal.toFixed(2)}` : 'N/A'}
-                                </span>
-                                {hasPrice && (
-                                  <span className="text-[9px] text-slate-400 font-medium mt-0.5">
-                                    @ ${product.price?.toFixed(2)}
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Delete button */}
                               <div className="col-span-1 text-right">
                                 <button
                                   type="button"
@@ -2676,45 +2651,23 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                     </div>
                   )}
                 </div>
-
-                {/* Grand Total */}
-                {(() => {
-                  const grandTotal = orderItems.reduce((sum, item) => {
-                    const product = products.find(p => p.name === item.productName);
-                    const qty = parseInt(item.quantity) || 0;
-                    if (product && product.price !== undefined && product.price !== null) {
-                      return sum + (product.price * qty);
-                    }
-                    return sum;
-                  }, 0);
-                  
-                  if (grandTotal > 0) {
-                    return (
-                      <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-3 flex justify-between items-center px-4 mt-1">
-                        <span className="text-xs font-black text-indigo-700">តម្លៃសរុបទាំងអស់៖</span>
-                        <span className="text-base font-black text-indigo-600">${grandTotal.toFixed(2)}</span>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
               </div>
-
-              {/* Submit Buttons */}
               <div className="pt-4 border-t border-slate-100 flex space-x-3">
                 <button
                   type="button"
                   onClick={() => setIsOrderModalOpen(false)}
-                  className="flex-1 hover:bg-slate-50 border border-slate-200 text-slate-500 font-bold text-sm py-3 rounded-2xl transition active:scale-95 cursor-pointer"
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm py-3.5 rounded-2xl transition cursor-pointer"
                 >
                   បោះបង់
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold text-sm py-3 rounded-2xl transition shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer"
+                  className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-bold text-sm py-3.5 rounded-2xl shadow-lg shadow-indigo-200 transition cursor-pointer disabled:opacity-50 flex items-center justify-center"
                 >
-                  {loading ? 'កំពុងរក្សាទុក...' : 'រក្សាទុកការកម្មង់'}
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : 'រក្សាទុក'}
                 </button>
               </div>
             </form>
@@ -2723,7 +2676,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         document.body
       )}
 
-      {/* Selected Order Detail Modal */}
       {selectedOrder && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-[28px] w-full max-w-md shadow-2xl overflow-hidden p-6 relative border border-slate-100 animate-in zoom-in-95 duration-200">
@@ -2786,9 +2738,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                         <td className="px-3 py-2">{item.productName}</td>
                         <td className="px-3 py-2 text-right text-emerald-600">
                           {item.quantity}
-                          {item.promoQty && item.promoQty > 0 ? (
-                            <span className="text-amber-500 ml-1 font-bold">+{item.promoQty}</span>
-                          ) : null}
                         </td>
                       </tr>
                     ))}
