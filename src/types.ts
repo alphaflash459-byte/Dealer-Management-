@@ -10,9 +10,18 @@ export interface User {
 
 export type TransactionType = 'Stock Out' | 'Stock Sold' | 'Stock Return';
 
+export interface PromotionTier {
+  buyQty: number;
+  getQty: number;
+}
+
 export interface Product {
   id: string;
   name: string;
+  price?: number;
+  promoBuyQty?: number;
+  promoGetQty?: number;
+  promotions?: PromotionTier[];
   createdAt: string;
 }
 
@@ -22,6 +31,8 @@ export interface Transaction {
   type: TransactionType;
   productName: string;
   quantity: number;
+  promoQty?: number;
+  price?: number;
   date: string;
   note?: string;
 }
@@ -32,6 +43,7 @@ export interface StockOrder {
   username: string;
   productName: string;
   quantity: number;
+  promoQty?: number;
   date: string;
   note?: string;
   delivered: boolean;

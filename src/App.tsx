@@ -13,7 +13,7 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [stockOrders, setStockOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions'>('users');
+  const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions' | 'stockOrders'>('users');
   const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return' | 'Report' | 'Stock Order'>('Stock Out');
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const lastScrollY = useRef(0);
@@ -110,11 +110,19 @@ export default function App() {
                     </div>
                     <span className="text-[10px] md:text-sm font-bold">គ្រប់គ្រងទំនិញ</span>
                 </button>
-                <button onClick={() => setActiveAdminView('transactions')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeAdminView === 'transactions' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                 <button onClick={() => setActiveAdminView('stockOrders')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeAdminView === 'stockOrders' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                    <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeAdminView === 'stockOrders' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                    </div>
+                    <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">ស្តុកកម្មង់</span>
+                </button>
+                 <button onClick={() => setActiveAdminView('transactions')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeAdminView === 'transactions' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
                     <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeAdminView === 'transactions' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                     </div>
-                    <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">តាមដានទិន្នន័យ</span>
+                    <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">របាយការណ៍</span>
                 </button>
               </>
             ) : (
@@ -220,6 +228,7 @@ export default function App() {
                     setUsers={setUsers} 
                     transactions={transactions} 
                     products={products}
+                    stockOrders={stockOrders}
                     activeTab={activeAdminView}
                   />
                 ) : (
