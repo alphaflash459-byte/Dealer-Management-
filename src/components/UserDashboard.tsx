@@ -804,9 +804,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
   const userTransactions = transactions.filter(t => t.userId === currentUser.id && (activeTab === 'Report' ? true : t.type === activeTab));
 
-  // Grouping for Stock Sold
+  // Grouping for Stock Sold, Stock Out, and Stock Return
   const groupedInvoices = (() => {
-    if (activeTab !== 'Stock Sold') return [];
+    if (activeTab === 'Report' || activeTab === 'Stock Order') return [];
     
     const groups: { [key: string]: Transaction[] } = {};
     userTransactions.forEach(t => {
@@ -838,9 +838,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   const sortedTransactions = [...userTransactions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const isStockOrderTab = activeTab === 'Stock Order';
-  const isStockSoldTab = activeTab === 'Stock Sold';
+  const isTransactionTab = activeTab === 'Stock Sold' || activeTab === 'Stock Out' || activeTab === 'Stock Return';
 
-  const totalItems = isStockSoldTab ? sortedInvoices.length : sortedTransactions.length;
+  const totalItems = isTransactionTab ? sortedInvoices.length : sortedTransactions.length;
   const totalPages = Math.ceil(totalItems / pageSize);
   const activePage = Math.min(Math.max(1, currentPage), totalPages || 1);
   const startIndex = (activePage - 1) * pageSize;
@@ -1507,133 +1507,78 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
-                    {activeTab === 'Stock Sold' ? (
-                      <>
-                        <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អតិថិជន</th>
-                        <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ទីតាំង</th>
-                        <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
-                        <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-emerald-600">ទំនិញ</th>
-                        <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-emerald-600">បរិមាណ</th>
-                      </>
-                    ) : (
-                      <>
-                        <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
-                        <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ចំណាំ</th>
-                        <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
-                        <th className={`px-1.5 md:px-3 py-2.5 text-center font-bold ${
-                          activeTab === 'Stock Out' ? 'text-rose-600' :
-                          activeTab === 'Stock Return' ? 'text-amber-600' : 'text-slate-600'
-                        }`}>បរិមាណ</th>
-                      </>
-                    )}
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">
+                      {activeTab === 'Stock Sold' ? 'អតិថិជន' : activeTab === 'Stock Out' ? 'អ្នកប្រគល់' : 'អ្នកទទួល'}
+                    </th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ទីតាំង</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
+                    <th className={`px-1.5 md:px-3 py-2.5 text-left font-bold ${activeTab === 'Stock Sold' ? 'text-emerald-600' : activeTab === 'Stock Out' ? 'text-rose-600' : 'text-amber-600'}`}>ទំនិញ</th>
+                    <th className={`px-1.5 md:px-3 py-2.5 text-center font-bold ${activeTab === 'Stock Sold' ? 'text-emerald-600' : activeTab === 'Stock Out' ? 'text-rose-600' : 'text-amber-600'}`}>បរិមាណ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
-                  {activeTab === 'Stock Sold' ? (
-                    paginatedInvoices.map(inv => {
-                      return (
-                        <tr 
-                          key={inv.id} 
-                          onClick={() => setSelectedInvoiceDetail(inv)}
-                          className="hover:bg-slate-50/70 transition-colors cursor-pointer"
-                          title="ចុចដើម្បីមើលវិក្កយបត្រលម្អិត"
-                        >
-                          {/* Column 1: Customer Name */}
-                          <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
-                            {inv.customerName}
-                          </td>
-                          {/* Column 2: Location */}
-                          <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
-                            {inv.location ? (
-                              <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
-                                {inv.location}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 font-bold">-</span>
-                            )}
-                          </td>
-                          {/* Column 3: Date */}
-                          <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
-                            {(() => {
-                              const d = new Date(inv.date);
-                              const day = String(d.getDate()).padStart(2, '0');
-                              const month = String(d.getMonth() + 1).padStart(2, '0');
-                              const shortYear = String(d.getFullYear()).slice(-2);
-                              return `${day}/${month}/${shortYear}`;
-                            })()}
-                          </td>
-                          {/* Column 4: Product list */}
-                          <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
-                            <div className="flex flex-col space-y-1.5">
-                              {inv.items.map((item: any, idx: number) => (
-                                <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
-                                  {item.productName}
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                          {/* Column 5: Quantity list */}
-                          <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
-                            <div className="flex flex-col space-y-1.5 items-center">
-                              {inv.items.map((item: any, idx: number) => (
-                                <div key={idx} className="h-6 flex items-center justify-center">
-                                  <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap">
-                                    {item.quantity}
-                                    {item.promoQty && item.promoQty > 0 ? (
-                                      <span className="text-amber-500 ml-1 font-bold">+{item.promoQty}</span>
-                                    ) : null}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    paginatedTransactions.map(t => {
-                      let colorClass = 'text-slate-600';
-                      if (t.type === 'Stock Sold') {
-                        colorClass = 'text-emerald-600';
-                      } else if (t.type === 'Stock Out') {
-                        colorClass = 'text-rose-600';
-                      } else if (t.type === 'Stock Return') {
-                        colorClass = 'text-amber-600';
-                      }
-
-                      return (
-                        <tr 
-                          key={t.id} 
-                          onClick={() => setSelectedTransactionDetail(t)}
-                          className="hover:bg-slate-50/70 transition-colors cursor-pointer"
-                          title="ចុចដើម្បីមើលលម្អិត"
-                        >
-                          <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
-                            <span className="font-black text-slate-800 block text-[11px] sm:text-xs md:text-sm">{t.productName}</span>
-                          </td>
-                          <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left max-w-[70px] sm:max-w-[200px] truncate">
-                            {t.note ? (
-                              <span className="text-slate-700 font-medium text-[10px] sm:text-xs">{t.note}</span>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
-                            {(() => {
-                              const d = new Date(t.date);
-                              const day = String(d.getDate()).padStart(2, '0');
-                              const month = String(d.getMonth() + 1).padStart(2, '0');
-                              const shortYear = String(d.getFullYear()).slice(-2);
-                              return `${day}/${month}/${shortYear}`;
-                            })()}
-                          </td>
-                          <td className={`px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-black text-xs sm:text-sm md:text-base ${colorClass}`}>
-                            {t.quantity}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                  {paginatedInvoices.map(inv => {
+                    const colorClass = activeTab === 'Stock Sold' ? 'text-emerald-600' : activeTab === 'Stock Out' ? 'text-rose-600' : 'text-amber-600';
+                    const bgClass = activeTab === 'Stock Sold' ? 'bg-emerald-50' : activeTab === 'Stock Out' ? 'bg-rose-50' : 'bg-amber-50';
+                    return (
+                      <tr 
+                        key={inv.id} 
+                        onClick={() => setSelectedInvoiceDetail(inv)}
+                        className="hover:bg-slate-50/70 transition-colors cursor-pointer"
+                        title="ចុចដើម្បីមើលវិក្កយបត្រលម្អិត"
+                      >
+                        {/* Column 1: Customer Name */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                          {inv.customerName}
+                        </td>
+                        {/* Column 2: Location */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                          {inv.location ? (
+                            <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
+                              {inv.location}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-bold">-</span>
+                          )}
+                        </td>
+                        {/* Column 3: Date */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
+                          {(() => {
+                            const d = new Date(inv.date);
+                            const day = String(d.getDate()).padStart(2, '0');
+                            const month = String(d.getMonth() + 1).padStart(2, '0');
+                            const shortYear = String(d.getFullYear()).slice(-2);
+                            return `${day}/${month}/${shortYear}`;
+                          })()}
+                        </td>
+                        {/* Column 4: Product list */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                          <div className="flex flex-col space-y-1.5">
+                            {inv.items.map((item: any, idx: number) => (
+                              <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
+                                {item.productName}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        {/* Column 5: Quantity list */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                          <div className="flex flex-col space-y-1.5 items-center">
+                            {inv.items.map((item: any, idx: number) => (
+                              <div key={idx} className="h-6 flex items-center justify-center">
+                                <span className={`font-black ${colorClass} ${bgClass} px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap`}>
+                                  {item.quantity}
+                                  {item.promoQty && item.promoQty > 0 ? (
+                                    <span className="text-amber-500 ml-1 font-bold">+{item.promoQty}</span>
+                                  ) : null}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1788,7 +1733,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   ) : (
                     <div className="space-y-1.5">
                       <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">
-                        {activeTab === 'Stock Out' ? 'អ្នកដឹកជញ្ជូន/ឡាន' : 'អ្នកប្រគល់/អតិថិជន'}
+                        {activeTab === 'Stock Out' ? 'អ្នកប្រគល់ស្តុក' : 'អ្នកទទួលស្តុក'}
                       </label>
                       <input
                         type="text"
@@ -2252,7 +2197,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 return null;
               })()}
               <div className="grid grid-cols-3 gap-2 items-center">
-                <span className="text-xs font-bold text-slate-400">ចំណាំ</span>
+                <span className="text-xs font-bold text-slate-400">
+                  {selectedTransactionDetail.type === 'Stock Out' ? 'អ្នកប្រគល់' : selectedTransactionDetail.type === 'Stock Return' ? 'អ្នកទទួល' : 'ចំណាំ'}
+                </span>
                 <span className="col-span-2 text-sm font-semibold text-slate-700">
                   {selectedTransactionDetail.note || <span className="text-slate-300 font-normal">—</span>}
                 </span>
@@ -2324,7 +2271,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 <span className="text-2xl">🧾</span>
                 <div>
                   <h3 className="text-base md:text-lg font-black text-slate-800">
-                    វិក្កយបត្រលក់ចេញ
+                    {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? 'វិក្កយបត្រលក់ចេញ' : 
+                     selectedInvoiceDetail.items[0]?.type === 'Stock Out' ? 'កំណត់ត្រាឡើងឡាន' : 'កំណត់ត្រាស្តុកត្រឡប់'}
                   </h3>
                   <p className="text-xs text-slate-500 font-medium mt-0.5">
                     {(() => {
@@ -2351,7 +2299,10 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               {/* Customer Info */}
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
                 <div className="grid grid-cols-3 gap-1">
-                  <span className="text-xs font-bold text-slate-400">អតិថិជន</span>
+                  <span className="text-xs font-bold text-slate-400">
+                    {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? 'អតិថិជន' : 
+                     selectedInvoiceDetail.items[0]?.type === 'Stock Out' ? 'អ្នកប្រគល់' : 'អ្នកទទួល'}
+                  </span>
                   <span className="col-span-2 text-sm font-black text-slate-800">{selectedInvoiceDetail.customerName}</span>
                 </div>
                 {selectedInvoiceDetail.location && (
@@ -2368,10 +2319,14 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 <div className="border border-slate-100 rounded-2xl bg-slate-50/30 p-2 sm:p-3 space-y-1">
                   {/* Column Headers */}
                   <div className="grid grid-cols-12 gap-2 px-2 pb-2 border-b border-slate-200 text-[10px] font-bold text-slate-400">
-                    <div className="col-span-4">ទំនិញ</div>
-                    <div className="col-span-2 text-center">បរិមាណ</div>
-                    <div className="col-span-3 text-right">តម្លៃ</div>
-                    <div className="col-span-3 text-right">សរុបរង</div>
+                    <div className={selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? "col-span-4" : "col-span-8"}>ទំនិញ</div>
+                    <div className={selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? "col-span-2 text-center" : "col-span-4 text-center"}>បរិមាណ</div>
+                    {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' && (
+                      <>
+                        <div className="col-span-3 text-right">តម្លៃ</div>
+                        <div className="col-span-3 text-right">សរុបរង</div>
+                      </>
+                    )}
                   </div>
 
                   {/* List Rows */}
@@ -2385,7 +2340,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                           className="grid grid-cols-12 gap-2 py-2.5 items-center px-2 hover:bg-slate-100 rounded-lg transition animate-in fade-in duration-150 cursor-pointer"
                         >
                           {/* Product Name */}
-                          <div className="col-span-4 flex flex-col min-w-0">
+                          <div className={`${selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? "col-span-4" : "col-span-8"} flex flex-col min-w-0`}>
                             <span className="font-bold text-slate-800 text-xs truncate" title={item.productName}>
                               {item.productName}
                             </span>
@@ -2397,25 +2352,30 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                           </div>
 
                           {/* Quantity */}
-                          <div className="col-span-2 text-center">
-                            <span className="font-black text-xs text-emerald-600">
+                          <div className={`${selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? "col-span-2" : "col-span-4"} text-center`}>
+                            <span className={`font-black text-xs ${
+                                selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? 'text-emerald-600' : 
+                                selectedInvoiceDetail.items[0]?.type === 'Stock Out' ? 'text-rose-600' : 'text-amber-600'
+                              }`}>
                               {item.quantity}
                             </span>
                           </div>
 
-                          {/* Price */}
-                          <div className="col-span-3 text-right">
-                            <span className="font-semibold text-xs text-slate-600">
-                              {item.price !== undefined ? `$${item.price.toFixed(2)}` : '-'}
-                            </span>
-                          </div>
-
-                          {/* Subtotal */}
-                          <div className="col-span-3 text-right">
-                            <span className="font-black text-xs text-indigo-600">
-                              {item.price !== undefined ? `$${subtotal.toFixed(2)}` : '-'}
-                            </span>
-                          </div>
+                          {/* Price and Subtotal */}
+                          {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' && (
+                            <>
+                              <div className="col-span-3 text-right">
+                                <span className="font-semibold text-xs text-slate-600">
+                                  {item.price !== undefined ? `$${item.price.toFixed(2)}` : '-'}
+                                </span>
+                              </div>
+                              <div className="col-span-3 text-right">
+                                <span className="font-black text-xs text-indigo-600">
+                                  {item.price !== undefined ? `$${subtotal.toFixed(2)}` : '-'}
+                                </span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
                     })}
@@ -2424,7 +2384,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               </div>
 
               {/* Total Price */}
-              {(() => {
+              {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' && (() => {
                 const totalCost = selectedInvoiceDetail.items.reduce((sum: number, item: any) => {
                   const qty = item.quantity || 0;
                   const pr = item.price || 0;
