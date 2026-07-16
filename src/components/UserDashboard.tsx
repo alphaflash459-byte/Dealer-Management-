@@ -1644,7 +1644,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
         {/* Pagination Section */}
         {activeTab !== 'Report' && displayTotalItems > 0 && (
-          <div className="flex justify-between items-center pt-3 border-t border-slate-100 mt-2 shrink-0">
+          <div className="hidden sm:flex justify-between items-center pt-3 border-t border-slate-100 mt-2 shrink-0">
             <div className="hidden sm:flex items-center space-x-2 text-xs md:text-sm text-slate-500 font-medium">
               <span>
                 បង្ហាញពី {displayStartIndex + 1} ដល់ {Math.min(displayStartIndex + pageSize, displayTotalItems)} នៃ {displayTotalItems}
@@ -1664,7 +1664,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 <span>មុន</span>
               </button>
               
-              <div className="flex items-center">
+              <div className="hidden sm:flex items-center">
                 {(() => {
                   const pages = [];
                   const maxVisible = 5;

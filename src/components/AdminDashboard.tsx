@@ -779,7 +779,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
           {/* Pagination Section */}
           {totalItems > 0 && (
-            <div className="flex justify-between items-center px-4 py-3 border-t border-slate-100 shrink-0">
+            <div className="hidden sm:flex justify-between items-center px-4 py-3 border-t border-slate-100 shrink-0">
               <div className="hidden sm:flex items-center space-x-2 text-xs md:text-sm text-slate-500 font-medium">
                 <span>
                   បង្ហាញពី {startIndex + 1} ដល់ {Math.min(startIndex + pageSize, totalItems)} នៃ {totalItems}
@@ -799,7 +799,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   <span>មុន</span>
                 </button>
 
-                <div className="flex items-center">
+                <div className="hidden sm:flex items-center">
                   {(() => {
                     const pages = [];
                     const maxVisible = 5;
@@ -948,7 +948,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
           {/* Pagination Controls */}
           {totalOrderItems > 0 && (
-            <div className="flex justify-between items-center px-4 py-3 border-t border-slate-100 shrink-0">
+            <div className="hidden sm:flex justify-between items-center px-4 py-3 border-t border-slate-100 shrink-0">
               <div className="hidden sm:flex items-center space-x-2 text-xs md:text-sm text-slate-500 font-medium">
                 <span>
                   បង្ហាញពី {orderStartIndex + 1} ដល់ {Math.min(orderStartIndex + pageSize, totalOrderItems)} នៃ {totalOrderItems}
@@ -968,7 +968,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   <span>មុន</span>
                 </button>
 
-                <div className="flex items-center">
+                <div className="hidden sm:flex items-center">
                   {(() => {
                     const pages = [];
                     const maxVisible = 5;
