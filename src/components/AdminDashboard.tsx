@@ -709,7 +709,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           <div className="px-5 md:px-6 py-5 border-b border-slate-50 shrink-0">
             <h3 className="text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
           </div>
-          <div ref={tableContainerRef} onTouchStart={handleTouchStart} onTouchEnd={(e) => handleTouchEnd(e, totalPages, activePage, setCurrentPage)} className="flex-1 overflow-hidden md:overflow-auto custom-scroll p-1 md:p-2">
+          <div ref={tableContainerRef} onTouchStart={handleTouchStart} onTouchEnd={(e) => handleTouchEnd(e, totalPages, activePage, setCurrentPage)} className="flex-1 overflow-auto custom-scroll p-1 md:p-2">
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
@@ -886,7 +886,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             </div>
           </div>
 
-          <div ref={tableContainerRef} onTouchStart={handleTouchStart} onTouchEnd={(e) => handleTouchEnd(e, totalOrderPages, activeOrderPage, setCurrentPage)} className="flex-1 overflow-hidden md:overflow-auto custom-scroll p-1 md:p-2">
+          <div ref={tableContainerRef} onTouchStart={handleTouchStart} onTouchEnd={(e) => handleTouchEnd(e, totalOrderPages, activeOrderPage, setCurrentPage)} className="flex-1 overflow-auto custom-scroll p-1 md:p-2">
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">

@@ -162,38 +162,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent, totalPagesCount: number, activePageNum: number, onPageChange: (p: number) => void) => {
-    if (touchStartX.current === null || touchStartY.current === null) return;
-    const diffX = e.changedTouches[0].clientX - touchStartX.current;
-    const diffY = e.changedTouches[0].clientY - touchStartY.current;
-
-    if (Math.abs(diffX) > Math.abs(diffY)) {
-      if (Math.abs(diffX) > 40) { // threshold of 40px
-        if (diffX > 0) {
-          // Swipe Right -> Go to Prev Page
-          if (activePageNum > 1) {
-            onPageChange(activePageNum - 1);
-          }
-        } else {
-          // Swipe Left -> Go to Next Page
-          if (activePageNum < totalPagesCount) {
-            onPageChange(activePageNum + 1);
-          }
-        }
-      }
-    }
-    touchStartX.current = null;
-    touchStartY.current = null;
-  };
-
   const observerRef = useRef<ResizeObserver | null>(null);
   const tableContainerRef = useCallback((node: HTMLDivElement | null) => {
     if (observerRef.current) {
@@ -1478,7 +1446,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                     <span className="font-bold text-slate-400">មិនទាន់មានការកម្មង់ទំនិញឡើយ</span>
                   </div>
                 ) : (
-                  <div ref={tableContainerRef} onTouchStart={handleTouchStart} onTouchEnd={(e) => handleTouchEnd(e, displayTotalPages, displayActivePage, setCurrentPage)} className="w-full flex-1 min-h-0 overflow-hidden md:overflow-auto custom-scroll animate-in fade-in duration-200">
+                  <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll animate-in fade-in duration-200">
                     <table className="w-full text-left border-collapse">
                       <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                         <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
@@ -1490,7 +1458,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
-                        {paginatedStockOrders
+                        {sortedStockOrders
                           .map((orderGroup: any) => {
                             return (
                               <tr 
@@ -1560,7 +1528,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <span className="font-bold text-slate-400">មិនទាន់មានប្រតិបត្តិការណាមួយក្នុងប្រភេទនេះទេ</span>
             </div>
           ) : (
-            <div ref={tableContainerRef} onTouchStart={handleTouchStart} onTouchEnd={(e) => handleTouchEnd(e, displayTotalPages, displayActivePage, setCurrentPage)} className="w-full flex-1 min-h-0 overflow-hidden md:overflow-auto custom-scroll">
+            <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll">
               <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
@@ -1574,7 +1542,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
-                  {paginatedInvoices.map(inv => {
+                  {sortedInvoices.map(inv => {
                     const colorClass = activeTab === 'Stock Sold' ? 'text-emerald-600' : activeTab === 'Stock Out' ? 'text-rose-600' : 'text-amber-600';
                     const bgClass = activeTab === 'Stock Sold' ? 'bg-emerald-50' : activeTab === 'Stock Out' ? 'bg-rose-50' : 'bg-amber-50';
                     return (
@@ -1641,76 +1609,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             </div>
           )}
         </div>
-
-        {/* Pagination Section */}
-        {activeTab !== 'Report' && displayTotalItems > 0 && (
-          <div className="hidden sm:flex justify-between items-center pt-3 border-t border-slate-100 mt-2 shrink-0">
-            <div className="hidden sm:flex items-center space-x-2 text-xs md:text-sm text-slate-500 font-medium">
-              <span>
-                បង្ហាញពី {displayStartIndex + 1} ដល់ {Math.min(displayStartIndex + pageSize, displayTotalItems)} នៃ {displayTotalItems}
-              </span>
-            </div>
-
-            <div className="flex w-full sm:w-auto items-center justify-center sm:justify-end space-x-1.5">
-              <button
-                type="button"
-                disabled={displayActivePage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                className="hidden sm:flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span>មុន</span>
-              </button>
-              
-              <div className="hidden sm:flex items-center">
-                {(() => {
-                  const pages = [];
-                  const maxVisible = 5;
-                  if (displayTotalPages <= maxVisible) {
-                    for (let i = 1; i <= displayTotalPages; i++) pages.push(i);
-                  } else {
-                    let start = Math.max(1, displayActivePage - 2);
-                    let end = Math.min(displayTotalPages, displayActivePage + 2);
-                    if (displayActivePage <= 3) {
-                      end = 5;
-                    } else if (displayActivePage >= displayTotalPages - 2) {
-                      start = displayTotalPages - 4;
-                    }
-                    for (let i = start; i <= end; i++) pages.push(i);
-                  }
-                  return pages;
-                })().map(pageNum => (
-                  <button
-                    key={pageNum}
-                    type="button"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-xl font-bold text-[10px] sm:text-xs transition mx-0.5 cursor-pointer ${
-                      pageNum === displayActivePage
-                        ? 'bg-emerald-600 text-white font-black shadow-md shadow-emerald-600/10'
-                        : 'hover:bg-slate-50 text-slate-600 hover:text-slate-800'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                disabled={displayActivePage === displayTotalPages}
-                onClick={() => setCurrentPage(prev => Math.min(displayTotalPages, prev + 1))}
-                className="hidden sm:flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
-              >
-                <span>បន្ទាប់</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Floating Modal for Input Data */}
