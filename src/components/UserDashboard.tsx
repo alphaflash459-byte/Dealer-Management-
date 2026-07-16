@@ -382,7 +382,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             </div>
 
             <table>
-              <thead>
+              <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                 <tr>
                   <th style="text-align: left;">ទំនិញ</th>
                   <th style="text-align: center; width: 100px;">បរិមាណ</th>
@@ -1099,7 +1099,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           </div>
 
           <table>
-            <thead>
+            <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
               <tr>
                 <th style="text-align: left;">ឈ្មោះទំនិញ</th>
                 <th style="text-align: center;">ឡើងឡាន</th>
@@ -1205,9 +1205,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full h-full flex flex-col">
       {/* History Section */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[600px] p-5 md:p-6">
+      <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6">
         <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 shrink-0">
           <div>
             <h3 className="text-base md:text-lg font-black text-slate-800">
@@ -1308,9 +1308,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   <span className="font-bold text-slate-400">មិនទាន់មានទំនិញក្នុងប្រព័ន្ធឡើយ</span>
                 </div>
               ) : (
-                <div className="w-full overflow-x-auto md:overflow-visible">
+                <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll">
                   <table className="w-full text-left border-collapse">
-                    <thead>
+                    <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                       <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100 text-center">
                         <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
                         <th className="px-1.5 md:px-3 py-2.5 font-bold text-rose-600 whitespace-nowrap">ឡើងឡាន</th>
@@ -1421,9 +1421,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                     <span className="font-bold text-slate-400">មិនទាន់មានការកម្មង់ទំនិញឡើយ</span>
                   </div>
                 ) : (
-                  <div className="w-full overflow-x-auto md:overflow-visible animate-in fade-in duration-200">
+                  <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll animate-in fade-in duration-200">
                     <table className="w-full text-left border-collapse">
-                      <thead>
+                      <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                         <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                           <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អតិថិជន</th>
                           <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ទីតាំង</th>
@@ -1503,9 +1503,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <span className="font-bold text-slate-400">មិនទាន់មានប្រតិបត្តិការណាមួយក្នុងប្រភេទនេះទេ</span>
             </div>
           ) : (
-            <div className="w-full overflow-x-auto md:overflow-visible">
+            <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll">
               <table className="w-full text-left border-collapse">
-                <thead>
+                <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">
                       {activeTab === 'Stock Sold' ? 'អតិថិជន' : activeTab === 'Stock Out' ? 'អ្នកប្រគល់' : 'អ្នកទទួល'}
@@ -2686,7 +2686,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
               <div className="mt-4 border border-slate-100 rounded-xl overflow-hidden bg-slate-50/50">
                 <table className="w-full text-left">
-                  <thead className="bg-slate-100/50">
+                  <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                     <tr className="text-slate-500 text-[10px] uppercase font-bold">
                       <th className="px-3 py-2">ទំនិញ</th>
                       <th className="px-3 py-2 text-right">បរិមាណ</th>

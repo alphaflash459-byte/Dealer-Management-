@@ -74,7 +74,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex justify-center items-center">
+      <div className="min-h-[100dvh] bg-slate-50 flex justify-center items-center">
         <div className="text-slate-500 font-bold">កំពុងផ្ទុកទិន្នន័យ...</div>
       </div>
     );
@@ -85,9 +85,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row w-full h-screen font-sans bg-[#f1f5f9]">
+    <div className="flex flex-col md:flex-row w-full h-[100dvh] font-sans bg-[#f1f5f9]">
       {/* NAVIGATION (Sidebar on Tablet/PC, Bottom Bar on Mobile) */}
-      <nav className="absolute md:relative bottom-0 w-full md:w-64 bg-white/95 md:bg-white backdrop-blur-md md:backdrop-blur-none border-t md:border-t-0 md:border-r border-slate-200/50 z-40 shrink-0 md:order-1 transition-all shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] md:shadow-none pb-safe">
+      <nav className="md:relative w-full md:w-64 bg-white/95 md:bg-white backdrop-blur-md md:backdrop-blur-none border-t md:border-t-0 md:border-r border-slate-200/50 z-40 shrink-0 order-2 md:order-1 transition-all shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] md:shadow-none pb-safe">
         <div className="hidden md:flex items-center space-x-3 p-6 mb-2 border-b border-slate-50">
             <div className="bg-emerald-600 text-white p-2.5 rounded-xl shadow-md shadow-emerald-600/30">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
@@ -182,7 +182,7 @@ export default function App() {
       </nav>
 
       {/* MAIN RIGHT AREA (Header + Content) */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#f1f5f9] md:order-2 relative">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[#f1f5f9] order-1 md:order-2 relative">
           {/* Sleek Mobile Header */}
           <header className={`md:hidden bg-emerald-600 border-b border-emerald-700 px-5 flex justify-between items-center shrink-0 relative z-20 shadow-md transition-all duration-300 ease-in-out ${
             isHeaderVisible 
@@ -205,7 +205,7 @@ export default function App() {
           </header>
 
           <main 
-            className="flex-1 overflow-y-auto custom-scroll relative z-10 w-full px-2 md:px-4 pt-5 pb-24 md:pb-8"
+            className="flex-1 flex flex-col overflow-hidden relative z-10 w-full px-2 md:px-4 pt-5 pb-0 md:pb-8"
             onScroll={(e) => {
               const currentScrollY = e.currentTarget.scrollTop;
               // If we are close to the top, show header

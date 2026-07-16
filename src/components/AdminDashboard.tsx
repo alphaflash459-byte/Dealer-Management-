@@ -523,10 +523,10 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const paginatedStockOrders = filteredStockOrders.slice(orderStartIndex, orderStartIndex + pageSize);
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col space-y-6 min-h-0">
       {activeTab === 'users' && (
         <div className="grid grid-cols-1 gap-6">
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden h-fit">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden max-h-full flex flex-col min-h-0">
             <div className="px-5 md:px-6 py-5 border-b border-slate-50 flex justify-between items-center">
               <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
               <button
@@ -539,9 +539,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <span>បង្កើតអ្នកប្រើប្រាស់</span>
               </button>
             </div>
-            <div className="w-full overflow-x-auto md:overflow-visible p-1 md:p-2">
+            <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll p-1 md:p-2">
               <table className="w-full text-left border-collapse">
-                <thead>
+                <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះអ្នកប្រើប្រាស់</th>
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">លេខសម្ងាត់</th>
@@ -578,7 +578,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
       {activeTab === 'products' && (
         <div className="grid grid-cols-1 gap-6">
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden h-fit">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden max-h-full flex flex-col min-h-0">
             <div className="px-5 md:px-6 py-5 border-b border-slate-50 flex justify-between items-center">
               <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីទំនិញ</h3>
               <button
@@ -591,9 +591,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <span>បន្ថែមទំនិញ</span>
               </button>
             </div>
-            <div className="w-full overflow-x-auto md:overflow-visible p-1 md:p-2">
+            <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll p-1 md:p-2">
               <table className="w-full text-left border-collapse">
-                <thead>
+                <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញ</th>
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100 text-right">តម្លៃ ($)</th>
@@ -648,13 +648,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       )}
 
       {activeTab === 'transactions' && (
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden h-[700px] flex flex-col">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="px-5 md:px-6 py-5 border-b border-slate-50 shrink-0">
             <h3 className="text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
           </div>
-          <div className="flex-1 overflow-x-auto md:overflow-y-auto custom-scroll p-1 md:p-2">
+          <div className="flex-1 overflow-auto custom-scroll p-1 md:p-2">
             <table className="w-full text-left border-collapse">
-              <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+              <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
                   <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">កាលបរិច្ឆេទ</th>
                   <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">អ្នកប្រើប្រាស់</th>
@@ -809,7 +809,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       )}
 
       {activeTab === 'stockOrders' && (
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden h-[700px] flex flex-col">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="px-5 md:px-6 py-5 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
             <div>
               <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកកម្មង់</h3>
@@ -845,7 +845,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             </div>
           </div>
 
-          <div className="flex-1 overflow-x-auto md:overflow-y-auto custom-scroll p-1 md:p-2">
+          <div className="flex-1 overflow-auto custom-scroll p-1 md:p-2">
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
