@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { User, Transaction, TransactionType, Product, StockOrder } from '../types';
 import { doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -161,6 +161,63 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   const [selectedRowItem, setSelectedRowItem] = useState<Transaction | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent, totalPagesCount: number, activePageNum: number, onPageChange: (p: number) => void) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const diffX = e.changedTouches[0].clientX - touchStartX.current;
+    const diffY = e.changedTouches[0].clientY - touchStartY.current;
+
+    if (Math.abs(diffX) > Math.abs(diffY)) {
+      if (Math.abs(diffX) > 40) { // threshold of 40px
+        if (diffX > 0) {
+          // Swipe Right -> Go to Prev Page
+          if (activePageNum > 1) {
+            onPageChange(activePageNum - 1);
+          }
+        } else {
+          // Swipe Left -> Go to Next Page
+          if (activePageNum < totalPagesCount) {
+            onPageChange(activePageNum + 1);
+          }
+        }
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const tableContainerRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+    if (node) {
+      observerRef.current = new ResizeObserver(entries => {
+        for (let entry of entries) {
+          const height = entry.contentRect.height;
+          const isMobile = window.innerWidth < 768;
+          let rows = Math.floor((height - 40) / (isMobile ? 95 : 50));
+          if (isMobile) {
+            if (rows < 1) rows = 1;
+            if (rows > 4) rows = 4;
+          } else {
+            if (rows < 3) rows = 3;
+            if (rows > 50) rows = 50;
+          }
+          setPageSize(prev => (prev !== rows ? rows : prev));
+        }
+      });
+      observerRef.current.observe(node);
+    }
+  }, []);
   const [editProductName, setEditProductName] = useState('');
 
   // Stock Order Specific States
@@ -1298,7 +1355,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto custom-scroll pr-2">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden pr-2">
           {activeTab === 'Report' ? (
               products.length === 0 ? (
                 <div className="text-center py-24 text-slate-400 text-xs md:text-sm flex flex-col items-center justify-center space-y-3">
@@ -1308,7 +1365,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   <span className="font-bold text-slate-400">មិនទាន់មានទំនិញក្នុងប្រព័ន្ធឡើយ</span>
                 </div>
               ) : (
-                <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll">
+                <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll">
                   <table className="w-full text-left border-collapse">
                     <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                       <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100 text-center">
@@ -1421,7 +1478,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                     <span className="font-bold text-slate-400">មិនទាន់មានការកម្មង់ទំនិញឡើយ</span>
                   </div>
                 ) : (
-                  <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll animate-in fade-in duration-200">
+                  <div ref={tableContainerRef} onTouchStart={handleTouchStart} onTouchEnd={(e) => handleTouchEnd(e, displayTotalPages, displayActivePage, setCurrentPage)} className="w-full flex-1 min-h-0 overflow-hidden md:overflow-auto custom-scroll animate-in fade-in duration-200">
                     <table className="w-full text-left border-collapse">
                       <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                         <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
@@ -1503,7 +1560,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <span className="font-bold text-slate-400">មិនទាន់មានប្រតិបត្តិការណាមួយក្នុងប្រភេទនេះទេ</span>
             </div>
           ) : (
-            <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll">
+            <div ref={tableContainerRef} onTouchStart={handleTouchStart} onTouchEnd={(e) => handleTouchEnd(e, displayTotalPages, displayActivePage, setCurrentPage)} className="w-full flex-1 min-h-0 overflow-hidden md:overflow-auto custom-scroll">
               <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
@@ -1589,32 +1646,17 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         {activeTab !== 'Report' && displayTotalItems > 0 && (
           <div className="flex justify-between items-center pt-3 border-t border-slate-100 mt-2 shrink-0">
             <div className="hidden sm:flex items-center space-x-2 text-xs md:text-sm text-slate-500 font-medium">
-              <span>បង្ហាញ</span>
-              <select
-                value={pageSize}
-                onChange={e => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 font-bold text-slate-700 outline-none focus:border-emerald-400 transition cursor-pointer"
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-              </select>
-              <span>ជួរ</span>
-              <span className="text-slate-300">|</span>
               <span>
                 បង្ហាញពី {displayStartIndex + 1} ដល់ {Math.min(displayStartIndex + pageSize, displayTotalItems)} នៃ {displayTotalItems}
               </span>
             </div>
 
-            <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end space-x-1.5">
+            <div className="flex w-full sm:w-auto items-center justify-center sm:justify-end space-x-1.5">
               <button
                 type="button"
                 disabled={displayActivePage === 1}
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                className="flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
+                className="hidden sm:flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
@@ -1659,7 +1701,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 type="button"
                 disabled={displayActivePage === displayTotalPages}
                 onClick={() => setCurrentPage(prev => Math.min(displayTotalPages, prev + 1))}
-                className="flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
+                className="hidden sm:flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
               >
                 <span>បន្ទាប់</span>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

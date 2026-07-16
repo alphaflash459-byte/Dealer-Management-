@@ -221,7 +221,7 @@ export default function App() {
               lastScrollY.current = currentScrollY;
             }}
           >
-            <div className="w-full animate-in fade-in duration-300">
+            <div className="w-full h-full flex flex-col min-h-0 overflow-hidden animate-in fade-in duration-300">
                 {currentUser.role === 'Admin' ? (
                   <AdminDashboard 
                     users={users} 
