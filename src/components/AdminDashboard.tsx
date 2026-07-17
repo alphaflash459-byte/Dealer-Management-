@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { User, Transaction, Product, StockOrder, PromotionTier } from '../types';
-import { doc, setDoc, deleteDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc, deleteField, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export function cleanUndefined<T extends object>(obj: T): T {
@@ -94,13 +94,19 @@ export function calculatePromoQtyWithPriceCheck(product: Product | undefined, qt
   return calculatePromoQty(product, qty);
 }
 
+interface StockItemInput {
+  productName: string;
+  quantity: string;
+  price?: string;
+}
+
 interface AdminDashboardProps {
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   transactions: Transaction[];
   products: Product[];
   stockOrders: StockOrder[];
-  activeTab: 'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn';
+  activeTab: 'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn' | 'warehouse';
 }
 
 export default function AdminDashboard({ users, setUsers, transactions, products, stockOrders, activeTab }: AdminDashboardProps) {
@@ -183,6 +189,154 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const [editOrderCustomerName, setEditOrderCustomerName] = useState('');
   const [editOrderLocation, setEditOrderLocation] = useState('');
   const [editOrderDelivered, setEditOrderDelivered] = useState(false);
+
+  // Warehouse Stock states
+  const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
+  const [isEditWarehouseStockModalOpen, setIsEditWarehouseStockModalOpen] = useState(false);
+  const [productToEditWarehouseStock, setProductToEditWarehouseStock] = useState<Product | null>(null);
+  const [editWarehouseStockVal, setEditWarehouseStockVal] = useState('');
+  const [stockInDate, setStockInDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+  const [stockInDeliverer, setStockInDeliverer] = useState('');
+  const [stockInItems, setStockInItems] = useState<StockItemInput[]>([]);
+  const [actualStockDrafts, setActualStockDrafts] = useState<{ [productId: string]: string }>({});
+  const [warehouseSearchQuery, setWarehouseSearchQuery] = useState('');
+
+  const handleSaveWarehouseStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productToEditWarehouseStock) return;
+    const qty = parseInt(editWarehouseStockVal);
+    if (isNaN(qty) || qty < 0) {
+      alert("សូមបញ្ចូលចំនួនត្រឹមត្រូវ (Please enter a valid quantity)");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, 'products', productToEditWarehouseStock.id), {
+        warehouseStock: qty
+      });
+      setIsEditWarehouseStockModalOpen(false);
+      setProductToEditWarehouseStock(null);
+      setEditWarehouseStockVal('');
+    } catch (err) {
+      console.error("Error saving warehouse stock: ", err);
+      alert("មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យ");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveActualStock = async (product: Product) => {
+    const draftValue = actualStockDrafts[product.id];
+    if (draftValue === undefined || draftValue === '') return;
+    const qty = parseInt(draftValue);
+    if (isNaN(qty) || qty < 0) {
+      alert("សូមបញ្ចូលចំនួនត្រឹមត្រូវ (Please enter a valid quantity)");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, 'products', product.id), {
+        actualStock: qty,
+        lastStockTake: new Date().toISOString()
+      });
+      // Clear the draft state so it falls back to the database value
+      const updatedDrafts = { ...actualStockDrafts };
+      delete updatedDrafts[product.id];
+      setActualStockDrafts(updatedDrafts);
+    } catch (err) {
+      console.error("Error saving actual stock: ", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProductSelectToStockIn = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedProdName = e.target.value;
+    if (!selectedProdName) return;
+
+    const alreadyExists = stockInItems.some(item => item.productName === selectedProdName);
+    if (alreadyExists) {
+      alert('មុខទំនិញនេះត្រូវបានបន្ថែមរួចហើយ!');
+      e.target.value = '';
+      return;
+    }
+
+    setStockInItems(prev => [...prev, { productName: selectedProdName, quantity: '' }]);
+    e.target.value = '';
+  };
+
+  const updateStockInRow = (index: number, field: keyof StockItemInput, value: string) => {
+    setStockInItems(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const removeStockInRow = (index: number) => {
+    setStockInItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveStockIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const validItems = stockInItems.filter(item => item.productName && item.quantity);
+    if (validItems.length === 0) {
+      alert("សូមជ្រើសរើសទំនិញយ៉ាងហោចណាស់មួយ និងបញ្ចូលចំនួន");
+      return;
+    }
+
+    // Validate
+    for (let i = 0; i < validItems.length; i++) {
+      const item = validItems[i];
+      if (!item.productName) {
+        alert(`សូមជ្រើសរើសឈ្មោះទំនិញនៅជួរទី ${i + 1}`);
+        return;
+      }
+      if (!item.quantity) {
+        alert(`សូមបំពេញចំនួនទំនិញនៅជួរទី ${i + 1}`);
+        return;
+      }
+      const qty = parseInt(item.quantity);
+      if (isNaN(qty) || qty <= 0) {
+        alert(`ចំនួនសម្រាប់ទំនិញ "${item.productName}" ត្រូវតែជាលេខវិជ្ជមាន!`);
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      await Promise.all(validItems.map(async (item) => {
+        const product = products.find(p => p.name === item.productName);
+        if (product) {
+          const qty = parseInt(item.quantity);
+          const currentStock = product.warehouseStock || 0;
+          await updateDoc(doc(db, 'products', product.id), {
+            warehouseStock: currentStock + qty
+          });
+        }
+      }));
+
+      setIsStockInModalOpen(false);
+      setStockInItems([]);
+    } catch (err) {
+      console.error("Error saving stock in: ", err);
+      alert("មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យ");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredWarehouseProducts = products.filter(p =>
+    p.name.toLowerCase().includes(warehouseSearchQuery.toLowerCase())
+  );
 
   const getOrderCustomerAndLocation = (noteStr: string) => {
     const match = (noteStr || '').match(/^(.*?)\s*\((.*?)\)$/);
@@ -624,6 +778,20 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const handleDeleteTransaction = async (id: string) => {
     setLoading(true);
     try {
+      if (transactionToDelete) {
+        const product = products.find(p => p.name === transactionToDelete.productName);
+        if (product) {
+          if (transactionToDelete.type === 'Stock Out') {
+            await updateDoc(doc(db, 'products', product.id), {
+              warehouseStock: increment(transactionToDelete.quantity)
+            });
+          } else if (transactionToDelete.type === 'Stock Return') {
+            await updateDoc(doc(db, 'products', product.id), {
+              warehouseStock: increment(-transactionToDelete.quantity)
+            });
+          }
+        }
+      }
       await deleteDoc(doc(db, 'transactions', id));
       setTransactionToDelete(null);
     } catch (error) {
@@ -719,6 +887,55 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
       if (!promoQty || promoQty <= 0) {
         (updatedTransaction as any).promoQty = deleteField(); 
+      }
+
+      // Handle Warehouse Stock updates for Edit
+      if (transactionToEdit.type === 'Stock Out') {
+        const oldProduct = products.find(p => p.name === transactionToEdit.productName);
+        const newProduct = products.find(p => p.name === editTxProductName);
+        
+        if (oldProduct && newProduct && oldProduct.id === newProduct.id) {
+          const diff = transactionToEdit.quantity - qty;
+          if (diff !== 0) {
+            await updateDoc(doc(db, 'products', oldProduct.id), {
+              warehouseStock: increment(diff)
+            });
+          }
+        } else {
+          if (oldProduct) {
+            await updateDoc(doc(db, 'products', oldProduct.id), {
+              warehouseStock: increment(transactionToEdit.quantity)
+            });
+          }
+          if (newProduct) {
+            await updateDoc(doc(db, 'products', newProduct.id), {
+              warehouseStock: increment(-qty)
+            });
+          }
+        }
+      } else if (transactionToEdit.type === 'Stock Return') {
+        const oldProduct = products.find(p => p.name === transactionToEdit.productName);
+        const newProduct = products.find(p => p.name === editTxProductName);
+        
+        if (oldProduct && newProduct && oldProduct.id === newProduct.id) {
+          const diff = qty - transactionToEdit.quantity;
+          if (diff !== 0) {
+            await updateDoc(doc(db, 'products', oldProduct.id), {
+              warehouseStock: increment(diff)
+            });
+          }
+        } else {
+          if (oldProduct) {
+            await updateDoc(doc(db, 'products', oldProduct.id), {
+              warehouseStock: increment(-transactionToEdit.quantity)
+            });
+          }
+          if (newProduct) {
+            await updateDoc(doc(db, 'products', newProduct.id), {
+              warehouseStock: increment(qty)
+            });
+          }
+        }
       }
 
       await updateDoc(doc(db, 'transactions', transactionToEdit.id), cleanUndefined(updatedTransaction));
@@ -1089,11 +1306,11 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   return (
     <div className="w-full h-full flex flex-col min-w-0 overflow-hidden">
       {activeTab === 'users' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6">
-          <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 shrink-0">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6">
+          <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2.5 sm:pb-4 shrink-0">
             <div>
-              <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
-              <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">គ្រប់គ្រងគណនីអ្នកប្រើប្រាស់ក្នុងប្រព័ន្ធ</p>
+              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
+              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងគណនីអ្នកប្រើប្រាស់ក្នុងប្រព័ន្ធ</p>
             </div>
             <button
               onClick={() => setIsCreateUserModalOpen(true)}
@@ -1142,11 +1359,11 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       )}
 
       {activeTab === 'products' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6">
-          <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 shrink-0">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6">
+          <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2.5 sm:pb-4 shrink-0">
             <div>
-              <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីទំនិញ</h3>
-              <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">គ្រប់គ្រងទំនិញ និងកម្មវិធីប្រម៉ូសិន</p>
+              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">បញ្ជីទំនិញ</h3>
+              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងទំនិញ និងកម្មវិធីប្រម៉ូសិន</p>
             </div>
             <button
               onClick={() => setIsCreateProductModalOpen(true)}
@@ -1214,23 +1431,23 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       )}
 
       {activeTab === 'transactions' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-slate-100 pb-4 shrink-0">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6">
+          <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2.5 sm:pb-4 shrink-0">
             <div>
-              <h3 className="text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
-              <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">របាយការណ៍ផ្ទៀងផ្ទាត់ និងតុល្យភាពស្តុកទំនិញ</p>
+              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
+              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">របាយការណ៍ផ្ទៀងផ្ទាត់ និងតុល្យភាពស្តុកទំនិញ</p>
             </div>
           </div>
 
           {/* Filters for Transactions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 shrink-0">
+          <div className="grid grid-cols-3 gap-1.5 md:gap-3 mb-3 bg-slate-50 p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shrink-0">
             {/* User Filter */}
-            <div className="flex flex-col space-y-1">
-              <label className="text-[11px] md:text-xs font-black text-slate-500">អ្នកប្រើប្រាស់</label>
+            <div className="flex flex-col space-y-0.5">
+              <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">អ្នកប្រើប្រាស់</label>
               <select
                 value={filterTxUserId}
                 onChange={(e) => setFilterTxUserId(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
               >
                 <option value="all">ទាំងអស់</option>
                 {users.map(u => (
@@ -1240,24 +1457,28 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             </div>
 
             {/* Start Date Filter */}
-            <div className="flex flex-col space-y-1">
-              <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទចាប់ផ្តើម</label>
+            <div className="flex flex-col space-y-0.5">
+              <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>ចាប់ផ្តើម
+              </label>
               <input
                 type="date"
                 value={filterTxStartDate}
                 onChange={(e) => setFilterTxStartDate(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
               />
             </div>
 
             {/* End Date Filter */}
-            <div className="flex flex-col space-y-1">
-              <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទបញ្ចប់</label>
+            <div className="flex flex-col space-y-0.5">
+              <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>បញ្ចប់
+              </label>
               <input
                 type="date"
                 value={filterTxEndDate}
                 onChange={(e) => setFilterTxEndDate(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
               />
             </div>
           </div>
@@ -1361,34 +1582,34 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6 animate-in fade-in duration-200">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-4 shrink-0">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-200">
+            <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
-                <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកឡើងឡានរបស់ User</h3>
-                <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យឡើងឡានរបស់ភ្នាក់ងារលក់</p>
+                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកឡើងឡានរបស់ User</h3>
+                <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យឡើងឡានរបស់ភ្នាក់ងារលក់</p>
               </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 gap-3 mb-4 shrink-0">
-              <div className="bg-rose-50/50 border border-rose-100/50 p-4 rounded-2xl flex flex-col justify-between">
+            <div className="grid grid-cols-2 gap-2 mb-3 shrink-0">
+              <div className="bg-rose-50/50 border border-rose-100/50 p-2.5 rounded-xl flex flex-col justify-between">
                 <span className="text-[10px] sm:text-xs font-black text-slate-500">សរុបឡើងឡាន</span>
-                <span className="text-lg sm:text-2xl font-black text-rose-600 mt-1">{totalOutQty}</span>
+                <span className="text-sm sm:text-2xl font-black text-rose-600 mt-0.5">{totalOutQty}</span>
               </div>
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex flex-col justify-between">
+              <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex flex-col justify-between">
                 <span className="text-[10px] sm:text-xs font-black text-slate-500 font-bold">ប្រតិបត្តិការសរុប</span>
-                <span className="text-lg sm:text-2xl font-black text-slate-800 mt-1">{sortedOutInvoices.length} វិក្កយបត្រ</span>
+                <span className="text-sm sm:text-2xl font-black text-slate-800 mt-0.5">{sortedOutInvoices.length} វិក្កយបត្រ</span>
               </div>
             </div>
 
             {/* Shared Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 shrink-0">
-              <div className="flex flex-col space-y-1">
-                <label className="text-[11px] md:text-xs font-black text-slate-500">អ្នកប្រើប្រាស់</label>
+            <div className="grid grid-cols-3 gap-1.5 md:gap-3 mb-3 bg-slate-50 p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shrink-0">
+              <div className="flex flex-col space-y-0.5">
+                <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">អ្នកប្រើប្រាស់</label>
                 <select
                   value={filterTxUserId}
                   onChange={(e) => setFilterTxUserId(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 >
                   <option value="all">ទាំងអស់</option>
                   {users.map(u => (
@@ -1397,23 +1618,27 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 </select>
               </div>
 
-              <div className="flex flex-col space-y-1">
-                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទចាប់ផ្តើម</label>
+              <div className="flex flex-col space-y-0.5">
+                <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                  <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>ចាប់ផ្តើម
+                </label>
                 <input
                   type="date"
                   value={filterTxStartDate}
                   onChange={(e) => setFilterTxStartDate(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 />
               </div>
 
-              <div className="flex flex-col space-y-1">
-                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទបញ្ចប់</label>
+              <div className="flex flex-col space-y-0.5">
+                <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                  <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>បញ្ចប់
+                </label>
                 <input
                   type="date"
                   value={filterTxEndDate}
                   onChange={(e) => setFilterTxEndDate(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 />
               </div>
             </div>
@@ -1545,38 +1770,38 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6 animate-in fade-in duration-200">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-4 shrink-0">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-200">
+            <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
-                <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកលក់ចេញរបស់ User</h3>
-                <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យលក់ចេញ និងការថែមជូនប្រម៉ូសិនរបស់ភ្នាក់ងារលក់</p>
+                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកលក់ចេញរបស់ User</h3>
+                <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យលក់ចេញ និងការថែមជូនប្រម៉ូសិនរបស់ភ្នាក់ងារលក់</p>
               </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-3 gap-2.5 mb-4 shrink-0">
-              <div className="bg-emerald-50/50 border border-emerald-100/50 p-3 sm:p-4 rounded-2xl flex flex-col justify-between">
-                <span className="text-[10px] sm:text-xs font-black text-slate-500">សរុបលក់ចេញ</span>
-                <span className="text-base sm:text-2xl font-black text-emerald-600 mt-1">{totalSoldQty}</span>
+            <div className="grid grid-cols-3 gap-2 mb-3 shrink-0">
+              <div className="bg-emerald-50/50 border border-emerald-100/50 p-2 rounded-xl flex flex-col justify-between">
+                <span className="text-[9px] sm:text-xs font-black text-slate-500 truncate">សរុបលក់ចេញ</span>
+                <span className="text-xs sm:text-2xl font-black text-emerald-600 mt-0.5">{totalSoldQty}</span>
               </div>
-              <div className="bg-amber-50/50 border border-amber-100/50 p-3 sm:p-4 rounded-2xl flex flex-col justify-between">
-                <span className="text-[10px] sm:text-xs font-black text-slate-500">សរុបថែម</span>
-                <span className="text-base sm:text-2xl font-black text-amber-500 mt-1">{totalPromoQty}</span>
+              <div className="bg-amber-50/50 border border-amber-100/50 p-2 rounded-xl flex flex-col justify-between">
+                <span className="text-[9px] sm:text-xs font-black text-slate-500 truncate">សរុបថែម</span>
+                <span className="text-xs sm:text-2xl font-black text-amber-500 mt-0.5">{totalPromoQty}</span>
               </div>
-              <div className="bg-slate-50 border border-slate-100 p-3 sm:p-4 rounded-2xl flex flex-col justify-between">
-                <span className="text-[10px] sm:text-xs font-black text-slate-500 font-bold">ប្រតិបត្តិការ</span>
-                <span className="text-base sm:text-2xl font-black text-slate-800 mt-1">{sortedSoldInvoices.length} វិក្កយបត្រ</span>
+              <div className="bg-slate-50 border border-slate-100 p-2 rounded-xl flex flex-col justify-between">
+                <span className="text-[9px] sm:text-xs font-black text-slate-500 font-bold truncate">ប្រតិបត្តិការ</span>
+                <span className="text-xs sm:text-2xl font-black text-slate-800 mt-0.5">{sortedSoldInvoices.length} វិក្កយបត្រ</span>
               </div>
             </div>
 
             {/* Shared Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 shrink-0">
-              <div className="flex flex-col space-y-1">
-                <label className="text-[11px] md:text-xs font-black text-slate-500">អ្នកប្រើប្រាស់</label>
+            <div className="grid grid-cols-3 gap-1.5 md:gap-3 mb-3 bg-slate-50 p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shrink-0">
+              <div className="flex flex-col space-y-0.5">
+                <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">អ្នកប្រើប្រាស់</label>
                 <select
                   value={filterTxUserId}
                   onChange={(e) => setFilterTxUserId(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 >
                   <option value="all">ទាំងអស់</option>
                   {users.map(u => (
@@ -1585,23 +1810,27 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 </select>
               </div>
 
-              <div className="flex flex-col space-y-1">
-                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទចាប់ផ្តើម</label>
+              <div className="flex flex-col space-y-0.5">
+                <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                  <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>ចាប់ផ្តើម
+                </label>
                 <input
                   type="date"
                   value={filterTxStartDate}
                   onChange={(e) => setFilterTxStartDate(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 />
               </div>
 
-              <div className="flex flex-col space-y-1">
-                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទបញ្ចប់</label>
+              <div className="flex flex-col space-y-0.5">
+                <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                  <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>បញ្ចប់
+                </label>
                 <input
                   type="date"
                   value={filterTxEndDate}
                   onChange={(e) => setFilterTxEndDate(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 />
               </div>
             </div>
@@ -1735,34 +1964,34 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6 animate-in fade-in duration-200">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-4 shrink-0">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-200">
+            <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
-                <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកត្រឡប់របស់ User</h3>
-                <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យត្រឡប់របស់ភ្នាក់ងារលក់</p>
+                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកត្រឡប់របស់ User</h3>
+                <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យត្រឡប់របស់ភ្នាក់ងារលក់</p>
               </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 gap-3 mb-4 shrink-0">
-              <div className="bg-indigo-50/50 border border-indigo-100/50 p-4 rounded-2xl flex flex-col justify-between">
+            <div className="grid grid-cols-2 gap-2 mb-3 shrink-0">
+              <div className="bg-indigo-50/50 border border-indigo-100/50 p-2.5 rounded-xl flex flex-col justify-between">
                 <span className="text-[10px] sm:text-xs font-black text-slate-500">សរុបត្រឡប់</span>
-                <span className="text-lg sm:text-2xl font-black text-indigo-600 mt-1">{totalReturnQty}</span>
+                <span className="text-sm sm:text-2xl font-black text-indigo-600 mt-0.5">{totalReturnQty}</span>
               </div>
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex flex-col justify-between">
+              <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex flex-col justify-between">
                 <span className="text-[10px] sm:text-xs font-black text-slate-500 font-bold">ប្រតិបត្តិការសរុប</span>
-                <span className="text-lg sm:text-2xl font-black text-slate-800 mt-1">{sortedReturnInvoices.length} វិក្កយបត្រ</span>
+                <span className="text-sm sm:text-2xl font-black text-slate-800 mt-0.5">{sortedReturnInvoices.length} វិក្កយបត្រ</span>
               </div>
             </div>
 
             {/* Shared Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 shrink-0">
-              <div className="flex flex-col space-y-1">
-                <label className="text-[11px] md:text-xs font-black text-slate-500">អ្នកប្រើប្រាស់</label>
+            <div className="grid grid-cols-3 gap-1.5 md:gap-3 mb-3 bg-slate-50 p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shrink-0">
+              <div className="flex flex-col space-y-0.5">
+                <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">អ្នកប្រើប្រាស់</label>
                 <select
                   value={filterTxUserId}
                   onChange={(e) => setFilterTxUserId(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 >
                   <option value="all">ទាំងអស់</option>
                   {users.map(u => (
@@ -1771,23 +2000,27 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 </select>
               </div>
 
-              <div className="flex flex-col space-y-1">
-                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទចាប់ផ្តើម</label>
+              <div className="flex flex-col space-y-0.5">
+                <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                  <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>ចាប់ផ្តើម
+                </label>
                 <input
                   type="date"
                   value={filterTxStartDate}
                   onChange={(e) => setFilterTxStartDate(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 />
               </div>
 
-              <div className="flex flex-col space-y-1">
-                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទបញ្ចប់</label>
+              <div className="flex flex-col space-y-0.5">
+                <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                  <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>បញ្ចប់
+                </label>
                 <input
                   type="date"
                   value={filterTxEndDate}
                   onChange={(e) => setFilterTxEndDate(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                  className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 />
               </div>
             </div>
@@ -1881,11 +2114,11 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       })()}
 
       {activeTab === 'stockOrders' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-slate-100 pb-4 shrink-0">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6">
+          <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2.5 sm:pb-4 shrink-0">
             <div>
-              <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកកម្មង់</h3>
-              <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">ការកម្មង់សរុប៖ {totalOrderItems} ជួរ</p>
+              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកកម្មង់</h3>
+              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">ការកម្មង់សរុប៖ {totalOrderItems} ជួរ</p>
             </div>
             
             <div className="flex flex-wrap items-center gap-3">
@@ -2002,6 +2235,428 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
 
         </div>
+      )}
+
+      {activeTab === 'warehouse' && (
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-300">
+          
+          {/* Header */}
+          <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-4 shrink-0">
+            <div>
+              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកឃ្លាំង (Warehouse Stock)</h3>
+              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងចំនួនស្តុកប្រព័ន្ធ ផ្ទៀងផ្ទាត់ស្តុកជាក់ស្តែង និងបញ្ចូលស្តុកថ្មី</p>
+            </div>
+          </div>
+
+          {/* Metrics Dashboard Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5 shrink-0">
+            <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-2xl flex items-center space-x-3">
+              <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">មុខទំនិញសរុប</p>
+                <h4 className="text-sm sm:text-base font-black text-slate-700">{products.length} មុខ</h4>
+              </div>
+            </div>
+
+            <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-2xl flex items-center space-x-3">
+              <div className="p-2.5 rounded-xl bg-sky-50 text-sky-600">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2a4 4 0 00-4-4H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v8m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">ស្តុកប្រព័ន្ធសរុប</p>
+                <h4 className="text-sm sm:text-base font-black text-sky-600">
+                  {products.reduce((acc, p) => acc + (p.warehouseStock || 0), 0).toLocaleString()} ឯកតា
+                </h4>
+              </div>
+            </div>
+
+            <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-2xl flex items-center space-x-3">
+              <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">ស្តុកជាក់ស្តែងសរុប</p>
+                <h4 className="text-sm sm:text-base font-black text-emerald-600">
+                  {products.reduce((acc, p) => acc + (p.actualStock !== undefined ? p.actualStock : 0), 0).toLocaleString()} ឯកតា
+                </h4>
+              </div>
+            </div>
+
+            <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-2xl flex items-center space-x-3">
+              <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">ចំនួនលម្អៀង</p>
+                <h4 className="text-sm sm:text-base font-black text-amber-600">
+                  {products.filter(p => p.actualStock !== undefined && p.actualStock !== (p.warehouseStock || 0)).length} មុខ
+                </h4>
+              </div>
+            </div>
+          </div>
+
+          {/* Search bar and Stock In Button */}
+          <div className="mb-4 flex gap-3 shrink-0 items-center">
+            <div className="relative flex-1">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                placeholder="ស្វែងរកទំនិញក្នុងឃ្លាំង..."
+                value={warehouseSearchQuery}
+                onChange={(e) => setWarehouseSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setStockInDate(() => {
+                  const today = new Date();
+                  const yyyy = today.getFullYear();
+                  const mm = String(today.getMonth() + 1).padStart(2, '0');
+                  const dd = String(today.getDate()).padStart(2, '0');
+                  return `${yyyy}-${mm}-${dd}`;
+                });
+                setStockInDeliverer('Admin');
+                setStockInItems([]);
+                setIsStockInModalOpen(true);
+              }}
+              className="flex items-center space-x-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs sm:text-sm font-black px-4 py-3 rounded-2xl shadow-md shadow-sky-600/10 active:scale-95 transition cursor-pointer shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>ស្តុកចូល</span>
+            </button>
+          </div>
+
+          {/* Table Container */}
+          <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
+                <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
+                  <th className="px-2 md:px-4 py-3 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
+                  <th className="px-2 md:px-4 py-3 text-center font-bold text-sky-600 bg-sky-50/10">ស្តុកប្រព័ន្ធ (System)</th>
+                  <th className="px-2 md:px-4 py-3 text-center font-bold text-emerald-600 bg-emerald-50/10">ស្តុកជាក់ស្តែង (Actual)</th>
+                  <th className="px-2 md:px-4 py-3 text-center font-bold text-slate-500">កម្រិតលម្អៀង (Variance)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
+                {filteredWarehouseProducts.map(product => {
+                  const sysStock = product.warehouseStock || 0;
+                  const actStock = product.actualStock;
+                  const hasTake = actStock !== undefined;
+                  const variance = hasTake ? actStock - sysStock : 0;
+                  const draftVal = actualStockDrafts[product.id];
+                  const isDirty = draftVal !== undefined && draftVal !== String(actStock ?? '');
+
+                  return (
+                    <tr 
+                      key={product.id} 
+                      onClick={() => {
+                        setProductToEditWarehouseStock(product);
+                        setEditWarehouseStockVal(String(sysStock));
+                        setIsEditWarehouseStockModalOpen(true);
+                      }}
+                      className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
+                    >
+                      <td className="px-2 md:px-4 py-3">
+                        <div className="font-bold text-slate-800">{product.name}</div>
+                        {product.lastStockTake && (
+                          <div className="text-[9px] text-slate-400 font-medium mt-0.5">
+                            ផ្ទៀងផ្ទាត់ចុងក្រោយ៖ {new Date(product.lastStockTake).toLocaleDateString('kh-KH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-2 md:px-4 py-3 text-center font-black text-sky-600 bg-sky-50/5">
+                        {sysStock.toLocaleString()}
+                      </td>
+                      <td className="px-2 md:px-4 py-3 bg-emerald-50/5" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center space-x-1.5 max-w-[150px] mx-auto">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="បញ្ចូលចំនួន..."
+                            value={draftVal !== undefined ? draftVal : (actStock !== undefined ? String(actStock) : '')}
+                            onChange={(e) => setActualStockDrafts({
+                              ...actualStockDrafts,
+                              [product.id]: e.target.value
+                            })}
+                            className="w-16 sm:w-20 text-center py-1 px-1.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs font-black text-slate-800"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveActualStock(product)}
+                            disabled={!isDirty || loading}
+                            className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                              isDirty 
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm scale-105' 
+                                : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed'
+                            }`}
+                            title="កត់ត្រាស្តុកជាក់ស្តែង"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-2 md:px-4 py-3 text-center font-bold">
+                        {hasTake ? (
+                          variance === 0 ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
+                              ត្រូវគ្នា (0)
+                            </span>
+                          ) : variance < 0 ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-100">
+                              ខ្វះឃ្លាំង ({variance.toLocaleString()})
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-100">
+                              លើសឃ្លាំង (+{variance.toLocaleString()})
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-slate-400 font-medium text-[10px] sm:text-xs">មិនទាន់ផ្ទៀងផ្ទាត់</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredWarehouseProducts.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-24 text-center text-slate-400 font-bold">
+                      {products.length === 0 ? "មិនទាន់មានទំនិញនៅក្នុងប្រព័ន្ធទេ" : "រកមិនឃើញទំនិញដែលស្វែងរកឡើយ"}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Stock In Modal */}
+      {isStockInModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">បញ្ចូលស្តុកចូល (Stock In)</h3>
+                <p className="text-xs text-slate-500 font-medium">សូមជ្រើសរើសទំនិញ និងបញ្ចូលចំនួនស្តុកបន្ថែម</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsStockInModalOpen(false);
+                  setStockInItems([]);
+                }} 
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveStockIn} className="flex flex-col min-h-0">
+              <div className="overflow-y-auto p-6 pt-4 custom-scroll space-y-4">
+                {/* Meta Inputs (Date & Deliverer) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">កាលបរិច្ឆេទ</label>
+                    <input
+                      type="date"
+                      value={stockInDate}
+                      onChange={e => setStockInDate(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 outline-none font-bold text-slate-800"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">អ្នកប្រគល់ស្តុក</label>
+                    <input
+                      type="text"
+                      value={stockInDeliverer}
+                      onChange={e => setStockInDeliverer(e.target.value)}
+                      placeholder="ឈ្មោះ..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Multi-Stock List Selection */}
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">
+                      ជ្រើសរើសទំនិញ
+                    </label>
+                    <div className="relative">
+                      <select
+                        onChange={handleProductSelectToStockIn}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 outline-none font-bold text-slate-800 appearance-none cursor-pointer"
+                        value=""
+                      >
+                        <option value="" disabled>-- ជ្រើសរើសទំនិញដើម្បីបញ្ចូលស្តុក --</option>
+                        {products.map(p => (
+                          <option key={p.id} value={p.name}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* List Rows */}
+                  <div className="space-y-1.5">
+                    {stockInItems.length === 0 ? (
+                      <div className="border border-dashed border-slate-200 rounded-2xl py-8 px-4 text-center text-xs text-slate-400 font-bold bg-slate-50/30">
+                        📦 សូមជ្រើសរើសទំនិញខាងលើ ដើម្បីបន្ថែមចូលក្នុងបញ្ជីបញ្ចូលស្តុក
+                      </div>
+                    ) : (
+                      <div className="border border-slate-100 rounded-2xl bg-slate-50/30 p-2 sm:p-3 space-y-1">
+                        {/* Column Headers */}
+                        <div className="grid grid-cols-12 gap-2 px-2 pb-2 border-b border-slate-200 text-[10px] font-bold text-slate-400">
+                          <div className="col-span-8">ទំនិញ</div>
+                          <div className="col-span-3 text-center">បរិមាណ</div>
+                          <div className="col-span-1"></div>
+                        </div>
+
+                        {/* Rows */}
+                        <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto pr-1 custom-scroll">
+                          {stockInItems.map((item, index) => (
+                            <div key={index} className="grid grid-cols-12 gap-2 py-2 items-center px-2 hover:bg-slate-50 rounded-lg transition animate-in fade-in duration-150">
+                              {/* Product Name */}
+                              <div className="col-span-8 flex flex-col min-w-0">
+                                <span className="font-bold text-slate-800 text-xs truncate" title={item.productName}>
+                                  {item.productName}
+                                </span>
+                              </div>
+
+                              {/* Quantity Input */}
+                              <div className="col-span-3">
+                                <input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={e => updateStockInRow(index, 'quantity', e.target.value)}
+                                  className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-center text-xs focus:border-sky-400 outline-none font-bold text-slate-800"
+                                  required
+                                  min="1"
+                                  placeholder="ចំនួន"
+                                />
+                              </div>
+
+                              {/* Delete button */}
+                              <div className="col-span-1 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => removeStockInRow(index)}
+                                  className="p-1 hover:bg-rose-50 text-rose-500 rounded-lg transition cursor-pointer flex justify-end w-full"
+                                  title="លុបចោល"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center space-x-3 shrink-0 rounded-b-3xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsStockInModalOpen(false);
+                    setStockInItems([]);
+                  }}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer animate-in duration-100"
+                >
+                  បោះបង់
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || stockInItems.length === 0}
+                  className="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-sky-600/30 transition disabled:opacity-70 cursor-pointer"
+                >
+                  {loading ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Edit Warehouse Stock Modal */}
+      {isEditWarehouseStockModalOpen && productToEditWarehouseStock && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">កែប្រែស្តុកឃ្លាំង (Edit Warehouse Stock)</h3>
+            <p className="text-xs text-slate-500 font-medium mb-4">កែប្រែចំនួនស្តុកប្រព័ន្ធសម្រាប់ទំនិញ <span className="font-bold text-slate-800">"{productToEditWarehouseStock.name}"</span></p>
+
+            <form onSubmit={handleSaveWarehouseStock} className="space-y-4">
+              <div>
+                <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">ស្តុកប្រព័ន្ធបច្ចុប្បន្ន (System Stock)</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  placeholder="ឧ. ១០០"
+                  value={editWarehouseStockVal}
+                  onChange={(e) => setEditWarehouseStockVal(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-black"
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditWarehouseStockModalOpen(false);
+                    setProductToEditWarehouseStock(null);
+                    setEditWarehouseStockVal('');
+                  }}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+                >
+                  បោះបង់
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 hover:bg-sky-700 bg-sky-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-sky-600/30 transition disabled:opacity-70 cursor-pointer"
+                >
+                  {loading ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Custom Confirmation Modal for Deleting User */}
@@ -3579,6 +4234,21 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 onClick={async () => {
                   setLoading(true);
                   try {
+                    await Promise.all(invoiceToDelete.items.map(async (item: any) => {
+                      const product = products.find(p => p.name === item.productName);
+                      if (product) {
+                        if (item.type === 'Stock Out') {
+                          await updateDoc(doc(db, 'products', product.id), {
+                            warehouseStock: increment(item.quantity)
+                          });
+                        } else if (item.type === 'Stock Return') {
+                          await updateDoc(doc(db, 'products', product.id), {
+                            warehouseStock: increment(-item.quantity)
+                          });
+                        }
+                      }
+                    }));
+
                     await Promise.all(invoiceToDelete.items.map((item: any) => deleteDoc(doc(db, 'transactions', item.id))));
                     setInvoiceToDelete(null);
                     setSelectedInvoiceDetail(null);

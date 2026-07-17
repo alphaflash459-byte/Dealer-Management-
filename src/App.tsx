@@ -14,7 +14,7 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [stockOrders, setStockOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn'>('stockOut');
+  const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn' | 'warehouse'>('stockOut');
   const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return' | 'Report' | 'Stock Order'>('Stock Out');
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -342,6 +342,30 @@ export default function App() {
                     </svg>
                   </div>
                   <span className="text-xs font-black">គ្រប់គ្រងមុខទំនិញ (Products)</span>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setActiveAdminView('warehouse');
+                    setIsUserMenuOpen(false);
+                  }} 
+                  className={`w-full flex items-center p-2.5 rounded-2xl transition-all cursor-pointer ${
+                    activeAdminView === 'warehouse' 
+                      ? 'text-emerald-700 bg-emerald-50 border border-emerald-100/50' 
+                      : 'text-slate-600 hover:bg-slate-50 border border-transparent'
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-xl mr-3 ${
+                    activeAdminView === 'warehouse' 
+                      ? 'bg-emerald-100 text-emerald-700' 
+                      : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-black">ស្តុកឃ្លាំង (Warehouse)</span>
                 </button>
               </div>
             )}

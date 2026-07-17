@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { User, Transaction, TransactionType, Product, StockOrder } from '../types';
-import { doc, setDoc, deleteDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc, deleteField, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export function cleanUndefined<T extends object>(obj: T): T {
@@ -651,6 +651,55 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         (updatedTransaction as any).promoQty = deleteField(); 
       }
 
+      // Handle Warehouse Stock updates for Edit
+      if (editingTransaction.type === 'Stock Out') {
+        const oldProduct = products.find(p => p.name === editingTransaction.productName);
+        const newProduct = products.find(p => p.name === editProductName);
+        
+        if (oldProduct && newProduct && oldProduct.id === newProduct.id) {
+          const diff = editingTransaction.quantity - qty;
+          if (diff !== 0) {
+            await updateDoc(doc(db, 'products', oldProduct.id), {
+              warehouseStock: increment(diff)
+            });
+          }
+        } else {
+          if (oldProduct) {
+            await updateDoc(doc(db, 'products', oldProduct.id), {
+              warehouseStock: increment(editingTransaction.quantity)
+            });
+          }
+          if (newProduct) {
+            await updateDoc(doc(db, 'products', newProduct.id), {
+              warehouseStock: increment(-qty)
+            });
+          }
+        }
+      } else if (editingTransaction.type === 'Stock Return') {
+        const oldProduct = products.find(p => p.name === editingTransaction.productName);
+        const newProduct = products.find(p => p.name === editProductName);
+        
+        if (oldProduct && newProduct && oldProduct.id === newProduct.id) {
+          const diff = qty - editingTransaction.quantity;
+          if (diff !== 0) {
+            await updateDoc(doc(db, 'products', oldProduct.id), {
+              warehouseStock: increment(diff)
+            });
+          }
+        } else {
+          if (oldProduct) {
+            await updateDoc(doc(db, 'products', oldProduct.id), {
+              warehouseStock: increment(-editingTransaction.quantity)
+            });
+          }
+          if (newProduct) {
+            await updateDoc(doc(db, 'products', newProduct.id), {
+              warehouseStock: increment(qty)
+            });
+          }
+        }
+      }
+
       await updateDoc(doc(db, 'transactions', editingTransaction.id), cleanUndefined(updatedTransaction));
       setEditingTransaction(null);
     } catch (error) {
@@ -664,6 +713,20 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   const handleDeleteTransaction = async (id: string) => {
     setLoading(true);
     try {
+      if (transactionToDelete) {
+        const product = products.find(p => p.name === transactionToDelete.productName);
+        if (product) {
+          if (transactionToDelete.type === 'Stock Out') {
+            await updateDoc(doc(db, 'products', product.id), {
+              warehouseStock: increment(transactionToDelete.quantity)
+            });
+          } else if (transactionToDelete.type === 'Stock Return') {
+            await updateDoc(doc(db, 'products', product.id), {
+              warehouseStock: increment(-transactionToDelete.quantity)
+            });
+          }
+        }
+      }
       await deleteDoc(doc(db, 'transactions', id));
       setTransactionToDelete(null);
     } catch (error) {
@@ -1438,6 +1501,19 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           note: (customerName && location) ? `${customerName} (${location})` : customerName || location || note
         };
         await setDoc(doc(db, 'transactions', newTransaction.id), cleanUndefined(newTransaction));
+
+        // Update Warehouse Stock
+        if (product) {
+          if (activeTab === 'Stock Out') {
+            await updateDoc(doc(db, 'products', product.id), {
+              warehouseStock: increment(-qty)
+            });
+          } else if (activeTab === 'Stock Return') {
+            await updateDoc(doc(db, 'products', product.id), {
+              warehouseStock: increment(qty)
+            });
+          }
+        }
       }));
 
       setIsModalOpen(false);
@@ -2293,6 +2369,21 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 onClick={async () => {
                   setLoading(true);
                   try {
+                    await Promise.all(invoiceToDelete.items.map(async (item: any) => {
+                      const product = products.find(p => p.name === item.productName);
+                      if (product) {
+                        if (item.type === 'Stock Out') {
+                          await updateDoc(doc(db, 'products', product.id), {
+                            warehouseStock: increment(item.quantity)
+                          });
+                        } else if (item.type === 'Stock Return') {
+                          await updateDoc(doc(db, 'products', product.id), {
+                            warehouseStock: increment(-item.quantity)
+                          });
+                        }
+                      }
+                    }));
+
                     await Promise.all(invoiceToDelete.items.map((item: any) => deleteDoc(doc(db, 'transactions', item.id))));
                     setInvoiceToDelete(null);
                     setSelectedInvoiceDetail(null);

@@ -23,6 +23,9 @@ export interface Product {
   promoGetQty?: number;
   promotions?: PromotionTier[];
   createdAt: string;
+  warehouseStock?: number;
+  actualStock?: number;
+  lastStockTake?: string;
 }
 
 export interface Transaction {

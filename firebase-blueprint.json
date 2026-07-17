@@ -32,7 +32,10 @@
       "name": "products",
       "fields": [
         { "name": "name", "type": "string" },
-        { "name": "createdAt", "type": "string" }
+        { "name": "createdAt", "type": "string" },
+        { "name": "warehouseStock", "type": "number" },
+        { "name": "actualStock", "type": "number" },
+        { "name": "lastStockTake", "type": "string" }
       ],
       "rules": [
         { "action": "read", "condition": "true" },
