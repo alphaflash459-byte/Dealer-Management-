@@ -1677,16 +1677,16 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
                           return (
                             <tr key={product.id} className="hover:bg-slate-50/70 transition-colors">
-                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 font-black text-slate-800 text-left">{product.name}</td>
-                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-bold text-rose-600 text-xs sm:text-sm">{loaded}</td>
-                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-bold text-emerald-600 text-xs sm:text-sm">
+                              <td className="px-1.5 md:px-3 py-2 font-black text-slate-800 text-left">{product.name}</td>
+                              <td className="px-1.5 md:px-3 py-2 text-center font-bold text-rose-600 text-xs sm:text-sm">{loaded}</td>
+                              <td className="px-1.5 md:px-3 py-2 text-center font-bold text-emerald-600 text-xs sm:text-sm">
                                 {soldOnly}
                               </td>
-                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-bold text-teal-600 text-xs sm:text-sm">
+                              <td className="px-1.5 md:px-3 py-2 text-center font-bold text-teal-600 text-xs sm:text-sm">
                                 {promosGiven}
                               </td>
-                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-bold text-amber-600 text-xs sm:text-sm">{returned}</td>
-                              <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-right">
+                              <td className="px-1.5 md:px-3 py-2 text-center font-bold text-amber-600 text-xs sm:text-sm">{returned}</td>
+                              <td className="px-1.5 md:px-3 py-2 text-right">
                                 <span className={`${badgeColorClass} px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-xl font-black text-[9px] sm:text-xs md:text-sm whitespace-nowrap`}>
                                   {statusText}
                                 </span>
@@ -1762,10 +1762,10 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                 className={`${orderGroup.delivered ? 'bg-emerald-50/50 hover:bg-emerald-50' : 'bg-amber-50/50 hover:bg-amber-50'} transition-all cursor-pointer group`}
                                 title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
                               >
-                                <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                                <td className="px-1.5 md:px-3 py-2 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
                                   {orderGroup.customerName || <span className="text-slate-300">គ្មានឈ្មោះ</span>}
                                 </td>
-                                <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                                <td className="px-1.5 md:px-3 py-2 text-left">
                                   {orderGroup.location ? (
                                     <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
                                       {orderGroup.location}
@@ -1774,7 +1774,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                     <span className="text-slate-300 font-bold">-</span>
                                   )}
                                 </td>
-                                <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">
+                                <td className="px-1.5 md:px-3 py-2 text-center text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">
                                   <div className="flex flex-col items-center justify-center space-y-1">
                                     <span className="font-medium text-slate-500">
                                       {(() => {
@@ -1787,7 +1787,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                     </span>
                                   </div>
                                 </td>
-                                <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                                <td className="px-1.5 md:px-3 py-2 text-left font-medium text-slate-700">
                                   <div className="flex flex-col space-y-1.5">
                                     {orderGroup.items.map((item: any, idx: number) => (
                                       <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
@@ -1796,7 +1796,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                     ))}
                                   </div>
                                 </td>
-                                <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                                <td className="px-1.5 md:px-3 py-2 text-center font-medium">
                                   <div className="flex flex-col space-y-1.5 items-center">
                                     {orderGroup.items.map((item: any, idx: number) => (
                                       <div key={idx} className="h-6 flex items-center justify-center">
@@ -1848,11 +1848,11 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                         title="ចុចដើម្បីមើលវិក្កយបត្រលម្អិត"
                       >
                         {/* Column 1: Customer Name */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
                           {inv.customerName}
                         </td>
                         {/* Column 2: Location */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                        <td className="px-1.5 md:px-3 py-2 text-left">
                           {inv.location ? (
                             <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
                               {inv.location}
@@ -1862,7 +1862,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                           )}
                         </td>
                         {/* Column 3: Date */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium text-slate-500 whitespace-nowrap">
                           {(() => {
                             const d = new Date(inv.date);
                             const day = String(d.getDate()).padStart(2, '0');
@@ -1872,7 +1872,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                           })()}
                         </td>
                         {/* Column 4: Product list */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-medium text-slate-700">
                           <div className="flex flex-col space-y-1.5">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
@@ -1882,7 +1882,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                           </div>
                         </td>
                         {/* Column 5: បរិមាណ list */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium">
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center justify-center">

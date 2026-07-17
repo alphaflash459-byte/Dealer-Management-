@@ -1438,8 +1438,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   return (
     <div className="w-full h-full flex flex-col min-w-0 overflow-hidden">
       {activeTab === 'users' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6">
-          <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2.5 sm:pb-4 shrink-0">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
+          <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
             <div>
               <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
               <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងគណនីអ្នកប្រើប្រាស់ក្នុងប្រព័ន្ធ</p>
@@ -1470,9 +1470,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       onClick={() => setSelectedUserDetail(user)}
                       className="hover:bg-slate-50 transition-colors cursor-pointer"
                     >
-                      <td className="px-2 md:px-4 py-2.5 sm:py-4 font-bold text-slate-800">{user.username}</td>
-                      <td className="px-2 md:px-4 py-2.5 sm:py-4 font-mono font-medium text-slate-500">{user.password}</td>
-                      <td className="px-2 md:px-4 py-2.5 sm:py-4">
+                      <td className="px-2 md:px-4 py-2 font-bold text-slate-800">{user.username}</td>
+                      <td className="px-2 md:px-4 py-2 font-mono font-medium text-slate-500">{user.password}</td>
+                      <td className="px-2 md:px-4 py-2">
                         <span className={`px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] md:text-xs font-bold ${user.role === 'Admin' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {user.role}
                         </span>
@@ -1491,8 +1491,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       )}
 
       {activeTab === 'products' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6">
-          <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2.5 sm:pb-4 shrink-0">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
+          <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
             <div>
               <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">បញ្ជីទំនិញ</h3>
               <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងទំនិញ និងកម្មវិធីប្រម៉ូសិន</p>
@@ -1523,11 +1523,11 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       className="hover:bg-slate-50 transition-colors cursor-pointer"
                       onClick={() => setSelectedProductDetail(product)}
                     >
-                      <td className="px-2 md:px-4 py-2.5 sm:py-4 font-bold text-slate-800">{product.name}</td>
-                      <td className="px-2 md:px-4 py-2.5 sm:py-4 text-right font-black text-indigo-600">
+                      <td className="px-2 md:px-4 py-2 font-bold text-slate-800">{product.name}</td>
+                      <td className="px-2 md:px-4 py-2 text-right font-black text-indigo-600">
                         {product.price !== undefined && product.price !== null ? `$${Number(product.price).toFixed(2)}` : '-'}
                       </td>
-                      <td className="px-2 md:px-4 py-2.5 sm:py-4 text-center">
+                      <td className="px-2 md:px-4 py-2 text-center">
                         {product.promotions && product.promotions.length > 0 ? (
                           <div className="flex flex-wrap gap-1 justify-center max-w-[200px] mx-auto">
                             {product.promotions.slice(0, 2).map((promo, idx) => (
@@ -1563,8 +1563,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       )}
 
       {activeTab === 'transactions' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6">
-          <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2.5 sm:pb-4 shrink-0">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
+          <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
             <div>
               <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
               <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">របាយការណ៍ផ្ទៀងផ្ទាត់ និងតុល្យភាពស្តុកទំនិញ</p>
@@ -1644,22 +1644,22 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       key={p.productName} 
                       className="hover:bg-slate-50/70 transition-all border-b border-slate-100"
                     >
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-bold text-slate-800">
+                      <td className="px-1.5 md:px-3 py-2 text-left font-bold text-slate-800">
                         {p.productName}
                       </td>
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-black text-xs sm:text-sm md:text-base text-rose-500">
+                      <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-rose-500">
                         {p.stockOut || '-'}
                       </td>
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-black text-xs sm:text-sm md:text-base text-emerald-600">
+                      <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-emerald-600">
                         {p.stockSold || '-'}
                       </td>
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-black text-xs sm:text-sm md:text-base text-amber-500">
+                      <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-amber-500">
                         {p.stockPromo || '-'}
                       </td>
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-black text-xs sm:text-sm md:text-base text-indigo-600">
+                      <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-indigo-600">
                         {p.stockReturn || '-'}
                       </td>
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center">
+                      <td className="px-1.5 md:px-3 py-2 text-center">
                         {badge}
                       </td>
                     </tr>
@@ -1714,7 +1714,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
             <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
                 <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកឡើងឡានរបស់អ្នកប្រើប្រាស់</h3>
@@ -1799,15 +1799,15 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                         title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
                       >
                         {/* Column 1: Salesperson / User */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-indigo-900 text-[11px] sm:text-xs md:text-sm">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-black text-indigo-900 text-[11px] sm:text-xs md:text-sm">
                           {user?.username || 'Unknown'}
                         </td>
                         {/* Column 2: Customer / Note Name */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
                           {inv.customerName}
                         </td>
                         {/* Column 3: Location */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                        <td className="px-1.5 md:px-3 py-2 text-left">
                           {inv.location ? (
                             <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
                               {inv.location}
@@ -1817,7 +1817,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           )}
                         </td>
                         {/* Column 4: Date */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium text-slate-500 whitespace-nowrap">
                           {(() => {
                             const d = new Date(inv.date);
                             const day = String(d.getDate()).padStart(2, '0');
@@ -1827,7 +1827,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           })()}
                         </td>
                         {/* Column 5: Product list stacked */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-medium text-slate-700">
                           <div className="flex flex-col space-y-1.5">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
@@ -1837,7 +1837,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           </div>
                         </td>
                         {/* Column 6: បរិមាណ list stacked */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium">
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center justify-center">
@@ -1902,7 +1902,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
             <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
                 <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកលក់ចេញរបស់អ្នកប្រើប្រាស់</h3>
@@ -1991,15 +1991,15 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                         title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
                       >
                         {/* Column 1: Salesperson / User */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-indigo-900 text-[11px] sm:text-xs md:text-sm">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-black text-indigo-900 text-[11px] sm:text-xs md:text-sm">
                           {user?.username || 'Unknown'}
                         </td>
                         {/* Column 2: Customer / Note Name */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
                           {inv.customerName}
                         </td>
                         {/* Column 3: Location */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                        <td className="px-1.5 md:px-3 py-2 text-left">
                           {inv.location ? (
                             <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
                               {inv.location}
@@ -2009,7 +2009,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           )}
                         </td>
                         {/* Column 4: Date */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium text-slate-500 whitespace-nowrap">
                           {(() => {
                             const d = new Date(inv.date);
                             const day = String(d.getDate()).padStart(2, '0');
@@ -2019,7 +2019,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           })()}
                         </td>
                         {/* Column 5: Product list stacked */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-medium text-slate-700">
                           <div className="flex flex-col space-y-1.5">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
@@ -2029,7 +2029,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           </div>
                         </td>
                         {/* Column 6: បរិមាណ list stacked */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium">
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center justify-center">
@@ -2096,7 +2096,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
             <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
                 <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកត្រឡប់របស់អ្នកប្រើប្រាស់</h3>
@@ -2181,15 +2181,15 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                         title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
                       >
                         {/* Column 1: Salesperson / User */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-indigo-900 text-[11px] sm:text-xs md:text-sm">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-black text-indigo-900 text-[11px] sm:text-xs md:text-sm">
                           {user?.username || 'Unknown'}
                         </td>
                         {/* Column 2: Customer / Note Name */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
                           {inv.customerName}
                         </td>
                         {/* Column 3: Location */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                        <td className="px-1.5 md:px-3 py-2 text-left">
                           {inv.location ? (
                             <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
                               {inv.location}
@@ -2199,7 +2199,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           )}
                         </td>
                         {/* Column 4: Date */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium text-slate-500 whitespace-nowrap">
                           {(() => {
                             const d = new Date(inv.date);
                             const day = String(d.getDate()).padStart(2, '0');
@@ -2209,7 +2209,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           })()}
                         </td>
                         {/* Column 5: Product list stacked */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                        <td className="px-1.5 md:px-3 py-2 text-left font-medium text-slate-700">
                           <div className="flex flex-col space-y-1.5">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
@@ -2219,7 +2219,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           </div>
                         </td>
                         {/* Column 6: បរិមាណ list stacked */}
-                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium">
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center justify-center">
@@ -2246,8 +2246,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       })()}
 
       {activeTab === 'stockOrders' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6">
-          <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2.5 sm:pb-4 shrink-0">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
+          <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
             <div>
               <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកកម្មង់</h3>
               <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">ការកម្មង់សរុប៖ {totalOrderItems} ជួរ</p>
@@ -2303,13 +2303,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       className={`${orderGroup.delivered ? 'bg-emerald-50/50 hover:bg-emerald-50' : 'bg-amber-50/50 hover:bg-amber-50'} transition-all cursor-pointer group`}
                       title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
                     >
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                      <td className="px-1.5 md:px-3 py-2 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
                         {orderGroup.username}
                       </td>
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-bold text-slate-700 text-[11px] sm:text-xs md:text-sm">
+                      <td className="px-1.5 md:px-3 py-2 text-left font-bold text-slate-700 text-[11px] sm:text-xs md:text-sm">
                         {orderGroup.customerName || <span className="text-slate-300">គ្មានឈ្មោះ</span>}
                       </td>
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                      <td className="px-1.5 md:px-3 py-2 text-left">
                         {orderGroup.location ? (
                           <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
                             {orderGroup.location}
@@ -2318,7 +2318,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           <span className="text-slate-300 font-bold">-</span>
                         )}
                       </td>
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">
+                      <td className="px-1.5 md:px-3 py-2 text-center text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">
                         <div className="flex flex-col items-center justify-center space-y-1">
                           <span className="font-medium text-slate-500">
                             {(() => {
@@ -2331,7 +2331,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           </span>
                         </div>
                       </td>
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                      <td className="px-1.5 md:px-3 py-2 text-left font-medium text-slate-700">
                         <div className="flex flex-col space-y-1.5">
                           {orderGroup.items.map((item: any, idx: number) => (
                             <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
@@ -2340,7 +2340,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           ))}
                         </div>
                       </td>
-                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                      <td className="px-1.5 md:px-3 py-2 text-center font-medium">
                         <div className="flex flex-col space-y-1.5 items-center">
                           {orderGroup.items.map((item: any, idx: number) => (
                             <div key={idx} className="h-6 flex items-center justify-center">
@@ -2370,7 +2370,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       )}
 
       {activeTab === 'warehouse' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-300">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-300">
           
           {/* Header */}
           <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2 shrink-0">
@@ -2519,11 +2519,6 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     >
                       <td className="px-1 md:px-3 py-1.5">
                         <div className="font-bold text-slate-800">{product.name}</div>
-                        {product.lastStockTake && (
-                          <div className="text-[8px] text-slate-400 font-medium mt-0.5">
-                            ផ្ទៀងផ្ទាត់ចុងក្រោយ៖ {new Date(product.lastStockTake).toLocaleDateString('kh-KH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        )}
                       </td>
                       <td className="px-1 md:px-3 py-1.5 text-center font-black text-sky-600 bg-sky-50/5">
                         {sysStock.toLocaleString()}
