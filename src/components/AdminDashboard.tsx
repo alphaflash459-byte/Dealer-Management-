@@ -65,22 +65,23 @@ export function calculateAutoតម្លៃForQty(product: Product, qty: number
     tiers.push({ buyQty: product.promoBuyQty, getQty: product.promoGetQty });
   }
 
-  // Sort descending by total (buyQty + getQty)
-  tiers.sort((a, b) => (b.buyQty + b.getQty) - (a.buyQty + a.getQty));
+  if (tiers.length === 0) {
+    return standardតម្លៃ;
+  }
 
-  let remainingQty = qty;
+  // Sort descending by buyQty
+  tiers.sort((a, b) => b.buyQty - a.buyQty);
+
   for (const tier of tiers) {
-    const totalQty = tier.buyQty + tier.getQty;
-    if (remainingQty >= totalQty) {
-      remainingQty %= totalQty;
-      // If it perfectly divides by one of the tiers, return its apportioned price
-      if (remainingQty === 0) {
-        return (tier.buyQty * standardតម្លៃ) / totalQty;
-      }
+    if (qty >= tier.buyQty) {
+      // Falls into this tier
+      return (tier.buyQty * standardតម្លៃ) / (tier.buyQty + tier.getQty);
     }
   }
 
-  return standardតម្លៃ;
+  // If quantity is smaller than the smallest tier, use the smallest tier's apportioned price
+  const smallestTier = tiers[tiers.length - 1];
+  return (smallestTier.buyQty * standardតម្លៃ) / (smallestTier.buyQty + smallestTier.getQty);
 }
 
 export function calculatePromoQtyWithតម្លៃCheck(product: Product | undefined, qty: number, priceVal: number): number {

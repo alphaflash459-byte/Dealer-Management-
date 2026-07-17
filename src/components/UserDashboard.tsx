@@ -69,21 +69,19 @@ export function calculateAutoតម្លៃForQty(product: Product, qty: number
     return standardតម្លៃ;
   }
 
-  // Sort descending by total (buyQty + getQty)
-  tiers.sort((a, b) => (b.buyQty + b.getQty) - (a.buyQty + a.getQty));
+  // Sort descending by buyQty
+  tiers.sort((a, b) => b.buyQty - a.buyQty);
 
   for (const tier of tiers) {
-    const totalQty = tier.buyQty + tier.getQty;
-    if (qty >= totalQty) {
+    if (qty >= tier.buyQty) {
       // Falls into this tier
-      return (tier.buyQty * standardតម្លៃ) / totalQty;
+      return (tier.buyQty * standardតម្លៃ) / (tier.buyQty + tier.getQty);
     }
   }
 
   // If quantity is smaller than the smallest tier, use the smallest tier's apportioned price
   const smallestTier = tiers[tiers.length - 1];
-  const smallestTotalQty = smallestTier.buyQty + smallestTier.getQty;
-  return (smallestTier.buyQty * standardតម្លៃ) / smallestTotalQty;
+  return (smallestTier.buyQty * standardតម្លៃ) / (smallestTier.buyQty + smallestTier.getQty);
 }
 
 export function calculatePromoQtyWithតម្លៃCheck(product: Product | undefined, qty: number, priceVal: number): number {
@@ -126,6 +124,22 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   });
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target as Node)) {
+        setIsProductSelectOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [editingTransaction, setកែប្រែingTransaction] = useState<Transaction | null>(null);
@@ -431,6 +445,37 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
   const removeOrderItemRow = (index: number) => {
     setOrderItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCustomProductSelectToOrder = (selectedProdName: string) => {
+    if (!selectedProdName) return;
+
+    const product = products.find(p => p.name === selectedProdName);
+    if (!product) return;
+
+    setOrderItems(prev => {
+      const existingIdx = prev.findIndex(item => item.productName === selectedProdName);
+      if (existingIdx !== -1) {
+        const copy = [...prev];
+        const currentQty = (parseInt(copy[existingIdx].quantity) || 0) + 1;
+        copy[existingIdx] = {
+          ...copy[existingIdx],
+          quantity: currentQty.toString()
+        };
+        return copy;
+      } else {
+        return [
+          ...prev,
+          {
+            productName: selectedProdName,
+            quantity: '1'
+          }
+         ];
+      }
+    });
+
+    setProductSearchTerm('');
+    setIsProductSelectOpen(false);
   };
 
   const handleProductSelectToOrder = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -745,12 +790,61 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     setNote('');
     setCustomerName('');
     setLocation('');
+    setProductSearchTerm('');
+    setIsProductSelectOpen(false);
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     setDate(`${yyyy}-${mm}-${dd}`);
     setIsModalOpen(true);
+  };
+
+  const handleCustomProductSelectToInvoice = (selectedProdName: string) => {
+    if (!selectedProdName) return;
+
+    const product = products.find(p => p.name === selectedProdName);
+    if (!product) return;
+
+    setItems(prev => {
+      if (activeTab === 'Stock Sold') {
+        const autoតម្លៃ = calculateAutoតម្លៃForQty(product, 1);
+        return [
+          ...prev,
+          {
+            productName: selectedProdName,
+            quantity: '1',
+            price: autoតម្លៃ.toFixed(2)
+          }
+        ];
+      }
+
+      const existingIdx = prev.findIndex(item => item.productName === selectedProdName);
+      if (existingIdx !== -1) {
+        const copy = [...prev];
+        const currentQty = (parseInt(copy[existingIdx].quantity) || 0) + 1;
+        const autoតម្លៃ = calculateAutoតម្លៃForQty(product, currentQty);
+        copy[existingIdx] = {
+          ...copy[existingIdx],
+          quantity: currentQty.toString(),
+          price: autoតម្លៃ.toFixed(2)
+        };
+        return copy;
+      } else {
+        const autoតម្លៃ = calculateAutoតម្លៃForQty(product, 1);
+        return [
+          ...prev,
+          {
+            productName: selectedProdName,
+            quantity: '1',
+            price: autoតម្លៃ.toFixed(2)
+          }
+        ];
+      }
+    });
+    
+    setProductSearchTerm('');
+    setIsProductSelectOpen(false);
   };
 
   const handleProductSelectToInvoice = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -1992,24 +2086,52 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">
                     ជ្រើសរើសទំនិញ{activeTab === 'Stock Sold' ? 'លក់' : ''}
                   </label>
-                  <div className="relative">
-                    <select
-                      onChange={handleProductSelectToInvoice}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800 appearance-none cursor-pointer"
-                      value=""
+                  <div className="relative" ref={productDropdownRef}>
+                    <div
+                      onClick={() => setIsProductSelectOpen(!isProductSelectOpen)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800 cursor-pointer flex justify-between items-center"
                     >
-                      <option value="" disabled>-- ជ្រើសរើសទំនិញ{activeTab === 'Stock Sold' ? 'ដើម្បីលក់' : ''} --</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.name}>
-                          {p.name} {p.price && activeTab === 'Stock Sold' ? `($${p.price.toFixed(2)})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <span className="text-slate-400">
+                        -- ជ្រើសរើសទំនិញ{activeTab === 'Stock Sold' ? 'ដើម្បីលក់' : ''} --
+                      </span>
+                      <svg className={`fill-current h-4 w-4 text-slate-500 transition-transform ${isProductSelectOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                         <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
                       </svg>
                     </div>
+                    {isProductSelectOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg max-h-60 overflow-hidden flex flex-col">
+                        <div className="p-2 border-b border-slate-100">
+                          <input
+                            type="text"
+                            placeholder="ស្វែងរកទំនិញ..."
+                            value={productSearchTerm}
+                            onChange={(e) => setProductSearchTerm(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:bg-white focus:border-emerald-400 outline-none font-medium text-slate-700"
+                            onClick={(e) => e.stopPropagation()}
+                            autoFocus
+                          />
+                        </div>
+                        <div className="overflow-y-auto custom-scroll">
+                          {products
+                            .filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()))
+                            .map(p => (
+                              <div
+                                key={p.id}
+                                onClick={() => handleCustomProductSelectToInvoice(p.name)}
+                                className="px-4 py-2.5 hover:bg-emerald-50 cursor-pointer text-sm font-bold text-slate-800 border-b border-slate-50 last:border-0 transition-colors flex justify-between items-center"
+                              >
+                                <span>{p.name}</span>
+                                {p.price && activeTab === 'Stock Sold' && (
+                                  <span className="text-emerald-600 font-black text-xs">${p.price.toFixed(2)}</span>
+                                )}
+                              </div>
+                            ))}
+                          {products.filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase())).length === 0 && (
+                            <div className="px-4 py-3 text-sm text-slate-500 text-center font-medium">មិនមានទំនិញនេះទេ</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2798,24 +2920,49 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ជ្រើសរើសទំនិញកម្មង់</label>
-                  <div className="relative">
-                    <select
-                      onChange={handleProductSelectToOrder}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-indigo-400 outline-none font-bold text-slate-800 appearance-none cursor-pointer"
-                      value=""
+                  <div className="relative" ref={productDropdownRef}>
+                    <div
+                      onClick={() => setIsProductSelectOpen(!isProductSelectOpen)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-indigo-400 outline-none font-bold text-slate-800 cursor-pointer flex justify-between items-center"
                     >
-                      <option value="" disabled>-- ជ្រើសរើសទំនិញដើម្បីកម្មង់ --</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.name}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <span className="text-slate-400">
+                        -- ជ្រើសរើសទំនិញដើម្បីកម្មង់ --
+                      </span>
+                      <svg className={`fill-current h-4 w-4 text-slate-500 transition-transform ${isProductSelectOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                         <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
                       </svg>
                     </div>
+                    {isProductSelectOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg max-h-60 overflow-hidden flex flex-col">
+                        <div className="p-2 border-b border-slate-100">
+                          <input
+                            type="text"
+                            placeholder="ស្វែងរកទំនិញ..."
+                            value={productSearchTerm}
+                            onChange={(e) => setProductSearchTerm(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:bg-white focus:border-indigo-400 outline-none font-medium text-slate-700"
+                            onClick={(e) => e.stopPropagation()}
+                            autoFocus
+                          />
+                        </div>
+                        <div className="overflow-y-auto custom-scroll">
+                          {products
+                            .filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()))
+                            .map(p => (
+                              <div
+                                key={p.id}
+                                onClick={() => handleCustomProductSelectToOrder(p.name)}
+                                className="px-4 py-2.5 hover:bg-indigo-50 cursor-pointer text-sm font-bold text-slate-800 border-b border-slate-50 last:border-0 transition-colors flex justify-between items-center"
+                              >
+                                <span>{p.name}</span>
+                              </div>
+                            ))}
+                          {products.filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase())).length === 0 && (
+                            <div className="px-4 py-3 text-sm text-slate-500 text-center font-medium">មិនមានទំនិញនេះទេ</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
