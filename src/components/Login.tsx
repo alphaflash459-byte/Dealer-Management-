@@ -6,9 +6,9 @@ interface LoginProps {
   onLogin: (user: User) => void;
 }
 
-export default function Login({ users, onLogin }: LoginProps) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+export default function ចូលប្រើប្រាស់({ users, onLogin }: LoginProps) {
+  const [username, setឈ្មោះអ្នកប្រើប្រាស់] = useState('');
+  const [password, setពាក្យសម្ងាត់] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -44,7 +44,7 @@ export default function Login({ users, onLogin }: LoginProps) {
             <input
               type="text"
               value={username}
-              onChange={e => setUsername(e.target.value)}
+              onChange={e => setឈ្មោះអ្នកប្រើប្រាស់(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm md:text-base focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
               placeholder="បញ្ចូលឈ្មោះ"
               required
@@ -55,7 +55,7 @@ export default function Login({ users, onLogin }: LoginProps) {
             <input
               type="password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={e => setពាក្យសម្ងាត់(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm md:text-base focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
               placeholder="បញ្ចូលលេខសម្ងាត់"
               required

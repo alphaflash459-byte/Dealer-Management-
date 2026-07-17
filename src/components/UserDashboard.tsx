@@ -47,14 +47,14 @@ export function calculatePromoQty(product: Product | undefined, qty: number): nu
   return 0;
 }
 
-export function calculateAutoPriceForQty(product: Product, qty: number): number {
-  const standardPrice = product.price || 0;
-  if (qty <= 0) return standardPrice;
+export function calculateAutoតម្លៃForQty(product: Product, qty: number): number {
+  const standardតម្លៃ = product.price || 0;
+  if (qty <= 0) return standardតម្លៃ;
 
   // Check if quantity is an exact promo target number
   const freeQty = calculatePromoQty(product, qty);
   if (freeQty > 0) {
-    return standardPrice;
+    return standardតម្លៃ;
   }
 
   // Check if it's an apportioned quantity (buyQty + getQty)
@@ -75,19 +75,19 @@ export function calculateAutoPriceForQty(product: Product, qty: number): number 
       remainingQty %= totalQty;
       // If it perfectly divides by one of the tiers, return its apportioned price
       if (remainingQty === 0) {
-        return (tier.buyQty * standardPrice) / totalQty;
+        return (tier.buyQty * standardតម្លៃ) / totalQty;
       }
     }
   }
 
-  return standardPrice;
+  return standardតម្លៃ;
 }
 
-export function calculatePromoQtyWithPriceCheck(product: Product | undefined, qty: number, priceVal: number): number {
+export function calculatePromoQtyWithតម្លៃCheck(product: Product | undefined, qty: number, priceVal: number): number {
   if (!product || qty <= 0) return 0;
   
-  const standardPrice = product.price || 0;
-  if (Math.abs(priceVal - standardPrice) > 0.001) {
+  const standardតម្លៃ = product.price || 0;
+  if (Math.abs(priceVal - standardតម្លៃ) > 0.001) {
     return 0;
   }
   
@@ -125,9 +125,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
-  const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
+  const [editingTransaction, setកែប្រែingTransaction] = useState<Transaction | null>(null);
+  const [transactionToលុប, setTransactionToលុប] = useState<Transaction | null>(null);
+  const [invoiceToលុប, setInvoiceToលុប] = useState<any | null>(null);
   const [selectedTransactionDetail, setSelectedTransactionDetail] = useState<Transaction | null>(null);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<any | null>(null);
   const [selectedRowItem, setSelectedRowItem] = useState<Transaction | null>(null);
@@ -158,7 +158,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
       observerRef.current.observe(node);
     }
   }, []);
-  const [editProductName, setEditProductName] = useState('');
+  const [editProductName, setកែប្រែProductName] = useState('');
 
   // Stock Order Specific States
   const [reportSubTab, setReportSubTab] = useState<'total' | 'orders'>('total');
@@ -393,18 +393,18 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             </table>
 
             <div class="total-row">
-              <span class="total-label">តម្លៃសរុប (Grand Total)</span>
+              <span class="total-label">តម្លៃសរុប </span>
               <span class="total-amount">$${totalCost.toFixed(2)}</span>
             </div>
             
             <div class="signatures">
               <div class="signature-block">
-                <div>អ្នកលក់ / Seller</div>
-                <div class="signature-line">ហត្ថលេខា / Signature</div>
+                <div>អ្នកលក់</div>
+                <div class="signature-line">ហត្ថលេខា</div>
               </div>
               <div class="signature-block">
-                <div>អ្នកទិញ / Buyer</div>
-                <div class="signature-line">ហត្ថលេខា / Signature</div>
+                <div>អ្នកទិញ</div>
+                <div class="signature-line">ហត្ថលេខា</div>
               </div>
             </div>
           </div>
@@ -481,7 +481,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     setIsOrderModalOpen(true);
   };
 
-  const handleCreateStockOrder = async (e: React.FormEvent) => {
+  const handleបង្កើតStockOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     const validItems = orderItems.filter(item => item.productName || item.quantity);
     if (validItems.length === 0) {
@@ -539,7 +539,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     }
   };
 
-  const handleConfirmDelivery = async (orderId: string) => {
+  const handleបញ្ជាក់Delivery = async (orderId: string) => {
     try {
       const orderDocRef = doc(db, 'stock_orders', orderId);
       await updateDoc(orderDocRef, {
@@ -556,46 +556,46 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   React.useEffect(() => {
     setCurrentPage(1);
   }, [activeTab]);
-  const [editQuantity, setEditQuantity] = useState('');
-  const [editDate, setEditDate] = useState('');
-  const [editNote, setEditNote] = useState('');
-  const [editCustomerName, setEditCustomerName] = useState('');
-  const [editLocation, setEditLocation] = useState('');
-  const [editPrice, setEditPrice] = useState('');
+  const [editQuantity, setកែប្រែបរិមាណ] = useState('');
+  const [editDate, setកែប្រែDate] = useState('');
+  const [editNote, setកែប្រែNote] = useState('');
+  const [editCustomerName, setកែប្រែCustomerName] = useState('');
+  const [editLocation, setកែប្រែLocation] = useState('');
+  const [editតម្លៃ, setកែប្រែតម្លៃ] = useState('');
 
-  const handleEditClick = (t: Transaction) => {
-    setEditingTransaction(t);
-    setEditProductName(t.productName);
-    setEditQuantity(String(t.quantity));
+  const handleកែប្រែClick = (t: Transaction) => {
+    setកែប្រែingTransaction(t);
+    setកែប្រែProductName(t.productName);
+    setកែប្រែបរិមាណ(String(t.quantity));
     
     const prod = products.find(p => p.name === t.productName);
-    setEditPrice(t.price !== undefined ? String(t.price) : (prod?.price !== undefined ? String(prod.price) : ''));
+    setកែប្រែតម្លៃ(t.price !== undefined ? String(t.price) : (prod?.price !== undefined ? String(prod.price) : ''));
     
     const tDate = t.date ? new Date(t.date) : new Date();
     const validDate = isNaN(tDate.getTime()) ? new Date() : tDate;
     const yyyy = validDate.getFullYear();
     const mm = String(validDate.getMonth() + 1).padStart(2, '0');
     const dd = String(validDate.getDate()).padStart(2, '0');
-    setEditDate(`${yyyy}-${mm}-${dd}`);
-    setEditNote(t.note || '');
+    setកែប្រែDate(`${yyyy}-${mm}-${dd}`);
+    setកែប្រែNote(t.note || '');
 
     if (t.type === 'Stock Sold') {
       const currentNote = t.note || '';
       const match = currentNote.match(/^(.*?)\s*\((.*?)\)$/);
       if (match) {
-        setEditCustomerName(match[1].trim());
-        setEditLocation(match[2].trim());
+        setកែប្រែCustomerName(match[1].trim());
+        setកែប្រែLocation(match[2].trim());
       } else {
-        setEditCustomerName(currentNote);
-        setEditLocation('');
+        setកែប្រែCustomerName(currentNote);
+        setកែប្រែLocation('');
       }
     } else {
-      setEditCustomerName('');
-      setEditLocation('');
+      setកែប្រែCustomerName('');
+      setកែប្រែLocation('');
     }
   };
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
+  const handleកែប្រែSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTransaction) return;
 
@@ -629,18 +629,18 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         );
       }
 
-      const parsedPrice = parseFloat(editPrice);
+      const parsedតម្លៃ = parseFloat(editតម្លៃ);
 
       const product = products.find(p => p.name === editProductName);
       let promoQty: number | undefined = undefined;
       if (product && editingTransaction.type === 'Stock Sold') {
-        promoQty = calculatePromoQtyWithPriceCheck(product, qty, isNaN(parsedPrice) ? 0 : parsedPrice);
+        promoQty = calculatePromoQtyWithតម្លៃCheck(product, qty, isNaN(parsedតម្លៃ) ? 0 : parsedតម្លៃ);
       }
 
       const updatedTransaction: Partial<Transaction> = {
         productName: editProductName,
         quantity: qty,
-        price: isNaN(parsedPrice) ? undefined : parsedPrice,
+        price: isNaN(parsedតម្លៃ) ? undefined : parsedតម្លៃ,
         promoQty: promoQty && promoQty > 0 ? promoQty : undefined,
         date: selectedDate.toISOString(),
         note: editingTransaction.type === 'Stock Sold' ? (editCustomerName && editLocation ? `${editCustomerName} (${editLocation})` : editCustomerName || editLocation || '') : editNote
@@ -651,7 +651,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         (updatedTransaction as any).promoQty = deleteField(); 
       }
 
-      // Handle Warehouse Stock updates for Edit
+      // Handle Warehouse Stock updates for កែប្រែ
       if (editingTransaction.type === 'Stock Out') {
         const oldProduct = products.find(p => p.name === editingTransaction.productName);
         const newProduct = products.find(p => p.name === editProductName);
@@ -701,7 +701,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
       }
 
       await updateDoc(doc(db, 'transactions', editingTransaction.id), cleanUndefined(updatedTransaction));
-      setEditingTransaction(null);
+      setកែប្រែingTransaction(null);
     } catch (error) {
       console.error("Error updating transaction: ", error);
       alert("មានបញ្ហាក្នុងការកែប្រែទិន្នន័យ");
@@ -710,25 +710,25 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     }
   };
 
-  const handleDeleteTransaction = async (id: string) => {
+  const handleលុបTransaction = async (id: string) => {
     setLoading(true);
     try {
-      if (transactionToDelete) {
-        const product = products.find(p => p.name === transactionToDelete.productName);
+      if (transactionToលុប) {
+        const product = products.find(p => p.name === transactionToលុប.productName);
         if (product) {
-          if (transactionToDelete.type === 'Stock Out') {
+          if (transactionToលុប.type === 'Stock Out') {
             await updateDoc(doc(db, 'products', product.id), {
-              warehouseStock: increment(transactionToDelete.quantity)
+              warehouseStock: increment(transactionToលុប.quantity)
             });
-          } else if (transactionToDelete.type === 'Stock Return') {
+          } else if (transactionToលុប.type === 'Stock Return') {
             await updateDoc(doc(db, 'products', product.id), {
-              warehouseStock: increment(-transactionToDelete.quantity)
+              warehouseStock: increment(-transactionToលុប.quantity)
             });
           }
         }
       }
       await deleteDoc(doc(db, 'transactions', id));
-      setTransactionToDelete(null);
+      setTransactionToលុប(null);
     } catch (error) {
       console.error("Error deleting transaction: ", error);
       alert("មានបញ្ហាក្នុងការលុបប្រតិបត្តិការ");
@@ -759,13 +759,13 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
     setItems(prev => {
       if (activeTab === 'Stock Sold') {
-        const autoPrice = calculateAutoPriceForQty(product, 1);
+        const autoតម្លៃ = calculateAutoតម្លៃForQty(product, 1);
         return [
           ...prev,
           {
             productName: selectedProdName,
             quantity: '1',
-            price: autoPrice.toFixed(2)
+            price: autoតម្លៃ.toFixed(2)
           }
         ];
       }
@@ -774,21 +774,21 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
       if (existingIdx !== -1) {
         const copy = [...prev];
         const currentQty = (parseInt(copy[existingIdx].quantity) || 0) + 1;
-        const autoPrice = calculateAutoPriceForQty(product, currentQty);
+        const autoតម្លៃ = calculateAutoតម្លៃForQty(product, currentQty);
         copy[existingIdx] = {
           ...copy[existingIdx],
           quantity: currentQty.toString(),
-          price: autoPrice.toFixed(2)
+          price: autoតម្លៃ.toFixed(2)
         };
         return copy;
       } else {
-        const autoPrice = calculateAutoPriceForQty(product, 1);
+        const autoតម្លៃ = calculateAutoតម្លៃForQty(product, 1);
         return [
           ...prev,
           {
             productName: selectedProdName,
             quantity: '1',
-            price: autoPrice.toFixed(2)
+            price: autoតម្លៃ.toFixed(2)
           }
         ];
       }
@@ -815,11 +815,11 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         if (field === 'quantity') {
           const qty = parseInt(value) || 0;
           if (product) {
-            const autoPrice = calculateAutoPriceForQty(product, qty);
+            const autoតម្លៃ = calculateAutoតម្លៃForQty(product, qty);
             copy[index] = {
               ...item,
               quantity: value,
-              price: autoPrice.toFixed(2)
+              price: autoតម្លៃ.toFixed(2)
             };
             return copy;
           }
@@ -1071,18 +1071,18 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             </tbody>
           </table>
           <div class="total-row">
-            <span class="total-label">តម្លៃសរុប (Grand Total)</span>
+            <span class="total-label">តម្លៃសរុប </span>
             <span class="total-amount">$${totalCost.toFixed(2)}</span>
           </div>
           
           <div class="signatures">
             <div class="signature-block">
-              <div>អ្នកលក់ / Seller</div>
-              <div class="signature-line">ហត្ថលេខា / Signature</div>
+              <div>អ្នកលក់</div>
+              <div class="signature-line">ហត្ថលេខា</div>
             </div>
             <div class="signature-block">
-              <div>អ្នកទិញ / Buyer</div>
-              <div class="signature-line">ហត្ថលេខា / Signature</div>
+              <div>អ្នកទិញ</div>
+              <div class="signature-line">ហត្ថលេខា</div>
             </div>
           </div>
         </div>
@@ -1478,15 +1478,15 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
       await Promise.all(validItems.map(async (item, index) => {
         const qty = parseInt(item.quantity);
-        // Add a slight millisecond offset to keep chronological order if they are on the exact same date
+        // បន្ថែម a slight millisecond offset to keep chronological order if they are on the exact same date
         const offsetDate = new Date(txDate.getTime() + index).toISOString();
         const product = products.find(p => p.name === item.productName);
-        let txPrice: number | undefined = undefined;
-        txPrice = item.price ? parseFloat(item.price) : (product?.price !== undefined ? product.price : undefined);
+        let txតម្លៃ: number | undefined = undefined;
+        txតម្លៃ = item.price ? parseFloat(item.price) : (product?.price !== undefined ? product.price : undefined);
 
         let promoQty: number | undefined = undefined;
         if (product && activeTab === 'Stock Sold') {
-          promoQty = calculatePromoQtyWithPriceCheck(product, qty, txPrice || 0);
+          promoQty = calculatePromoQtyWithតម្លៃCheck(product, qty, txតម្លៃ || 0);
         }
         
         const newTransaction: Transaction = {
@@ -1496,7 +1496,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           productName: item.productName,
           quantity: qty,
           promoQty: promoQty && promoQty > 0 ? promoQty : undefined,
-          price: txPrice,
+          price: txតម្លៃ,
           date: offsetDate,
           note: (customerName && location) ? `${customerName} (${location})` : customerName || location || note
         };
@@ -1881,7 +1881,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                             ))}
                           </div>
                         </td>
-                        {/* Column 5: Quantity list */}
+                        {/* Column 5: បរិមាណ list */}
                         <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
@@ -2048,7 +2048,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                 </span>
                                 {(() => {
                                   if (activeTab !== 'Stock Sold') return null;
-                                  const freeQty = qtyVal > 0 ? calculatePromoQtyWithPriceCheck(product, qtyVal, priceVal) : 0;
+                                  const freeQty = qtyVal > 0 ? calculatePromoQtyWithតម្លៃCheck(product, qtyVal, priceVal) : 0;
                                   if (freeQty > 0) {
                                     return (
                                       <span className="text-[9px] font-black text-emerald-600 animate-pulse mt-0.5">
@@ -2060,7 +2060,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                 })()}
                               </div>
 
-                              {/* Quantity Input */}
+                              {/* បរិមាណ Input */}
                               <div className={activeTab === 'Stock Sold' ? "col-span-2" : "col-span-3"}>
                                 <input
                                   type="number"
@@ -2075,7 +2075,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
                               {activeTab === 'Stock Sold' && (
                                 <>
-                                  {/* Price Input */}
+                                  {/* តម្លៃ Input */}
                                   <div className="col-span-3">
                                     <input
                                       type="number"
@@ -2089,7 +2089,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                     />
                                   </div>
 
-                                  {/* Subtotal */}
+                                  {/* សរុបរង */}
                                   <div className="col-span-2 text-right">
                                     <span className="font-black text-xs text-indigo-600">
                                       ${subtotal.toFixed(2)}
@@ -2098,7 +2098,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                 </>
                               )}
 
-                              {/* Delete button */}
+                              {/* លុប button */}
                               <div className="col-span-1 text-right">
                                 <button
                                   type="button"
@@ -2162,7 +2162,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         document.body
       )}
 
-      {/* Floating Modal for Editing Data */}
+      {/* Floating Modal for កែប្រែing Data */}
       {editingTransaction && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
@@ -2174,7 +2174,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 <p className="text-xs text-slate-500 font-medium">កែប្រែព័ត៌មានខាងក្រោមដើម្បីរក្សាទុក</p>
               </div>
               <button 
-                onClick={() => setEditingTransaction(null)} 
+                onClick={() => setកែប្រែingTransaction(null)} 
                 className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2183,7 +2183,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               </button>
             </div>
             
-            <form onSubmit={handleEditSubmit} className="flex flex-col min-h-0">
+            <form onSubmit={handleកែប្រែSubmit} className="flex flex-col min-h-0">
               <div className="overflow-y-auto p-6 pt-4 custom-scroll space-y-4">
               {/* Date selection */}
               <div className="space-y-1.5">
@@ -2191,7 +2191,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 <input
                   type="date"
                   value={editDate}
-                  onChange={e => setEditDate(e.target.value)}
+                  onChange={e => setកែប្រែDate(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                   required
                 />
@@ -2203,7 +2203,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 <div className="relative">
                   <select
                     value={editProductName}
-                    onChange={e => setEditProductName(e.target.value)}
+                    onChange={e => setកែប្រែProductName(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800 appearance-none"
                     required
                   >
@@ -2222,13 +2222,13 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 </div>
               </div>
 
-              {/* Quantity Input */}
+              {/* បរិមាណ Input */}
               <div className="space-y-1.5">
                 <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ចំនួនទំនិញ</label>
                 <input
                   type="number"
                   value={editQuantity}
-                  onChange={e => setEditQuantity(e.target.value)}
+                  onChange={e => setកែប្រែបរិមាណ(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-black text-slate-800"
                   required
                   min="1"
@@ -2236,15 +2236,15 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 />
               </div>
 
-              {/* Price Input (Only for Stock Sold) */}
+              {/* តម្លៃ Input (Only for Stock Sold) */}
               {editingTransaction.type === 'Stock Sold' && (
                 <div className="space-y-1.5">
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">តម្លៃឯកតា ($)</label>
                   <input
                     type="number"
                     step="0.01"
-                    value={editPrice}
-                    onChange={e => setEditPrice(e.target.value)}
+                    value={editតម្លៃ}
+                    onChange={e => setកែប្រែតម្លៃ(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-black text-slate-800"
                     required
                     min="0"
@@ -2261,7 +2261,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                     <input
                       type="text"
                       value={editCustomerName}
-                      onChange={e => setEditCustomerName(e.target.value)}
+                      onChange={e => setកែប្រែCustomerName(e.target.value)}
                       placeholder="ឈ្មោះអតិថិជន..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                     />
@@ -2271,7 +2271,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                     <input
                       type="text"
                       value={editLocation}
-                      onChange={e => setEditLocation(e.target.value)}
+                      onChange={e => setកែប្រែLocation(e.target.value)}
                       placeholder="ទីតាំង..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                     />
@@ -2284,7 +2284,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <div className="p-6 pt-4 border-t border-slate-100 flex space-x-3 shrink-0 bg-white rounded-b-3xl">
                 <button
                   type="button"
-                  onClick={() => setEditingTransaction(null)}
+                  onClick={() => setកែប្រែingTransaction(null)}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition"
                 >
                   បោះបង់
@@ -2303,8 +2303,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         document.body
       )}
 
-      {/* Custom Confirmation Modal for Deletion */}
-      {transactionToDelete && createPortal(
+      {/* Custom បញ្ជាក់ation Modal for Deletion */}
+      {transactionToលុប && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
             <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
@@ -2315,13 +2315,13 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             
             <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុប</h3>
             <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
-              តើអ្នកពិតជាចង់លុបប្រតិបត្តិការ <span className="font-bold text-slate-800">"{transactionToDelete.productName}" ({transactionToDelete.quantity})</span> នេះមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+              តើអ្នកពិតជាចង់លុបប្រតិបត្តិការ <span className="font-bold text-slate-800">"{transactionToលុប.productName}" ({transactionToលុប.quantity})</span> នេះមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
             </p>
 
             <div className="flex space-x-3">
               <button
                 type="button"
-                onClick={() => setTransactionToDelete(null)}
+                onClick={() => setTransactionToលុប(null)}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
               >
                 បោះបង់
@@ -2329,7 +2329,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => handleDeleteTransaction(transactionToDelete.id)}
+                onClick={() => handleលុបTransaction(transactionToលុប.id)}
                 className="flex-1 hover:bg-rose-700 bg-rose-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-rose-600/30 transition disabled:opacity-70 cursor-pointer"
               >
                 {loading ? 'កំពុងលុប...' : 'យល់ព្រម'}
@@ -2340,8 +2340,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         document.body
       )}
 
-      {/* Custom Confirmation Modal for Deleting Entire Invoice */}
-      {invoiceToDelete && createPortal(
+      {/* Custom បញ្ជាក់ation Modal for Deleting Entire Invoice */}
+      {invoiceToលុប && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[100] p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
             <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
@@ -2352,13 +2352,13 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             
             <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុបវិក្កយបត្រ</h3>
             <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
-              តើអ្នកពិតជាចង់លុបវិក្កយបត្ររបស់អតិថិជន <span className="font-bold text-slate-800">"{invoiceToDelete.customerName}"</span> នេះទាំងស្រុងមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+              តើអ្នកពិតជាចង់លុបវិក្កយបត្ររបស់អតិថិជន <span className="font-bold text-slate-800">"{invoiceToលុប.customerName}"</span> នេះទាំងស្រុងមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
             </p>
 
             <div className="flex space-x-3">
               <button
                 type="button"
-                onClick={() => setInvoiceToDelete(null)}
+                onClick={() => setInvoiceToលុប(null)}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
               >
                 បោះបង់
@@ -2369,7 +2369,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 onClick={async () => {
                   setLoading(true);
                   try {
-                    await Promise.all(invoiceToDelete.items.map(async (item: any) => {
+                    await Promise.all(invoiceToលុប.items.map(async (item: any) => {
                       const product = products.find(p => p.name === item.productName);
                       if (product) {
                         if (item.type === 'Stock Out') {
@@ -2384,8 +2384,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                       }
                     }));
 
-                    await Promise.all(invoiceToDelete.items.map((item: any) => deleteDoc(doc(db, 'transactions', item.id))));
-                    setInvoiceToDelete(null);
+                    await Promise.all(invoiceToលុប.items.map((item: any) => deleteDoc(doc(db, 'transactions', item.id))));
+                    setInvoiceToលុប(null);
                     setSelectedInvoiceDetail(null);
                   } catch (error) {
                     console.error("Error deleting invoice: ", error);
@@ -2434,17 +2434,17 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               </div>
               {(() => {
                 const product = products.find(p => p.name === selectedTransactionDetail.productName);
-                const displayPrice = selectedTransactionDetail.price !== undefined ? selectedTransactionDetail.price : product?.price;
-                if (displayPrice !== undefined && displayPrice !== null) {
+                const displayតម្លៃ = selectedTransactionDetail.price !== undefined ? selectedTransactionDetail.price : product?.price;
+                if (displayតម្លៃ !== undefined && displayតម្លៃ !== null) {
                   return (
                     <>
                       <div className="grid grid-cols-3 gap-2 items-center">
                         <span className="text-xs font-bold text-slate-400">តម្លៃឯកតា</span>
-                        <span className="col-span-2 text-sm font-black text-indigo-600">${displayPrice.toFixed(2)}</span>
+                        <span className="col-span-2 text-sm font-black text-indigo-600">${displayតម្លៃ.toFixed(2)}</span>
                       </div>
                       <div className="grid grid-cols-3 gap-2 items-center">
                         <span className="text-xs font-bold text-slate-400">តម្លៃសរុប</span>
-                        <span className="col-span-2 text-sm font-black text-indigo-600">${(displayPrice * selectedTransactionDetail.quantity).toFixed(2)}</span>
+                        <span className="col-span-2 text-sm font-black text-indigo-600">${(displayតម្លៃ * selectedTransactionDetail.quantity).toFixed(2)}</span>
                       </div>
                     </>
                   );
@@ -2488,7 +2488,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 onClick={() => {
                   const t = selectedTransactionDetail;
                   setSelectedTransactionDetail(null);
-                  handleEditClick(t);
+                  handleកែប្រែClick(t);
                 }}
                 className="flex-1 hover:bg-indigo-50 border border-indigo-200 text-indigo-600 font-bold text-sm py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer"
               >
@@ -2502,7 +2502,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 onClick={() => {
                   const t = selectedTransactionDetail;
                   setSelectedTransactionDetail(null);
-                  setTransactionToDelete(t);
+                  setTransactionToលុប(t);
                 }}
                 className="flex-1 hover:bg-rose-50 border border-rose-200 text-rose-600 font-bold text-sm py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer"
               >
@@ -2606,7 +2606,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                             ) : null}
                           </div>
 
-                          {/* Quantity */}
+                          {/* បរិមាណ */}
                           <div className={`${selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? "col-span-2" : "col-span-4"} text-center`}>
                             <span className={`font-black text-xs ${
                                 selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? 'text-emerald-600' : 
@@ -2616,7 +2616,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                             </span>
                           </div>
 
-                          {/* Price and Subtotal */}
+                          {/* តម្លៃ and សរុបរង */}
                           {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' && (
                             <>
                               <div className="col-span-3 text-right">
@@ -2638,7 +2638,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 </div>
               </div>
 
-              {/* Total Price */}
+              {/* តម្លៃសរុប */}
               {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' && (() => {
                 const totalCost = selectedInvoiceDetail.items.reduce((sum: number, item: any) => {
                   const qty = item.quantity || 0;
@@ -2658,7 +2658,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => setInvoiceToDelete(selectedInvoiceDetail)}
+                onClick={() => setInvoiceToលុប(selectedInvoiceDetail)}
                 className="flex-1 hover:bg-rose-50 border border-rose-200 text-rose-600 font-bold text-[10px] sm:text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1 cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2696,14 +2696,14 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   const item = selectedRowItem;
                   setSelectedRowItem(null);
                   setSelectedInvoiceDetail(null);
-                  handleEditClick(item);
+                  handleកែប្រែClick(item);
                 }}
                 className="w-full hover:bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                <span>កែប្រែ (Edit)</span>
+                <span>កែប្រែ (កែប្រែ)</span>
               </button>
               <button
                 type="button"
@@ -2711,14 +2711,14 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   const item = selectedRowItem;
                   setSelectedRowItem(null);
                   setSelectedInvoiceDetail(null);
-                  setTransactionToDelete(item);
+                  setTransactionToលុប(item);
                 }}
                 className="w-full hover:bg-rose-50 border border-rose-100 text-rose-600 font-bold text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                <span>លុប (Delete)</span>
+                <span>លុប (លុប)</span>
               </button>
             </div>
             <button
@@ -2726,7 +2726,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               onClick={() => setSelectedRowItem(null)}
               className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2.5 rounded-2xl transition cursor-pointer"
             >
-              បិទ (Close)
+              បិទ (បិទ)
             </button>
           </div>
         </div>,
@@ -2754,7 +2754,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               </button>
             </div>
             
-            <form onSubmit={handleCreateStockOrder} className="flex flex-col min-h-0">
+            <form onSubmit={handleបង្កើតStockOrder} className="flex flex-col min-h-0">
               <div className="overflow-y-auto p-6 pt-4 custom-scroll space-y-4">
                 <div className="space-y-4">
                 <div className="space-y-1.5">
@@ -2896,7 +2896,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
       {selectedOrder && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-[28px] w-full max-w-md shadow-2xl overflow-hidden p-6 relative border border-slate-100 animate-in zoom-in-95 duration-200">
-            {/* Close button */}
+            {/* បិទ button */}
             <button
               onClick={() => setSelectedOrder(null)}
               className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 p-2 rounded-full transition cursor-pointer"
@@ -3003,7 +3003,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               {!selectedOrder.delivered && (
                 <button
                   onClick={async () => {
-                    await Promise.all(selectedOrder.items.map((item: any) => handleConfirmDelivery(item.id)));
+                    await Promise.all(selectedOrder.items.map((item: any) => handleបញ្ជាក់Delivery(item.id)));
                     setSelectedOrder((prev: any) => prev ? { ...prev, delivered: true, deliveredBy: currentUser.username } : null);
                   }}
                   className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs md:text-sm py-3 rounded-2xl transition shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer flex items-center justify-center space-x-1"

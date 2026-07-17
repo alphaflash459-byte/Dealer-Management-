@@ -195,7 +195,7 @@ export default function App() {
                 <div className="min-w-0 flex-1">
                     <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">គណនី</h4>
                     <h2 className="text-sm font-bold text-slate-700 truncate mt-1 group-hover:text-emerald-600 transition-colors">{currentUser.username}</h2>
-                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">{currentUser.role === 'Admin' ? 'អ្នកគ្រប់គ្រង (Admin)' : 'បុគ្គលិក (User)'}</p>
+                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">{currentUser.role === 'Admin' ? 'អ្នកគ្រប់គ្រង ' : 'បុគ្គលិក '}</p>
                 </div>
                 <div className="text-slate-400 group-hover:text-emerald-600 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transform group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -289,7 +289,7 @@ export default function App() {
                     {currentUser.username.charAt(0).toUpperCase()}
                 </div>
                 <h3 className="text-lg font-black text-slate-800">{currentUser.username}</h3>
-                <p className="text-xs text-slate-500 font-bold mt-1">តួនាទី៖ {currentUser.role === 'Admin' ? 'អ្នកគ្រប់គ្រង (Admin)' : 'បុគ្គលិក (User)'}</p>
+                <p className="text-xs text-slate-500 font-bold mt-1">តួនាទី៖ {currentUser.role === 'Admin' ? 'អ្នកគ្រប់គ្រង ' : 'បុគ្គលិក '}</p>
             </div>
             
             {currentUser.role === 'Admin' && (
@@ -317,7 +317,7 @@ export default function App() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                   </div>
-                  <span className="text-xs font-black">បញ្ជីអ្នកប្រើប្រាស់ (Users)</span>
+                  <span className="text-xs font-black">បញ្ជីអ្នកប្រើប្រាស់ </span>
                 </button>
 
                 <button 
@@ -341,7 +341,7 @@ export default function App() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                     </svg>
                   </div>
-                  <span className="text-xs font-black">គ្រប់គ្រងមុខទំនិញ (Products)</span>
+                  <span className="text-xs font-black">គ្រប់គ្រងមុខទំនិញ </span>
                 </button>
 
                 <button 
@@ -365,7 +365,7 @@ export default function App() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                   </div>
-                  <span className="text-xs font-black">ស្តុកឃ្លាំង (Warehouse)</span>
+                  <span className="text-xs font-black">ស្តុកឃ្លាំង </span>
                 </button>
               </div>
             )}
@@ -377,7 +377,7 @@ export default function App() {
                 className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 p-3 rounded-2xl text-xs font-black transition active:scale-95 flex items-center justify-center space-x-2 cursor-pointer"
               >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                  <span>ចាកចេញពីគណនី (Logout)</span>
+                  <span>ចាកចេញពីគណនី </span>
               </button>
               <button
                 type="button"

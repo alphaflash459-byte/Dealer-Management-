@@ -47,14 +47,14 @@ export function calculatePromoQty(product: Product | undefined, qty: number): nu
   return 0;
 }
 
-export function calculateAutoPriceForQty(product: Product, qty: number): number {
-  const standardPrice = product.price || 0;
-  if (qty <= 0) return standardPrice;
+export function calculateAutoតម្លៃForQty(product: Product, qty: number): number {
+  const standardតម្លៃ = product.price || 0;
+  if (qty <= 0) return standardតម្លៃ;
 
   // Check if quantity is an exact promo target number
   const freeQty = calculatePromoQty(product, qty);
   if (freeQty > 0) {
-    return standardPrice;
+    return standardតម្លៃ;
   }
 
   // Check if it's an apportioned quantity (buyQty + getQty)
@@ -75,19 +75,19 @@ export function calculateAutoPriceForQty(product: Product, qty: number): number 
       remainingQty %= totalQty;
       // If it perfectly divides by one of the tiers, return its apportioned price
       if (remainingQty === 0) {
-        return (tier.buyQty * standardPrice) / totalQty;
+        return (tier.buyQty * standardតម្លៃ) / totalQty;
       }
     }
   }
 
-  return standardPrice;
+  return standardតម្លៃ;
 }
 
-export function calculatePromoQtyWithPriceCheck(product: Product | undefined, qty: number, priceVal: number): number {
+export function calculatePromoQtyWithតម្លៃCheck(product: Product | undefined, qty: number, priceVal: number): number {
   if (!product || qty <= 0) return 0;
   
-  const standardPrice = product.price || 0;
-  if (Math.abs(priceVal - standardPrice) > 0.001) {
+  const standardតម្លៃ = product.price || 0;
+  if (Math.abs(priceVal - standardតម្លៃ) > 0.001) {
     return 0;
   }
   
@@ -110,50 +110,50 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ users, setUsers, transactions, products, stockOrders, activeTab }: AdminDashboardProps) {
-  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
-  const [isCreateProductModalOpen, setIsCreateProductModalOpen] = useState(false);
-  const [newUsername, setNewUsername] = useState('');
-  const [newPassword, setNewPassword] = useState('');
+  const [isបង្កើតUserModalOpen, setIsបង្កើតUserModalOpen] = useState(false);
+  const [isបង្កើតProductModalOpen, setIsបង្កើតProductModalOpen] = useState(false);
+  const [newឈ្មោះអ្នកប្រើប្រាស់, setNewឈ្មោះអ្នកប្រើប្រាស់] = useState('');
+  const [newពាក្យសម្ងាត់, setNewពាក្យសម្ងាត់] = useState('');
   const [newProductName, setNewProductName] = useState('');
-  const [newProductPrice, setNewProductPrice] = useState('');
+  const [newProductតម្លៃ, setNewProductតម្លៃ] = useState('');
   const [newProductPromoBuy, setNewProductPromoBuy] = useState('');
   const [newProductPromoGet, setNewProductPromoGet] = useState('');
   const [newProductPromotions, setNewProductPromotions] = useState<PromotionTier[]>([]);
 
-  // Product Edit States
-  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
-  const [editProductName, setEditProductName] = useState('');
-  const [editProductPrice, setEditProductPrice] = useState('');
-  const [editProductPromoBuy, setEditProductPromoBuy] = useState('');
-  const [editProductPromoGet, setEditProductPromoGet] = useState('');
-  const [editProductPromotions, setEditProductPromotions] = useState<PromotionTier[]>([]);
+  // Product កែប្រែ States
+  const [productToកែប្រែ, setProductToកែប្រែ] = useState<Product | null>(null);
+  const [editProductName, setកែប្រែProductName] = useState('');
+  const [editProductតម្លៃ, setកែប្រែProductតម្លៃ] = useState('');
+  const [editProductPromoBuy, setកែប្រែProductPromoBuy] = useState('');
+  const [editProductPromoGet, setកែប្រែProductPromoGet] = useState('');
+  const [editProductPromotions, setកែប្រែProductPromotions] = useState<PromotionTier[]>([]);
 
   const [loading, setLoading] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const [userToEdit, setUserToEdit] = useState<User | null>(null);
-  const [editUsername, setEditUsername] = useState('');
-  const [editPassword, setEditPassword] = useState('');
-  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
-  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
+  const [userToលុប, setUserToលុប] = useState<User | null>(null);
+  const [productToលុប, setProductToលុប] = useState<Product | null>(null);
+  const [userToកែប្រែ, setUserToកែប្រែ] = useState<User | null>(null);
+  const [editឈ្មោះអ្នកប្រើប្រាស់, setកែប្រែឈ្មោះអ្នកប្រើប្រាស់] = useState('');
+  const [editពាក្យសម្ងាត់, setកែប្រែពាក្យសម្ងាត់] = useState('');
+  const [transactionToលុប, setTransactionToលុប] = useState<Transaction | null>(null);
+  const [transactionToកែប្រែ, setTransactionToកែប្រែ] = useState<Transaction | null>(null);
   const [selectedTransactionDetail, setSelectedTransactionDetail] = useState<Transaction | null>(null);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<any | null>(null);
   const [selectedRowItem, setSelectedRowItem] = useState<Transaction | null>(null);
-  const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
+  const [invoiceToលុប, setInvoiceToលុប] = useState<any | null>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<User | null>(null);
   const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
-  const [isEditingTransaction, setIsEditingTransaction] = useState(false);
-  const [isEditingUser, setIsEditingUser] = useState(false);
-  const [editQuantity, setEditQuantity] = useState('');
-  const [editNote, setEditNote] = useState('');
-  const [editTxProductName, setEditTxProductName] = useState('');
-  const [editTxDate, setEditTxDate] = useState('');
-  const [editTxCustomerName, setEditTxCustomerName] = useState('');
-  const [editTxLocation, setEditTxLocation] = useState('');
-  const [editTxPrice, setEditTxPrice] = useState('');
+  const [isកែប្រែingTransaction, setIsកែប្រែingTransaction] = useState(false);
+  const [isកែប្រែingUser, setIsកែប្រែingUser] = useState(false);
+  const [editQuantity, setកែប្រែបរិមាណ] = useState('');
+  const [editNote, setកែប្រែNote] = useState('');
+  const [editTxProductName, setកែប្រែTxProductName] = useState('');
+  const [editTxDate, setកែប្រែTxDate] = useState('');
+  const [editTxCustomerName, setកែប្រែTxCustomerName] = useState('');
+  const [editTxLocation, setកែប្រែTxLocation] = useState('');
+  const [editTxតម្លៃ, setកែប្រែTxតម្លៃ] = useState('');
 
   // Stock Order Admin States
-  const [isCreateOrderModalOpen, setIsCreateOrderModalOpen] = useState(false);
+  const [isបង្កើតOrderModalOpen, setIsបង្កើតOrderModalOpen] = useState(false);
   const [orderUserId, setOrderUserId] = useState('admin');
   const [orderDate, setOrderDate] = useState(() => {
     const today = new Date();
@@ -177,24 +177,24 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const [filterTxStartDate, setFilterTxStartDate] = useState<string>('');
   const [filterTxEndDate, setFilterTxEndDate] = useState<string>('');
 
-  // Edit / Delete stock order states
-  const [orderToDelete, setOrderToDelete] = useState<StockOrder | null>(null);
-  const [orderToEdit, setOrderToEdit] = useState<StockOrder | null>(null);
+  // កែប្រែ / លុប stock order states
+  const [orderToលុប, setOrderToលុប] = useState<StockOrder | null>(null);
+  const [orderToកែប្រែ, setOrderToកែប្រែ] = useState<StockOrder | null>(null);
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<any | null>(null);
-  const [isEditingOrder, setIsEditingOrder] = useState(false);
-  const [editOrderUserId, setEditOrderUserId] = useState('');
-  const [editOrderProductName, setEditOrderProductName] = useState('');
-  const [editOrderQuantity, setEditOrderQuantity] = useState('');
-  const [editOrderDate, setEditOrderDate] = useState('');
-  const [editOrderCustomerName, setEditOrderCustomerName] = useState('');
-  const [editOrderLocation, setEditOrderLocation] = useState('');
-  const [editOrderDelivered, setEditOrderDelivered] = useState(false);
+  const [isកែប្រែingOrder, setIsកែប្រែingOrder] = useState(false);
+  const [editOrderUserId, setកែប្រែOrderUserId] = useState('');
+  const [editOrderProductName, setកែប្រែOrderProductName] = useState('');
+  const [editOrderQuantity, setកែប្រែOrderQuantity] = useState('');
+  const [editOrderDate, setកែប្រែOrderDate] = useState('');
+  const [editOrderCustomerName, setកែប្រែOrderCustomerName] = useState('');
+  const [editOrderLocation, setកែប្រែOrderLocation] = useState('');
+  const [editOrderDelivered, setកែប្រែOrderDelivered] = useState(false);
 
   // Warehouse Stock states
   const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
-  const [isEditWarehouseStockModalOpen, setIsEditWarehouseStockModalOpen] = useState(false);
-  const [productToEditWarehouseStock, setProductToEditWarehouseStock] = useState<Product | null>(null);
-  const [editWarehouseStockVal, setEditWarehouseStockVal] = useState('');
+  const [isកែប្រែWarehouseStockModalOpen, setIsកែប្រែWarehouseStockModalOpen] = useState(false);
+  const [productToកែប្រែWarehouseStock, setProductToកែប្រែWarehouseStock] = useState<Product | null>(null);
+  const [editWarehouseStockVal, setកែប្រែWarehouseStockVal] = useState('');
   const [stockInDate, setStockInDate] = useState(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -208,15 +208,15 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const [warehouseSearchQuery, setWarehouseSearchQuery] = useState('');
   const [warehouseStockIns, setWarehouseStockIns] = useState<any[]>([]);
   const [isStockInHistoryOpen, setIsStockInHistoryOpen] = useState(false);
-  const [stockInToDelete, setStockInToDelete] = useState<any | null>(null);
+  const [stockInToលុប, setStockInToលុប] = useState<any | null>(null);
   
-  // New States for Stock In History Row details and Edit
+  // New States for Stock In History Row details and កែប្រែ
   const [selectedStockInRecord, setSelectedStockInRecord] = useState<any | null>(null);
-  const [isEditStockInModalOpen, setIsEditStockInModalOpen] = useState(false);
-  const [stockInToEdit, setStockInToEdit] = useState<any | null>(null);
-  const [editStockInDate, setEditStockInDate] = useState('');
-  const [editStockInDeliverer, setEditStockInDeliverer] = useState('');
-  const [editStockInItems, setEditStockInItems] = useState<StockItemInput[]>([]);
+  const [isកែប្រែStockInModalOpen, setIsកែប្រែStockInModalOpen] = useState(false);
+  const [stockInToកែប្រែ, setStockInToកែប្រែ] = useState<any | null>(null);
+  const [editStockInDate, setកែប្រែStockInDate] = useState('');
+  const [editStockInDeliverer, setកែប្រែStockInDeliverer] = useState('');
+  const [editStockInItems, setកែប្រែStockInItems] = useState<StockItemInput[]>([]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'warehouse_stock_ins'), (snapshot) => {
@@ -233,7 +233,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
   const handleUpdateStockIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stockInToEdit) return;
+    if (!stockInToកែប្រែ) return;
 
     const validItems = editStockInItems.filter(item => item.productName && item.quantity);
     if (validItems.length === 0) {
@@ -262,7 +262,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     setLoading(true);
     try {
       // 1. Revert old items
-      await Promise.all(stockInToEdit.items.map(async (oldItem: any) => {
+      await Promise.all(stockInToកែប្រែ.items.map(async (oldItem: any) => {
         const product = products.find(p => p.name === oldItem.productName);
         if (product) {
           await updateDoc(doc(db, 'products', product.id), {
@@ -283,7 +283,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
       // 3. Update record
       const updatedRecord = {
-        ...stockInToEdit,
+        ...stockInToកែប្រែ,
         date: editStockInDate,
         deliverer: editStockInDeliverer,
         items: validItems.map(item => ({
@@ -291,10 +291,10 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           quantity: parseInt(item.quantity)
         }))
       };
-      await updateDoc(doc(db, 'warehouse_stock_ins', stockInToEdit.id), updatedRecord);
+      await updateDoc(doc(db, 'warehouse_stock_ins', stockInToកែប្រែ.id), updatedRecord);
 
-      setIsEditStockInModalOpen(false);
-      setStockInToEdit(null);
+      setIsកែប្រែStockInModalOpen(false);
+      setStockInToកែប្រែ(null);
       setSelectedStockInRecord(updatedRecord);
     } catch (err) {
       console.error("Error updating stock in: ", err);
@@ -304,23 +304,23 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleSaveWarehouseStock = async (e: React.FormEvent) => {
+  const handleរក្សាទុកWarehouseStock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productToEditWarehouseStock) return;
+    if (!productToកែប្រែWarehouseStock) return;
     const qty = parseInt(editWarehouseStockVal);
     if (isNaN(qty) || qty < 0) {
-      alert("សូមបញ្ចូលចំនួនត្រឹមត្រូវ (Please enter a valid quantity)");
+      alert("សូមបញ្ចូលចំនួនត្រឹមត្រូវ ");
       return;
     }
 
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'products', productToEditWarehouseStock.id), {
+      await updateDoc(doc(db, 'products', productToកែប្រែWarehouseStock.id), {
         warehouseStock: qty
       });
-      setIsEditWarehouseStockModalOpen(false);
-      setProductToEditWarehouseStock(null);
-      setEditWarehouseStockVal('');
+      setIsកែប្រែWarehouseStockModalOpen(false);
+      setProductToកែប្រែWarehouseStock(null);
+      setកែប្រែWarehouseStockVal('');
     } catch (err) {
       console.error("Error saving warehouse stock: ", err);
       alert("មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យ");
@@ -329,12 +329,12 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleSaveActualStock = async (product: Product) => {
+  const handleរក្សាទុកActualStock = async (product: Product) => {
     const draftValue = actualStockDrafts[product.id];
     if (draftValue === undefined || draftValue === '') return;
     const qty = parseInt(draftValue);
     if (isNaN(qty) || qty < 0) {
-      alert("សូមបញ្ចូលចំនួនត្រឹមត្រូវ (Please enter a valid quantity)");
+      alert("សូមបញ្ចូលចំនួនត្រឹមត្រូវ ");
       return;
     }
     
@@ -382,7 +382,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     setStockInItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSaveStockIn = async (e: React.FormEvent) => {
+  const handleរក្សាទុកStockIn = async (e: React.FormEvent) => {
     e.preventDefault();
     const validItems = stockInItems.filter(item => item.productName && item.quantity);
     if (validItems.length === 0) {
@@ -421,7 +421,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }
       }));
 
-      // Add Stock In history record
+      // បន្ថែម Stock In history record
       const stockInRecord = {
         id: `stock-in-${Date.now()}`,
         date: stockInDate,
@@ -444,7 +444,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleDeleteStockIn = async (record: any) => {
+  const handleលុបStockIn = async (record: any) => {
     setLoading(true);
     try {
       await Promise.all(record.items.map(async (item: any) => {
@@ -457,7 +457,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }
       }));
       await deleteDoc(doc(db, 'warehouse_stock_ins', record.id));
-      setStockInToDelete(null);
+      setStockInToលុប(null);
     } catch (err) {
       console.error("Error deleting stock in record: ", err);
       alert("មានបញ្ហាក្នុងការលុបប្រវត្តិស្តុកចូល");
@@ -495,7 +495,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     });
   };
 
-  const handleAdminCreateStockOrder = async (e: React.FormEvent) => {
+  const handleAdminបង្កើតStockOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     const selectedUserObj = users.find(u => u.id === orderUserId) || { id: 'admin', username: 'Admin' };
 
@@ -542,7 +542,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         await setDoc(doc(db, 'stock_orders', newOrder.id), newOrder);
       }));
 
-      setIsCreateOrderModalOpen(false);
+      setIsបង្កើតOrderModalOpen(false);
       setOrderItems([{ productName: '', quantity: '' }]);
       setOrderCustomerName('');
       setOrderLocation('');
@@ -555,7 +555,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleAdminConfirmDelivery = async (orderGroup: any) => {
+  const handleAdminបញ្ជាក់Delivery = async (orderGroup: any) => {
     setLoading(true);
     try {
       await Promise.all(orderGroup.items.map(async (item: any) => {
@@ -593,11 +593,11 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleAdminDeleteOrder = async (orderId: string) => {
+  const handleAdminលុបOrder = async (orderId: string) => {
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'stock_orders', orderId));
-      setOrderToDelete(null);
+      setOrderToលុប(null);
       setSelectedOrderDetail(null);
     } catch (error) {
       console.error("Error deleting stock order: ", error);
@@ -607,9 +607,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleAdminEditOrder = async (e: React.FormEvent) => {
+  const handleAdminកែប្រែOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetOrder = orderToEdit || selectedOrderDetail;
+    const targetOrder = orderToកែប្រែ || selectedOrderDetail;
     if (!targetOrder) return;
 
     if (!editOrderUserId) {
@@ -655,9 +655,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
       await setDoc(doc(db, 'stock_orders', targetOrder.id), cleanUndefined(updatedOrder), { merge: true });
       
-      setOrderToEdit(null);
+      setOrderToកែប្រែ(null);
       setSelectedOrderDetail(null);
-      setIsEditingOrder(false);
+      setIsកែប្រែingOrder(false);
     } catch (error) {
       console.error("Error updating order: ", error);
       alert("មានបញ្ហាក្នុងការកែប្រែទិន្នន័យ");
@@ -730,9 +730,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     setCurrentPage(1);
   }, [activeTab]);
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleបង្កើតUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (users.find(u => u.username === newUsername)) {
+    if (users.find(u => u.username === newឈ្មោះអ្នកប្រើប្រាស់)) {
       alert('ឈ្មោះនេះមានរួចហើយ!');
       return;
     }
@@ -740,17 +740,17 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     setLoading(true);
     const newUser: User = {
       id: `user-${Date.now()}`,
-      username: newUsername,
-      password: newPassword,
+      username: newឈ្មោះអ្នកប្រើប្រាស់,
+      password: newពាក្យសម្ងាត់,
       role: 'User',
       createdAt: new Date().toISOString()
     };
     
     try {
       await setDoc(doc(db, 'users', newUser.id), newUser);
-      setNewUsername('');
-      setNewPassword('');
-      setIsCreateUserModalOpen(false);
+      setNewឈ្មោះអ្នកប្រើប្រាស់('');
+      setNewពាក្យសម្ងាត់('');
+      setIsបង្កើតUserModalOpen(false);
     } catch (error) {
       console.error("Error adding user: ", error);
       alert('មានបញ្ហាក្នុងការបង្កើតអ្នកប្រើប្រាស់');
@@ -759,11 +759,11 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleDeleteUser = async (id: string) => {
+  const handleលុបUser = async (id: string) => {
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'users', id));
-      setUserToDelete(null);
+      setUserToលុប(null);
     } catch (error) {
       console.error("Error deleting user: ", error);
       alert('មានបញ្ហាក្នុងការលុបអ្នកប្រើប្រាស់');
@@ -772,35 +772,35 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const addCreatePromoRow = () => {
+  const addបង្កើតPromoRow = () => {
     setNewProductPromotions([...newProductPromotions, { buyQty: 0, getQty: 0 }]);
   };
 
-  const updateCreatePromoRow = (index: number, field: 'buyQty' | 'getQty', value: string) => {
+  const updateបង្កើតPromoRow = (index: number, field: 'buyQty' | 'getQty', value: string) => {
     const updated = [...newProductPromotions];
     updated[index] = { ...updated[index], [field]: Number(value) || 0 };
     setNewProductPromotions(updated);
   };
 
-  const removeCreatePromoRow = (index: number) => {
+  const removeបង្កើតPromoRow = (index: number) => {
     setNewProductPromotions(newProductPromotions.filter((_, i) => i !== index));
   };
 
-  const addEditPromoRow = () => {
-    setEditProductPromotions([...editProductPromotions, { buyQty: 0, getQty: 0 }]);
+  const addកែប្រែPromoRow = () => {
+    setកែប្រែProductPromotions([...editProductPromotions, { buyQty: 0, getQty: 0 }]);
   };
 
-  const updateEditPromoRow = (index: number, field: 'buyQty' | 'getQty', value: string) => {
+  const updateកែប្រែPromoRow = (index: number, field: 'buyQty' | 'getQty', value: string) => {
     const updated = [...editProductPromotions];
     updated[index] = { ...updated[index], [field]: Number(value) || 0 };
-    setEditProductPromotions(updated);
+    setកែប្រែProductPromotions(updated);
   };
 
-  const removeEditPromoRow = (index: number) => {
-    setEditProductPromotions(editProductPromotions.filter((_, i) => i !== index));
+  const removeកែប្រែPromoRow = (index: number) => {
+    setកែប្រែProductPromotions(editProductPromotions.filter((_, i) => i !== index));
   };
 
-  const handleCreateProduct = async (e: React.FormEvent) => {
+  const handleបង្កើតProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProductName.trim()) return;
     
@@ -819,7 +819,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     const newProduct: Product = {
       id: `prod-${Date.now()}`,
       name: newProductName.trim(),
-      price: newProductPrice ? Number(newProductPrice) : undefined,
+      price: newProductតម្លៃ ? Number(newProductតម្លៃ) : undefined,
       promoBuyQty: firstPromo ? firstPromo.buyQty : (newProductPromoBuy ? Number(newProductPromoBuy) : undefined),
       promoGetQty: firstPromo ? firstPromo.getQty : (newProductPromoGet ? Number(newProductPromoGet) : undefined),
       promotions: cleanPromos.length > 0 ? cleanPromos : undefined,
@@ -829,11 +829,11 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     try {
       await setDoc(doc(db, 'products', newProduct.id), cleanUndefined(newProduct));
       setNewProductName('');
-      setNewProductPrice('');
+      setNewProductតម្លៃ('');
       setNewProductPromoBuy('');
       setNewProductPromoGet('');
       setNewProductPromotions([]);
-      setIsCreateProductModalOpen(false);
+      setIsបង្កើតProductModalOpen(false);
     } catch (error) {
       console.error("Error adding product: ", error);
       alert('មានបញ្ហាក្នុងការបង្កើតទំនិញ');
@@ -844,7 +844,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productToEdit) return;
+    if (!productToកែប្រែ) return;
     if (!editProductName.trim()) return;
     
     setLoading(true);
@@ -855,19 +855,19 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     const firstPromo = cleanPromos[0];
 
     try {
-      // Create a fresh doc structure or merge with deleted keys
+      // បង្កើត a fresh doc structure or merge with deleted keys
       const updatedProduct: Product = {
-        ...productToEdit,
+        ...productToកែប្រែ,
         name: editProductName.trim(),
-        price: editProductPrice ? Number(editProductPrice) : undefined,
+        price: editProductតម្លៃ ? Number(editProductតម្លៃ) : undefined,
         promoBuyQty: firstPromo ? firstPromo.buyQty : (editProductPromoBuy ? Number(editProductPromoBuy) : undefined),
         promoGetQty: firstPromo ? firstPromo.getQty : (editProductPromoGet ? Number(editProductPromoGet) : undefined),
         promotions: cleanPromos.length > 0 ? cleanPromos : undefined,
       };
 
       // Since firestore merge doesn't remove fields, if promotions is undefined, we delete it or set it to null/empty in setDoc. Let's do setDoc without merge to fully overwrite, or just merge. Standard overwrite is safer here.
-      await setDoc(doc(db, 'products', productToEdit.id), cleanUndefined(updatedProduct));
-      setProductToEdit(null);
+      await setDoc(doc(db, 'products', productToកែប្រែ.id), cleanUndefined(updatedProduct));
+      setProductToកែប្រែ(null);
     } catch (error) {
       console.error("Error updating product: ", error);
       alert('មានបញ្ហាក្នុងការកែប្រែទំនិញ');
@@ -876,11 +876,11 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleDeleteProduct = async (id: string) => {
+  const handleលុបProduct = async (id: string) => {
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'products', id));
-      setProductToDelete(null);
+      setProductToលុប(null);
     } catch (error) {
       console.error("Error deleting product: ", error);
       alert('មានបញ្ហាក្នុងការលុបទំនិញ');
@@ -891,14 +891,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetUser = userToEdit || selectedUserDetail;
+    const targetUser = userToកែប្រែ || selectedUserDetail;
     if (!targetUser) return;
     setLoading(true);
     try {
-      await setDoc(doc(db, 'users', targetUser.id), { ...targetUser, username: editUsername, password: editPassword }, { merge: true });
-      setUserToEdit(null);
+      await setDoc(doc(db, 'users', targetUser.id), { ...targetUser, username: editឈ្មោះអ្នកប្រើប្រាស់, password: editពាក្យសម្ងាត់ }, { merge: true });
+      setUserToកែប្រែ(null);
       setSelectedUserDetail(null);
-      setIsEditingUser(false);
+      setIsកែប្រែingUser(false);
     } catch (error) {
       console.error("Error updating user: ", error);
       alert('មានបញ្ហាក្នុងការកែប្រែអ្នកប្រើប្រាស់');
@@ -907,25 +907,25 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleDeleteTransaction = async (id: string) => {
+  const handleលុបTransaction = async (id: string) => {
     setLoading(true);
     try {
-      if (transactionToDelete) {
-        const product = products.find(p => p.name === transactionToDelete.productName);
+      if (transactionToលុប) {
+        const product = products.find(p => p.name === transactionToលុប.productName);
         if (product) {
-          if (transactionToDelete.type === 'Stock Out') {
+          if (transactionToលុប.type === 'Stock Out') {
             await updateDoc(doc(db, 'products', product.id), {
-              warehouseStock: increment(transactionToDelete.quantity)
+              warehouseStock: increment(transactionToលុប.quantity)
             });
-          } else if (transactionToDelete.type === 'Stock Return') {
+          } else if (transactionToលុប.type === 'Stock Return') {
             await updateDoc(doc(db, 'products', product.id), {
-              warehouseStock: increment(-transactionToDelete.quantity)
+              warehouseStock: increment(-transactionToលុប.quantity)
             });
           }
         }
       }
       await deleteDoc(doc(db, 'transactions', id));
-      setTransactionToDelete(null);
+      setTransactionToលុប(null);
     } catch (error) {
       console.error("Error deleting transaction: ", error);
       alert('មានបញ្ហាក្នុងការលុបប្រតិបត្តិការ');
@@ -934,41 +934,41 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleEditTransactionClick = (t: Transaction) => {
-    setTransactionToEdit(t);
-    setEditTxProductName(t.productName);
-    setEditQuantity(String(t.quantity));
+  const handleកែប្រែTransactionClick = (t: Transaction) => {
+    setTransactionToកែប្រែ(t);
+    setកែប្រែTxProductName(t.productName);
+    setកែប្រែបរិមាណ(String(t.quantity));
     
     const prod = products.find(p => p.name === t.productName);
-    setEditTxPrice(t.price !== undefined ? String(t.price) : (prod?.price !== undefined ? String(prod.price) : ''));
+    setកែប្រែTxតម្លៃ(t.price !== undefined ? String(t.price) : (prod?.price !== undefined ? String(prod.price) : ''));
     
     const tDate = t.date ? new Date(t.date) : new Date();
     const validDate = isNaN(tDate.getTime()) ? new Date() : tDate;
     const yyyy = validDate.getFullYear();
     const mm = String(validDate.getMonth() + 1).padStart(2, '0');
     const dd = String(validDate.getDate()).padStart(2, '0');
-    setEditTxDate(`${yyyy}-${mm}-${dd}`);
-    setEditNote(t.note || '');
+    setកែប្រែTxDate(`${yyyy}-${mm}-${dd}`);
+    setកែប្រែNote(t.note || '');
 
     if (t.type === 'Stock Sold') {
       const currentNote = t.note || '';
       const match = currentNote.match(/^(.*?)\s*\((.*?)\)$/);
       if (match) {
-        setEditTxCustomerName(match[1].trim());
-        setEditTxLocation(match[2].trim());
+        setកែប្រែTxCustomerName(match[1].trim());
+        setកែប្រែTxLocation(match[2].trim());
       } else {
-        setEditTxCustomerName(currentNote);
-        setEditTxLocation('');
+        setកែប្រែTxCustomerName(currentNote);
+        setកែប្រែTxLocation('');
       }
     } else {
-      setEditTxCustomerName('');
-      setEditTxLocation('');
+      setកែប្រែTxCustomerName('');
+      setកែប្រែTxLocation('');
     }
   };
 
   const handleUpdateTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!transactionToEdit) return;
+    if (!transactionToកែប្រែ) return;
 
     if (!editTxProductName) {
       alert('សូមជ្រើសរើសឈ្មោះទំនិញ!');
@@ -987,7 +987,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     setLoading(true);
 
     try {
-      const origDate = transactionToEdit.date ? new Date(transactionToEdit.date) : new Date();
+      const origDate = transactionToកែប្រែ.date ? new Date(transactionToកែប្រែ.date) : new Date();
       const safeOrigDate = isNaN(origDate.getTime()) ? new Date() : origDate;
       const selectedDate = new Date(editTxDate);
       
@@ -1000,34 +1000,34 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         );
       }
 
-      const parsedPrice = parseFloat(editTxPrice);
+      const parsedតម្លៃ = parseFloat(editTxតម្លៃ);
 
       const product = products.find(p => p.name === editTxProductName);
       let promoQty: number | undefined = undefined;
-      if (product && transactionToEdit.type === 'Stock Sold') {
-        promoQty = calculatePromoQtyWithPriceCheck(product, qty, isNaN(parsedPrice) ? 0 : parsedPrice);
+      if (product && transactionToកែប្រែ.type === 'Stock Sold') {
+        promoQty = calculatePromoQtyWithតម្លៃCheck(product, qty, isNaN(parsedតម្លៃ) ? 0 : parsedតម្លៃ);
       }
 
       const updatedTransaction: Partial<Transaction> = {
         productName: editTxProductName,
         quantity: qty,
-        price: isNaN(parsedPrice) ? undefined : parsedPrice,
+        price: isNaN(parsedតម្លៃ) ? undefined : parsedតម្លៃ,
         promoQty: promoQty && promoQty > 0 ? promoQty : undefined,
         date: selectedDate.toISOString(),
-        note: transactionToEdit.type === 'Stock Sold' ? (editTxCustomerName && editTxLocation ? `${editTxCustomerName} (${editTxLocation})` : editTxCustomerName || editTxLocation || '') : editNote
+        note: transactionToកែប្រែ.type === 'Stock Sold' ? (editTxCustomerName && editTxLocation ? `${editTxCustomerName} (${editTxLocation})` : editTxCustomerName || editTxLocation || '') : editNote
       };
 
       if (!promoQty || promoQty <= 0) {
         (updatedTransaction as any).promoQty = deleteField(); 
       }
 
-      // Handle Warehouse Stock updates for Edit
-      if (transactionToEdit.type === 'Stock Out') {
-        const oldProduct = products.find(p => p.name === transactionToEdit.productName);
+      // Handle Warehouse Stock updates for កែប្រែ
+      if (transactionToកែប្រែ.type === 'Stock Out') {
+        const oldProduct = products.find(p => p.name === transactionToកែប្រែ.productName);
         const newProduct = products.find(p => p.name === editTxProductName);
         
         if (oldProduct && newProduct && oldProduct.id === newProduct.id) {
-          const diff = transactionToEdit.quantity - qty;
+          const diff = transactionToកែប្រែ.quantity - qty;
           if (diff !== 0) {
             await updateDoc(doc(db, 'products', oldProduct.id), {
               warehouseStock: increment(diff)
@@ -1036,7 +1036,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         } else {
           if (oldProduct) {
             await updateDoc(doc(db, 'products', oldProduct.id), {
-              warehouseStock: increment(transactionToEdit.quantity)
+              warehouseStock: increment(transactionToកែប្រែ.quantity)
             });
           }
           if (newProduct) {
@@ -1045,12 +1045,12 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             });
           }
         }
-      } else if (transactionToEdit.type === 'Stock Return') {
-        const oldProduct = products.find(p => p.name === transactionToEdit.productName);
+      } else if (transactionToកែប្រែ.type === 'Stock Return') {
+        const oldProduct = products.find(p => p.name === transactionToកែប្រែ.productName);
         const newProduct = products.find(p => p.name === editTxProductName);
         
         if (oldProduct && newProduct && oldProduct.id === newProduct.id) {
-          const diff = qty - transactionToEdit.quantity;
+          const diff = qty - transactionToកែប្រែ.quantity;
           if (diff !== 0) {
             await updateDoc(doc(db, 'products', oldProduct.id), {
               warehouseStock: increment(diff)
@@ -1059,7 +1059,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         } else {
           if (oldProduct) {
             await updateDoc(doc(db, 'products', oldProduct.id), {
-              warehouseStock: increment(-transactionToEdit.quantity)
+              warehouseStock: increment(-transactionToកែប្រែ.quantity)
             });
           }
           if (newProduct) {
@@ -1070,9 +1070,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }
       }
 
-      await updateDoc(doc(db, 'transactions', transactionToEdit.id), cleanUndefined(updatedTransaction));
-      setTransactionToEdit(null);
-      setIsEditingTransaction(false);
+      await updateDoc(doc(db, 'transactions', transactionToកែប្រែ.id), cleanUndefined(updatedTransaction));
+      setTransactionToកែប្រែ(null);
+      setIsកែប្រែingTransaction(false);
     } catch (error) {
       console.error("Error updating transaction: ", error);
       alert("មានបញ្ហាក្នុងការកែប្រែទិន្នន័យ");
@@ -1290,18 +1290,18 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             </table>
 
             <div class="total-row">
-              <span class="total-label">តម្លៃសរុប (Grand Total)</span>
+              <span class="total-label">តម្លៃសរុប </span>
               <span class="total-amount">$${totalCost.toFixed(2)}</span>
             </div>
             
             <div class="signatures">
               <div class="signature-block">
-                <div>អ្នកលក់ / Seller</div>
-                <div class="signature-line">ហត្ថលេខា / Signature</div>
+                <div>អ្នកលក់</div>
+                <div class="signature-line">ហត្ថលេខា</div>
               </div>
               <div class="signature-block">
-                <div>អ្នកទិញ / Buyer</div>
-                <div class="signature-line">ហត្ថលេខា / Signature</div>
+                <div>អ្នកទិញ</div>
+                <div class="signature-line">ហត្ថលេខា</div>
               </div>
             </div>
           </div>
@@ -1445,7 +1445,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងគណនីអ្នកប្រើប្រាស់ក្នុងប្រព័ន្ធ</p>
             </div>
             <button
-              onClick={() => setIsCreateUserModalOpen(true)}
+              onClick={() => setIsបង្កើតUserModalOpen(true)}
               className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm px-4 py-2.5 rounded-2xl font-black shadow-md shadow-indigo-600/20 active:scale-95 transition cursor-pointer"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1498,7 +1498,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងទំនិញ និងកម្មវិធីប្រម៉ូសិន</p>
             </div>
             <button
-              onClick={() => setIsCreateProductModalOpen(true)}
+              onClick={() => setIsបង្កើតProductModalOpen(true)}
               className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm px-4 py-2.5 rounded-2xl font-black shadow-md shadow-indigo-600/20 active:scale-95 transition cursor-pointer"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1717,7 +1717,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-200">
             <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
-                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកឡើងឡានរបស់ User</h3>
+                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកឡើងឡានរបស់អ្នកប្រើប្រាស់</h3>
                 <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យឡើងឡានរបស់ភ្នាក់ងារលក់</p>
               </div>
             </div>
@@ -1836,7 +1836,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                             ))}
                           </div>
                         </td>
-                        {/* Column 6: Quantity list stacked */}
+                        {/* Column 6: បរិមាណ list stacked */}
                         <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
@@ -1905,7 +1905,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-200">
             <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
-                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកលក់ចេញរបស់ User</h3>
+                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកលក់ចេញរបស់អ្នកប្រើប្រាស់</h3>
                 <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យលក់ចេញ និងការថែមជូនប្រម៉ូសិនរបស់ភ្នាក់ងារលក់</p>
               </div>
             </div>
@@ -2028,7 +2028,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                             ))}
                           </div>
                         </td>
-                        {/* Column 6: Quantity list stacked */}
+                        {/* Column 6: បរិមាណ list stacked */}
                         <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
@@ -2099,7 +2099,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-200">
             <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
-                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកត្រឡប់របស់ User</h3>
+                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកត្រឡប់របស់អ្នកប្រើប្រាស់</h3>
                 <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យត្រឡប់របស់ភ្នាក់ងារលក់</p>
               </div>
             </div>
@@ -2218,7 +2218,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                             ))}
                           </div>
                         </td>
-                        {/* Column 6: Quantity list stacked */}
+                        {/* Column 6: បរិមាណ list stacked */}
                         <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
@@ -2254,7 +2254,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             </div>
             
             <div className="flex flex-wrap items-center gap-3">
-              {/* Status filter */}
+              {/* ស្ថានភាព filter */}
               <div className="bg-slate-100/80 p-1 rounded-2xl flex space-x-1 border border-slate-200/50">
                 {(['all', 'pending', 'delivered'] as const).map((status) => {
                   let label = 'ទាំងអស់';
@@ -2375,7 +2375,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           {/* Header */}
           <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-4 shrink-0">
             <div>
-              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកឃ្លាំង (Warehouse Stock)</h3>
+              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកឃ្លាំង </h3>
               <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងចំនួនស្តុកប្រព័ន្ធ ផ្ទៀងផ្ទាត់ស្តុកជាក់ស្តែង និងបញ្ចូលស្តុកថ្មី</p>
             </div>
           </div>
@@ -2437,7 +2437,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             </div>
           </div>
 
-          {/* Search bar and Stock In Button */}
+          {/* ស្វែងរក bar and Stock In Button */}
           <div className="mb-4 flex gap-3 shrink-0 items-center">
             <div className="relative flex-1">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -2492,9 +2492,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                   <th className="px-2 md:px-4 py-3 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
-                  <th className="px-2 md:px-4 py-3 text-center font-bold text-sky-600 bg-sky-50/10">ស្តុកប្រព័ន្ធ (System)</th>
-                  <th className="px-2 md:px-4 py-3 text-center font-bold text-emerald-600 bg-emerald-50/10">ស្តុកជាក់ស្តែង (Actual)</th>
-                  <th className="px-2 md:px-4 py-3 text-center font-bold text-slate-500">កម្រិតលម្អៀង (Variance)</th>
+                  <th className="px-2 md:px-4 py-3 text-center font-bold text-sky-600 bg-sky-50/10">ស្តុកប្រព័ន្ធ </th>
+                  <th className="px-2 md:px-4 py-3 text-center font-bold text-emerald-600 bg-emerald-50/10">ស្តុកជាក់ស្តែង </th>
+                  <th className="px-2 md:px-4 py-3 text-center font-bold text-slate-500">កម្រិតលម្អៀង </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
@@ -2510,9 +2510,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     <tr 
                       key={product.id} 
                       onClick={() => {
-                        setProductToEditWarehouseStock(product);
-                        setEditWarehouseStockVal(String(sysStock));
-                        setIsEditWarehouseStockModalOpen(true);
+                        setProductToកែប្រែWarehouseStock(product);
+                        setកែប្រែWarehouseStockVal(String(sysStock));
+                        setIsកែប្រែWarehouseStockModalOpen(true);
                       }}
                       className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
                     >
@@ -2542,7 +2542,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           />
                           <button
                             type="button"
-                            onClick={() => handleSaveActualStock(product)}
+                            onClick={() => handleរក្សាទុកActualStock(product)}
                             disabled={!isDirty || loading}
                             className={`p-1.5 rounded-xl transition-all cursor-pointer ${
                               isDirty 
@@ -2598,7 +2598,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           <div className="bg-white w-full max-w-xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">បញ្ចូលស្តុកចូល (Stock In)</h3>
+                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">បញ្ចូលស្តុកចូល </h3>
                 <p className="text-xs text-slate-500 font-medium">សូមជ្រើសរើសទំនិញ និងបញ្ចូលចំនួនស្តុកបន្ថែម</p>
               </div>
               <button 
@@ -2614,7 +2614,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               </button>
             </div>
 
-            <form onSubmit={handleSaveStockIn} className="flex flex-col min-h-0">
+            <form onSubmit={handleរក្សាទុកStockIn} className="flex flex-col min-h-0">
               <div className="overflow-y-auto p-6 pt-4 custom-scroll space-y-4">
                 {/* Meta Inputs (Date & Deliverer) */}
                 <div className="grid grid-cols-2 gap-4">
@@ -2693,7 +2693,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                                 </span>
                               </div>
 
-                              {/* Quantity Input */}
+                              {/* បរិមាណ Input */}
                               <div className="col-span-3">
                                 <input
                                   type="number"
@@ -2706,7 +2706,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                                 />
                               </div>
 
-                              {/* Delete button */}
+                              {/* លុប button */}
                               <div className="col-span-1 text-right">
                                 <button
                                   type="button"
@@ -2754,23 +2754,23 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {/* Edit Warehouse Stock Modal */}
-      {isEditWarehouseStockModalOpen && productToEditWarehouseStock && createPortal(
+      {/* កែប្រែស្តុកឃ្លាំង Modal */}
+      {isកែប្រែWarehouseStockModalOpen && productToកែប្រែWarehouseStock && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
-            <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">កែប្រែស្តុកឃ្លាំង (Edit Warehouse Stock)</h3>
-            <p className="text-xs text-slate-500 font-medium mb-4">កែប្រែចំនួនស្តុកប្រព័ន្ធសម្រាប់ទំនិញ <span className="font-bold text-slate-800">"{productToEditWarehouseStock.name}"</span></p>
+            <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">កែប្រែស្តុកឃ្លាំង (កែប្រែស្តុកឃ្លាំង)</h3>
+            <p className="text-xs text-slate-500 font-medium mb-4">កែប្រែចំនួនស្តុកប្រព័ន្ធសម្រាប់ទំនិញ <span className="font-bold text-slate-800">"{productToកែប្រែWarehouseStock.name}"</span></p>
 
-            <form onSubmit={handleSaveWarehouseStock} className="space-y-4">
+            <form onSubmit={handleរក្សាទុកWarehouseStock} className="space-y-4">
               <div>
-                <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">ស្តុកប្រព័ន្ធបច្ចុប្បន្ន (System Stock)</label>
+                <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">ស្តុកប្រព័ន្ធបច្ចុប្បន្ន (ស្តុកប្រព័ន្ធ)</label>
                 <input
                   type="number"
                   min="0"
                   required
                   placeholder="ឧ. ១០០"
                   value={editWarehouseStockVal}
-                  onChange={(e) => setEditWarehouseStockVal(e.target.value)}
+                  onChange={(e) => setកែប្រែWarehouseStockVal(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-black"
                 />
               </div>
@@ -2779,9 +2779,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <button
                   type="button"
                   onClick={() => {
-                    setIsEditWarehouseStockModalOpen(false);
-                    setProductToEditWarehouseStock(null);
-                    setEditWarehouseStockVal('');
+                    setIsកែប្រែWarehouseStockModalOpen(false);
+                    setProductToកែប្រែWarehouseStock(null);
+                    setកែប្រែWarehouseStockVal('');
                   }}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                 >
@@ -2801,8 +2801,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {/* Custom Confirmation Modal for Deleting User */}
-      {userToDelete && createPortal(
+      {/* Custom បញ្ជាក់ation Modal for Deleting User */}
+      {userToលុប && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
             <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
@@ -2813,13 +2813,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             
             <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុប</h3>
             <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
-              តើអ្នកពិតជាចង់លុបអ្នកប្រើប្រាស់ <span className="font-bold text-slate-800">"{userToDelete.username}"</span> នេះមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+              តើអ្នកពិតជាចង់លុបអ្នកប្រើប្រាស់ <span className="font-bold text-slate-800">"{userToលុប.username}"</span> នេះមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
             </p>
 
             <div className="flex space-x-3">
               <button
                 type="button"
-                onClick={() => setUserToDelete(null)}
+                onClick={() => setUserToលុប(null)}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
               >
                 បោះបង់
@@ -2827,7 +2827,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => handleDeleteUser(userToDelete.id)}
+                onClick={() => handleលុបUser(userToលុប.id)}
                 className="flex-1 hover:bg-rose-700 bg-rose-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-rose-600/30 transition disabled:opacity-70 cursor-pointer"
               >
                 {loading ? 'កំពុងលុប...' : 'យល់ព្រម'}
@@ -2838,8 +2838,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {/* Custom Confirmation Modal for Deleting Product */}
-      {productToDelete && createPortal(
+      {/* Custom បញ្ជាក់ation Modal for Deleting Product */}
+      {productToលុប && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
             <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
@@ -2850,13 +2850,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             
             <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុប</h3>
             <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
-              តើអ្នកពិតជាចង់លុបទំនិញ <span className="font-bold text-slate-800">"{productToDelete.name}"</span> នេះមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+              តើអ្នកពិតជាចង់លុបទំនិញ <span className="font-bold text-slate-800">"{productToលុប.name}"</span> នេះមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
             </p>
 
             <div className="flex space-x-3">
               <button
                 type="button"
-                onClick={() => setProductToDelete(null)}
+                onClick={() => setProductToលុប(null)}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
               >
                 បោះបង់
@@ -2864,7 +2864,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => handleDeleteProduct(productToDelete.id)}
+                onClick={() => handleលុបProduct(productToលុប.id)}
                 className="flex-1 hover:bg-rose-700 bg-rose-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-rose-600/30 transition disabled:opacity-70 cursor-pointer"
               >
                 {loading ? 'កំពុងលុប...' : 'យល់ព្រម'}
@@ -2875,14 +2875,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {isCreateUserModalOpen && createPortal(
+      {isបង្កើតUserModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-0">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsCreateUserModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsបង្កើតUserModalOpen(false)}></div>
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden relative z-10 animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center">
               <h3 className="text-lg font-black text-slate-800">បង្កើតអ្នកប្រើប្រាស់ថ្មី</h3>
               <button 
-                onClick={() => setIsCreateUserModalOpen(false)}
+                onClick={() => setIsបង្កើតUserModalOpen(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -2890,13 +2890,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 </svg>
               </button>
             </div>
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+            <form onSubmit={handleបង្កើតUser} className="p-6 space-y-4">
               <div className="space-y-1.5">
                 <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះអ្នកប្រើប្រាស់</label>
                 <input
                   type="text"
-                  value={newUsername}
-                  onChange={e => setNewUsername(e.target.value)}
+                  value={newឈ្មោះអ្នកប្រើប្រាស់}
+                  onChange={e => setNewឈ្មោះអ្នកប្រើប្រាស់(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                   required
                 />
@@ -2905,8 +2905,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">លេខសម្ងាត់</label>
                 <input
                   type="text"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
+                  value={newពាក្យសម្ងាត់}
+                  onChange={e => setNewពាក្យសម្ងាត់(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                   required
                 />
@@ -2914,7 +2914,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <div className="pt-4 flex space-x-3">
                   <button
                     type="button"
-                    onClick={() => setIsCreateUserModalOpen(false)}
+                    onClick={() => setIsបង្កើតUserModalOpen(false)}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3.5 rounded-2xl transition cursor-pointer"
                   >
                     បោះបង់
@@ -2933,14 +2933,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {isCreateProductModalOpen && createPortal(
+      {isបង្កើតProductModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-0">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsCreateProductModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsបង្កើតProductModalOpen(false)}></div>
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden relative z-10 animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center">
               <h3 className="text-lg font-black text-slate-800">បន្ថែមទំនិញថ្មី</h3>
               <button 
-                onClick={() => setIsCreateProductModalOpen(false)}
+                onClick={() => setIsបង្កើតProductModalOpen(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -2948,7 +2948,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 </svg>
               </button>
             </div>
-            <form onSubmit={handleCreateProduct} className="p-6 space-y-4">
+            <form onSubmit={handleបង្កើតProduct} className="p-6 space-y-4">
               <div className="space-y-1.5">
                 <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះទំនិញ</label>
                 <input
@@ -2966,8 +2966,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <input
                   type="number"
                   step="any"
-                  value={newProductPrice}
-                  onChange={e => setNewProductPrice(e.target.value)}
+                  value={newProductតម្លៃ}
+                  onChange={e => setNewProductតម្លៃ(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                   placeholder="បញ្ចូលតម្លៃ (ឧទាហរណ៍៖ 5.5)"
                 />
@@ -2978,7 +2978,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   <p className="text-xs font-bold text-slate-500">កម្មវិធីប្រម៉ូសិន ទិញនិងថែម (Multi-Promotion)</p>
                   <button
                     type="button"
-                    onClick={addCreatePromoRow}
+                    onClick={addបង្កើតPromoRow}
                     className="text-[11px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center space-x-1 hover:underline cursor-pointer"
                   >
                     <span>+ បន្ថែមកម្រិត</span>
@@ -2994,7 +2994,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           <input
                             type="number"
                             value={p.buyQty || ''}
-                            onChange={e => updateCreatePromoRow(idx, 'buyQty', e.target.value)}
+                            onChange={e => updateបង្កើតPromoRow(idx, 'buyQty', e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-2 py-1.5 text-xs focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                             placeholder="10"
                             min="1"
@@ -3006,7 +3006,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           <input
                             type="number"
                             value={p.getQty || ''}
-                            onChange={e => updateCreatePromoRow(idx, 'getQty', e.target.value)}
+                            onChange={e => updateបង្កើតPromoRow(idx, 'getQty', e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-2 py-1.5 text-xs focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                             placeholder="1"
                             min="1"
@@ -3017,7 +3017,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       
                       <button
                         type="button"
-                        onClick={() => removeCreatePromoRow(idx)}
+                        onClick={() => removeបង្កើតPromoRow(idx)}
                         className="p-1.5 hover:bg-rose-50 text-rose-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
                         title="លុបកម្រិតនេះ"
                       >
@@ -3032,7 +3032,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       <p className="text-[11px] text-slate-400 font-bold">គ្មានការកំណត់ប្រម៉ូសិនទេ</p>
                       <button
                         type="button"
-                        onClick={addCreatePromoRow}
+                        onClick={addបង្កើតPromoRow}
                         className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold mt-1 inline-block hover:underline"
                       >
                         ចុចទីនេះដើម្បីបន្ថែមប្រម៉ូសិនដំបូង
@@ -3045,7 +3045,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <div className="pt-4 flex space-x-3">
                   <button
                     type="button"
-                    onClick={() => setIsCreateProductModalOpen(false)}
+                    onClick={() => setIsបង្កើតProductModalOpen(false)}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                   >
                     បោះបង់
@@ -3064,14 +3064,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {productToEdit && createPortal(
+      {productToកែប្រែ && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-0">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setProductToEdit(null)}></div>
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setProductToកែប្រែ(null)}></div>
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden relative z-10 animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center">
               <h3 className="text-lg font-black text-slate-800">កែប្រែព័ត៌មានទំនិញ</h3>
               <button 
-                onClick={() => setProductToEdit(null)}
+                onClick={() => setProductToកែប្រែ(null)}
                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -3085,7 +3085,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <input
                   type="text"
                   value={editProductName}
-                  onChange={e => setEditProductName(e.target.value)}
+                  onChange={e => setកែប្រែProductName(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                   required
                   placeholder="បញ្ចូលឈ្មោះទំនិញ"
@@ -3097,8 +3097,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <input
                   type="number"
                   step="any"
-                  value={editProductPrice}
-                  onChange={e => setEditProductPrice(e.target.value)}
+                  value={editProductតម្លៃ}
+                  onChange={e => setកែប្រែProductតម្លៃ(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                   placeholder="បញ្ចូលតម្លៃ (ឧទាហរណ៍៖ 5.5)"
                 />
@@ -3109,7 +3109,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   <p className="text-xs font-bold text-slate-500">កម្មវិធីប្រម៉ូសិន ទិញនិងថែម (Multi-Promotion)</p>
                   <button
                     type="button"
-                    onClick={addEditPromoRow}
+                    onClick={addកែប្រែPromoRow}
                     className="text-[11px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center space-x-1 hover:underline cursor-pointer"
                   >
                     <span>+ បន្ថែមកម្រិត</span>
@@ -3125,7 +3125,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           <input
                             type="number"
                             value={p.buyQty || ''}
-                            onChange={e => updateEditPromoRow(idx, 'buyQty', e.target.value)}
+                            onChange={e => updateកែប្រែPromoRow(idx, 'buyQty', e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-2 py-1.5 text-xs focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                             placeholder="10"
                             min="1"
@@ -3137,7 +3137,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                           <input
                             type="number"
                             value={p.getQty || ''}
-                            onChange={e => updateEditPromoRow(idx, 'getQty', e.target.value)}
+                            onChange={e => updateកែប្រែPromoRow(idx, 'getQty', e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-2 py-1.5 text-xs focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                             placeholder="1"
                             min="1"
@@ -3148,7 +3148,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       
                       <button
                         type="button"
-                        onClick={() => removeEditPromoRow(idx)}
+                        onClick={() => removeកែប្រែPromoRow(idx)}
                         className="p-1.5 hover:bg-rose-50 text-rose-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
                         title="លុបកម្រិតនេះ"
                       >
@@ -3163,7 +3163,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       <p className="text-[11px] text-slate-400 font-bold">គ្មានការកំណត់ប្រម៉ូសិនទេ</p>
                       <button
                         type="button"
-                        onClick={addEditPromoRow}
+                        onClick={addកែប្រែPromoRow}
                         className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold mt-1 inline-block hover:underline"
                       >
                         ចុចទីនេះដើម្បីបន្ថែមប្រម៉ូសិនដំបូង
@@ -3176,7 +3176,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <div className="pt-4 flex space-x-3">
                   <button
                     type="button"
-                    onClick={() => setProductToEdit(null)}
+                    onClick={() => setProductToកែប្រែ(null)}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                   >
                     បោះបង់
@@ -3195,21 +3195,21 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {transactionToDelete && createPortal(
+      {transactionToលុប && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-0">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setTransactionToDelete(null)}></div>
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setTransactionToលុប(null)}></div>
           <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm relative z-10 animate-in zoom-in-95 duration-200">
             <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុប</h3>
             <p className="text-sm font-medium text-slate-500 mb-6">តើអ្នកពិតជាចង់លុបប្រតិបត្តិការនេះមែនទេ?</p>
             <div className="flex space-x-3">
               <button
-                onClick={() => setTransactionToDelete(null)}
+                onClick={() => setTransactionToលុប(null)}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-xl transition cursor-pointer"
               >
                 បោះបង់
               </button>
               <button
-                onClick={() => handleDeleteTransaction(transactionToDelete.id)}
+                onClick={() => handleលុបTransaction(transactionToលុប.id)}
                 disabled={loading}
                 className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm py-3 rounded-xl shadow-lg shadow-rose-500/30 active:scale-95 transition disabled:opacity-70 cursor-pointer"
               >
@@ -3227,7 +3227,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             <div className="flex justify-between items-center pb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-base md:text-lg font-black text-slate-800">
-                  {isEditingTransaction ? 'កែប្រែព័ត៌មានលម្អិត' : 'ព័ត៌មានលម្អិត'}
+                  {isកែប្រែingTransaction ? 'កែប្រែព័ត៌មានលម្អិត' : 'ព័ត៌មានលម្អិត'}
                 </h3>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">
                   {selectedTransactionDetail.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : selectedTransactionDetail.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : 'ស្តុកត្រឡប់'}
@@ -3236,7 +3236,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <button 
                 onClick={() => {
                   setSelectedTransactionDetail(null);
-                  setIsEditingTransaction(false);
+                  setIsកែប្រែingTransaction(false);
                 }} 
                 className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
               >
@@ -3246,14 +3246,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               </button>
             </div>
 
-            {isEditingTransaction ? (
+            {isកែប្រែingTransaction ? (
               <form onSubmit={handleUpdateTransaction} className="py-5 space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ចំនួន</label>
                   <input
                     type="number"
                     value={editQuantity}
-                    onChange={e => setEditQuantity(e.target.value)}
+                    onChange={e => setកែប្រែបរិមាណ(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition outline-none font-bold text-slate-800"
                     required
                   />
@@ -3263,19 +3263,19 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 {(() => {
                   const product = products.find(p => p.name === selectedTransactionDetail.productName);
                   const qtyVal = parseInt(editQuantity) || 0;
-                  const hasPrice = product && product.price !== undefined && product.price !== null;
-                  const subtotal = hasPrice && qtyVal > 0 ? product.price * qtyVal : 0;
+                  const hasតម្លៃ = product && product.price !== undefined && product.price !== null;
+                  const subtotal = hasតម្លៃ && qtyVal > 0 ? product.price * qtyVal : 0;
                   if (product) {
                     return (
                       <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex justify-between items-center px-4 text-xs font-medium text-slate-500">
                         <span>
-                          {hasPrice ? (
+                          {hasតម្លៃ ? (
                             <span>តម្លៃឯកតា៖ <span className="font-bold text-slate-700">${product.price?.toFixed(2)}</span></span>
                           ) : (
                             <span className="text-slate-400">-</span>
                           )}
                         </span>
-                        {hasPrice && qtyVal > 0 && (
+                        {hasតម្លៃ && qtyVal > 0 && (
                           <span className="font-black text-indigo-600">សរុប៖ ${subtotal.toFixed(2)}</span>
                         )}
                       </div>
@@ -3288,7 +3288,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ចំណាំ</label>
                   <textarea
                     value={editNote}
-                    onChange={e => setEditNote(e.target.value)}
+                    onChange={e => setកែប្រែNote(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-indigo-400 outline-none font-medium text-slate-800 h-24 resize-none"
                     placeholder="គ្មានចំណាំ"
                   />
@@ -3296,7 +3296,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <div className="flex gap-3 pt-4 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setIsEditingTransaction(false)}
+                    onClick={() => setIsកែប្រែingTransaction(false)}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                   >
                     បោះបង់
@@ -3374,9 +3374,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <div className="flex gap-3 pt-4 border-t border-slate-100">
                   <button
                     onClick={() => {
-                      setIsEditingTransaction(true);
-                      setEditQuantity(String(selectedTransactionDetail.quantity));
-                      setEditNote(selectedTransactionDetail.note || '');
+                      setIsកែប្រែingTransaction(true);
+                      setកែប្រែបរិមាណ(String(selectedTransactionDetail.quantity));
+                      setកែប្រែNote(selectedTransactionDetail.note || '');
                     }}
                     className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                   >
@@ -3384,7 +3384,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   </button>
                   <button
                     onClick={() => {
-                      setTransactionToDelete(selectedTransactionDetail);
+                      setTransactionToលុប(selectedTransactionDetail);
                       setSelectedTransactionDetail(null);
                     }}
                     className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
@@ -3405,13 +3405,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             <div className="flex justify-between items-center pb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-base md:text-lg font-black text-slate-800">
-                  {isEditingUser ? 'កែប្រែអ្នកប្រើប្រាស់' : 'ព័ត៌មានអ្នកប្រើប្រាស់'}
+                  {isកែប្រែingUser ? 'កែប្រែអ្នកប្រើប្រាស់' : 'ព័ត៌មានអ្នកប្រើប្រាស់'}
                 </h3>
               </div>
               <button 
                 onClick={() => {
                   setSelectedUserDetail(null);
-                  setIsEditingUser(false);
+                  setIsកែប្រែingUser(false);
                 }} 
                 className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
               >
@@ -3421,14 +3421,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               </button>
             </div>
 
-            {isEditingUser ? (
+            {isកែប្រែingUser ? (
               <form onSubmit={handleUpdateUser} className="py-5 space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះអ្នកប្រើប្រាស់</label>
                   <input
                     type="text"
-                    value={editUsername}
-                    onChange={e => setEditUsername(e.target.value)}
+                    value={editឈ្មោះអ្នកប្រើប្រាស់}
+                    onChange={e => setកែប្រែឈ្មោះអ្នកប្រើប្រាស់(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition outline-none font-bold text-slate-800"
                     required
                   />
@@ -3437,8 +3437,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">លេខសម្ងាត់</label>
                   <input
                     type="text"
-                    value={editPassword}
-                    onChange={e => setEditPassword(e.target.value)}
+                    value={editពាក្យសម្ងាត់}
+                    onChange={e => setកែប្រែពាក្យសម្ងាត់(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition outline-none font-bold text-slate-800"
                     required
                   />
@@ -3446,7 +3446,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <div className="flex gap-3 pt-4 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setIsEditingUser(false)}
+                    onClick={() => setIsកែប្រែingUser(false)}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                   >
                     បោះបង់
@@ -3485,9 +3485,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   <div className="flex gap-3 pt-4 border-t border-slate-100">
                     <button
                       onClick={() => {
-                        setIsEditingUser(true);
-                        setEditUsername(selectedUserDetail.username);
-                        setEditPassword(selectedUserDetail.password);
+                        setIsកែប្រែingUser(true);
+                        setកែប្រែឈ្មោះអ្នកប្រើប្រាស់(selectedUserDetail.username);
+                        setកែប្រែពាក្យសម្ងាត់(selectedUserDetail.password);
                       }}
                       className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                     >
@@ -3495,7 +3495,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     </button>
                     <button
                       onClick={() => {
-                        setUserToDelete(selectedUserDetail);
+                        setUserToលុប(selectedUserDetail);
                         setSelectedUserDetail(null);
                       }}
                       className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
@@ -3569,18 +3569,18 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <button
                 type="button"
                 onClick={() => {
-                  setProductToEdit(selectedProductDetail);
-                  setEditProductName(selectedProductDetail.name);
-                  setEditProductPrice(selectedProductDetail.price !== undefined ? String(selectedProductDetail.price) : '');
-                  setEditProductPromoBuy(selectedProductDetail.promoBuyQty !== undefined ? String(selectedProductDetail.promoBuyQty) : '');
-                  setEditProductPromoGet(selectedProductDetail.promoGetQty !== undefined ? String(selectedProductDetail.promoGetQty) : '');
+                  setProductToកែប្រែ(selectedProductDetail);
+                  setកែប្រែProductName(selectedProductDetail.name);
+                  setកែប្រែProductតម្លៃ(selectedProductDetail.price !== undefined ? String(selectedProductDetail.price) : '');
+                  setកែប្រែProductPromoBuy(selectedProductDetail.promoBuyQty !== undefined ? String(selectedProductDetail.promoBuyQty) : '');
+                  setកែប្រែProductPromoGet(selectedProductDetail.promoGetQty !== undefined ? String(selectedProductDetail.promoGetQty) : '');
                   
                   if (selectedProductDetail.promotions && selectedProductDetail.promotions.length > 0) {
-                    setEditProductPromotions(selectedProductDetail.promotions.map(p => ({ buyQty: p.buyQty, getQty: p.getQty })));
+                    setកែប្រែProductPromotions(selectedProductDetail.promotions.map(p => ({ buyQty: p.buyQty, getQty: p.getQty })));
                   } else if (selectedProductDetail.promoBuyQty && selectedProductDetail.promoGetQty) {
-                    setEditProductPromotions([{ buyQty: selectedProductDetail.promoBuyQty, getQty: selectedProductDetail.promoGetQty }]);
+                    setកែប្រែProductPromotions([{ buyQty: selectedProductDetail.promoBuyQty, getQty: selectedProductDetail.promoGetQty }]);
                   } else {
-                    setEditProductPromotions([]);
+                    setកែប្រែProductPromotions([]);
                   }
                   setSelectedProductDetail(null);
                 }}
@@ -3591,7 +3591,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <button
                 type="button"
                 onClick={() => {
-                  setProductToDelete(selectedProductDetail);
+                  setProductToលុប(selectedProductDetail);
                   setSelectedProductDetail(null);
                 }}
                 className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer text-center"
@@ -3605,13 +3605,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       )}
 
       {/* Stock Order Modals */}
-      {isCreateOrderModalOpen && createPortal(
+      {isបង្កើតOrderModalOpen && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-xl rounded-3xl p-6 shadow-2xl relative border border-slate-100 max-h-[90vh] overflow-y-auto custom-scroll animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-6">
               <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ចូលស្តុកកម្មង់ថ្មី</h3>
               <button 
-                onClick={() => setIsCreateOrderModalOpen(false)} 
+                onClick={() => setIsបង្កើតOrderModalOpen(false)} 
                 className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3620,7 +3620,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               </button>
             </div>
 
-            <form onSubmit={handleAdminCreateStockOrder} className="space-y-4">
+            <form onSubmit={handleAdminបង្កើតStockOrder} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">កាលបរិច្ឆេទ</label>
                 <input
@@ -3648,8 +3648,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 {orderItems.map((item, idx) => {
                   const product = products.find(p => p.name === item.productName);
                   const qtyVal = parseInt(item.quantity) || 0;
-                  const hasPrice = product && product.price !== undefined && product.price !== null;
-                  const subtotal = hasPrice && qtyVal > 0 ? product.price * qtyVal : 0;
+                  const hasតម្លៃ = product && product.price !== undefined && product.price !== null;
+                  const subtotal = hasតម្លៃ && qtyVal > 0 ? product.price * qtyVal : 0;
 
                   return (
                     <div key={idx} className="bg-slate-50 hover:bg-slate-100/75 p-3 rounded-2xl border border-slate-100 space-y-2 transition animate-in fade-in duration-150">
@@ -3699,13 +3699,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       {product && (
                         <div className="flex justify-between items-center text-[11px] px-1 text-slate-500 font-medium border-t border-slate-200/50 pt-1.5">
                           <span>
-                            {hasPrice ? (
+                            {hasតម្លៃ ? (
                               <span>តម្លៃឯកតា៖ <span className="font-bold text-slate-700">${product.price?.toFixed(2)}</span></span>
                             ) : (
                               <span className="text-slate-400">-</span>
                             )}
                           </span>
-                          {hasPrice && qtyVal > 0 && (
+                          {hasតម្លៃ && qtyVal > 0 && (
                             <span className="font-black text-indigo-600">សរុប៖ ${subtotal.toFixed(2)}</span>
                           )}
                         </div>
@@ -3763,7 +3763,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <div className="flex gap-3 pt-6 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsCreateOrderModalOpen(false)}
+                  onClick={() => setIsបង្កើតOrderModalOpen(false)}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3.5 rounded-2xl transition cursor-pointer"
                 >
                   បោះបង់
@@ -3782,7 +3782,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {orderToDelete && createPortal(
+      {orderToលុប && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
             <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
@@ -3793,20 +3793,20 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             
             <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុបកម្មង់</h3>
             <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
-              តើអ្នកពិតជាចង់លុបការកម្មង់ <span className="font-bold text-slate-800">"{orderToDelete.productName} ({orderToDelete.quantity})"</span> របស់ <span className="font-bold text-slate-800">{orderToDelete.username}</span> នេះមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+              តើអ្នកពិតជាចង់លុបការកម្មង់ <span className="font-bold text-slate-800">"{orderToលុប.productName} ({orderToលុប.quantity})"</span> របស់ <span className="font-bold text-slate-800">{orderToលុប.username}</span> នេះមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
             </p>
 
             <div className="flex space-x-3">
               <button
                 type="button"
-                onClick={() => setOrderToDelete(null)}
+                onClick={() => setOrderToលុប(null)}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
               >
                 បោះបង់
               </button>
               <button
                 type="button"
-                onClick={() => handleAdminDeleteOrder(orderToDelete.id)}
+                onClick={() => handleAdminលុបOrder(orderToលុប.id)}
                 disabled={loading}
                 className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-rose-600/20 active:scale-95 transition disabled:opacity-70 cursor-pointer"
               >
@@ -3823,12 +3823,12 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-5">
               <h3 className="text-base md:text-lg font-black text-slate-800">
-                {isEditingOrder ? 'កែប្រែព័ត៌មានការកម្មង់' : 'ព័ត៌មានលម្អិតពីការកម្មង់'}
+                {isកែប្រែingOrder ? 'កែប្រែព័ត៌មានការកម្មង់' : 'ព័ត៌មានលម្អិតពីការកម្មង់'}
               </h3>
               <button 
                 onClick={() => {
                   setSelectedOrderDetail(null);
-                  setIsEditingOrder(false);
+                  setIsកែប្រែingOrder(false);
                 }} 
                 className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
               >
@@ -3838,13 +3838,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               </button>
             </div>
 
-            {isEditingOrder ? (
-              <form onSubmit={handleAdminEditOrder} className="space-y-4">
+            {isកែប្រែingOrder ? (
+              <form onSubmit={handleAdminកែប្រែOrder} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">អ្នកប្រើប្រាស់ / ឡាន</label>
                   <select
                     value={editOrderUserId}
-                    onChange={e => setEditOrderUserId(e.target.value)}
+                    onChange={e => setកែប្រែOrderUserId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800 cursor-pointer"
                     required
                   >
@@ -3859,7 +3859,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះទំនិញ</label>
                     <select
                       value={editOrderProductName}
-                      onChange={e => setEditOrderProductName(e.target.value)}
+                      onChange={e => setកែប្រែOrderProductName(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800 cursor-pointer"
                       required
                     >
@@ -3876,7 +3876,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     <input
                       type="number"
                       value={editOrderQuantity}
-                      onChange={e => setEditOrderQuantity(e.target.value)}
+                      onChange={e => setកែប្រែOrderQuantity(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800 text-right"
                       required
                       min="1"
@@ -3888,19 +3888,19 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 {(() => {
                   const product = products.find(p => p.name === editOrderProductName);
                   const qtyVal = parseInt(editOrderQuantity) || 0;
-                  const hasPrice = product && product.price !== undefined && product.price !== null;
-                  const subtotal = hasPrice && qtyVal > 0 ? product.price * qtyVal : 0;
+                  const hasតម្លៃ = product && product.price !== undefined && product.price !== null;
+                  const subtotal = hasតម្លៃ && qtyVal > 0 ? product.price * qtyVal : 0;
                   if (product) {
                     return (
                       <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex justify-between items-center px-4 text-xs font-medium text-slate-500">
                         <span>
-                          {hasPrice ? (
+                          {hasតម្លៃ ? (
                             <span>តម្លៃឯកតា៖ <span className="font-bold text-slate-700">${product.price?.toFixed(2)}</span></span>
                           ) : (
                             <span className="text-slate-400">-</span>
                           )}
                         </span>
-                        {hasPrice && qtyVal > 0 && (
+                        {hasតម្លៃ && qtyVal > 0 && (
                           <span className="font-black text-indigo-600">សរុប៖ ${subtotal.toFixed(2)}</span>
                         )}
                       </div>
@@ -3915,7 +3915,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     <input
                       type="date"
                       value={editOrderDate}
-                      onChange={e => setEditOrderDate(e.target.value)}
+                      onChange={e => setកែប្រែOrderDate(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                       required
                     />
@@ -3925,7 +3925,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ស្ថានភាពប្រគល់</label>
                     <select
                       value={String(editOrderDelivered)}
-                      onChange={e => setEditOrderDelivered(e.target.value === 'true')}
+                      onChange={e => setកែប្រែOrderDelivered(e.target.value === 'true')}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800 cursor-pointer"
                     >
                       <option value="false">កំពុងរង់ចាំ</option>
@@ -3940,7 +3940,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     <input
                       type="text"
                       value={editOrderCustomerName}
-                      onChange={e => setEditOrderCustomerName(e.target.value)}
+                      onChange={e => setកែប្រែOrderCustomerName(e.target.value)}
                       placeholder="ឈ្មោះអតិថិជន..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                     />
@@ -3950,7 +3950,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     <input
                       type="text"
                       value={editOrderLocation}
-                      onChange={e => setEditOrderLocation(e.target.value)}
+                      onChange={e => setកែប្រែOrderLocation(e.target.value)}
                       placeholder="ទីតាំង..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                     />
@@ -3960,7 +3960,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <div className="flex gap-3 pt-4 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setIsEditingOrder(false)}
+                    onClick={() => setIsកែប្រែingOrder(false)}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                   >
                     បោះបង់
@@ -4056,16 +4056,16 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                               <div className="flex justify-center items-center gap-1.5">
                                 <button
                                   onClick={() => {
-                                    setOrderToEdit(item);
-                                    setEditOrderUserId(item.userId);
-                                    setEditOrderProductName(item.productName);
-                                    setEditOrderQuantity(String(item.quantity));
-                                    setEditOrderDate(item.date);
+                                    setOrderToកែប្រែ(item);
+                                    setកែប្រែOrderUserId(item.userId);
+                                    setកែប្រែOrderProductName(item.productName);
+                                    setកែប្រែOrderQuantity(String(item.quantity));
+                                    setកែប្រែOrderDate(item.date);
                                     const { customer, location } = getOrderCustomerAndLocation(item.note || '');
-                                    setEditOrderCustomerName(customer);
-                                    setEditOrderLocation(location);
-                                    setEditOrderDelivered(item.delivered);
-                                    setIsEditingOrder(true);
+                                    setកែប្រែOrderCustomerName(customer);
+                                    setកែប្រែOrderLocation(location);
+                                    setកែប្រែOrderDelivered(item.delivered);
+                                    setIsកែប្រែingOrder(true);
                                   }}
                                   className="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition cursor-pointer"
                                   title="កែប្រែ"
@@ -4076,7 +4076,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                                 </button>
                                 <button
                                   onClick={() => {
-                                    setOrderToDelete(item);
+                                    setOrderToលុប(item);
                                     setSelectedOrderDetail(null);
                                   }}
                                   className="p-1 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
@@ -4104,7 +4104,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 <div className="flex gap-2.5 pt-5 border-t border-slate-100 mt-6">
                   {!selectedOrderDetail.delivered ? (
                     <button
-                      onClick={() => handleAdminConfirmDelivery(selectedOrderDetail)}
+                      onClick={() => handleAdminបញ្ជាក់Delivery(selectedOrderDetail)}
                       className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm py-3 rounded-2xl shadow-md shadow-emerald-600/10 active:scale-95 transition cursor-pointer"
                     >
                       បញ្ជាក់ការប្រគល់ទាំងអស់
@@ -4220,7 +4220,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                             ) : null}
                           </div>
 
-                          {/* Quantity */}
+                          {/* បរិមាណ */}
                           <div className={`${selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? "col-span-2" : "col-span-4"} text-center`}>
                             <span className={`font-black text-xs ${
                                 selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? 'text-emerald-600' : 
@@ -4230,7 +4230,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                             </span>
                           </div>
 
-                          {/* Price and Subtotal */}
+                          {/* តម្លៃ and សរុបរង */}
                           {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' && (
                             <>
                               <div className="col-span-3 text-right">
@@ -4252,7 +4252,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 </div>
               </div>
 
-              {/* Total Price */}
+              {/* តម្លៃសរុប */}
               {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' && (() => {
                 const totalCost = selectedInvoiceDetail.items.reduce((sum: number, item: any) => {
                   const qty = item.quantity || 0;
@@ -4272,7 +4272,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => setInvoiceToDelete(selectedInvoiceDetail)}
+                onClick={() => setInvoiceToលុប(selectedInvoiceDetail)}
                 className="flex-1 hover:bg-rose-50 border border-rose-200 text-rose-600 font-bold text-[10px] sm:text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1 cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -4310,14 +4310,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   const item = selectedRowItem;
                   setSelectedRowItem(null);
                   setSelectedInvoiceDetail(null);
-                  handleEditTransactionClick(item);
+                  handleកែប្រែTransactionClick(item);
                 }}
                 className="w-full hover:bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                <span>កែប្រែ (Edit)</span>
+                <span>កែប្រែ (កែប្រែ)</span>
               </button>
               <button
                 type="button"
@@ -4325,14 +4325,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   const item = selectedRowItem;
                   setSelectedRowItem(null);
                   setSelectedInvoiceDetail(null);
-                  setTransactionToDelete(item);
+                  setTransactionToលុប(item);
                 }}
                 className="w-full hover:bg-rose-50 border border-rose-100 text-rose-600 font-bold text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                <span>លុប (Delete)</span>
+                <span>លុប (លុប)</span>
               </button>
             </div>
             <button
@@ -4340,15 +4340,15 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               onClick={() => setSelectedRowItem(null)}
               className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2.5 rounded-2xl transition cursor-pointer"
             >
-              បិទ (Close)
+              បិទ (បិទ)
             </button>
           </div>
         </div>,
         document.body
       )}
 
-      {/* Confirmation Modal for Deleting Entire Invoice */}
-      {invoiceToDelete && createPortal(
+      {/* បញ្ជាក់ation Modal for Deleting Entire Invoice */}
+      {invoiceToលុប && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[100] p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
             <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
@@ -4359,13 +4359,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             
             <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុបវិក្កយបត្រ</h3>
             <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
-              តើអ្នកពិតជាចង់លុបវិក្កយបត្ររបស់អតិថិជន <span className="font-bold text-slate-800">"{invoiceToDelete.customerName}"</span> នេះទាំងស្រុងមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+              តើអ្នកពិតជាចង់លុបវិក្កយបត្ររបស់អតិថិជន <span className="font-bold text-slate-800">"{invoiceToលុប.customerName}"</span> នេះទាំងស្រុងមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
             </p>
 
             <div className="flex space-x-3">
               <button
                 type="button"
-                onClick={() => setInvoiceToDelete(null)}
+                onClick={() => setInvoiceToលុប(null)}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
               >
                 បោះបង់
@@ -4376,7 +4376,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 onClick={async () => {
                   setLoading(true);
                   try {
-                    await Promise.all(invoiceToDelete.items.map(async (item: any) => {
+                    await Promise.all(invoiceToលុប.items.map(async (item: any) => {
                       const product = products.find(p => p.name === item.productName);
                       if (product) {
                         if (item.type === 'Stock Out') {
@@ -4391,8 +4391,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       }
                     }));
 
-                    await Promise.all(invoiceToDelete.items.map((item: any) => deleteDoc(doc(db, 'transactions', item.id))));
-                    setInvoiceToDelete(null);
+                    await Promise.all(invoiceToលុប.items.map((item: any) => deleteDoc(doc(db, 'transactions', item.id))));
+                    setInvoiceToលុប(null);
                     setSelectedInvoiceDetail(null);
                   } catch (error) {
                     console.error("Error deleting invoice: ", error);
@@ -4411,19 +4411,19 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {/* Floating Modal for Editing Transaction */}
-      {transactionToEdit && createPortal(
+      {/* Floating Modal for កែប្រែing Transaction */}
+      {transactionToកែប្រែ && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-lg font-black text-slate-800">
-                  កែប្រែប្រតិបត្តិការ {transactionToEdit.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : transactionToEdit.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : 'ស្តុកត្រឡប់'}
+                  កែប្រែប្រតិបត្តិការ {transactionToកែប្រែ.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : transactionToកែប្រែ.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : 'ស្តុកត្រឡប់'}
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">កែប្រែព័ត៌មានខាងក្រោមដើម្បីរក្សាទុក</p>
               </div>
               <button 
-                onClick={() => setTransactionToEdit(null)} 
+                onClick={() => setTransactionToកែប្រែ(null)} 
                 className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -4440,7 +4440,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   <input
                     type="date"
                     value={editTxDate}
-                    onChange={e => setEditTxDate(e.target.value)}
+                    onChange={e => setកែប្រែTxDate(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                     required
                   />
@@ -4452,7 +4452,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   <div className="relative">
                     <select
                       value={editTxProductName}
-                      onChange={e => setEditTxProductName(e.target.value)}
+                      onChange={e => setកែប្រែTxProductName(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800 appearance-none cursor-pointer"
                       required
                     >
@@ -4471,13 +4471,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   </div>
                 </div>
 
-                {/* Quantity Input */}
+                {/* បរិមាណ Input */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ចំនួនទំនិញ</label>
                   <input
                     type="number"
                     value={editQuantity}
-                    onChange={e => setEditQuantity(e.target.value)}
+                    onChange={e => setកែប្រែបរិមាណ(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-black text-slate-800"
                     required
                     min="1"
@@ -4485,15 +4485,15 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   />
                 </div>
 
-                {/* Price Input (Only for Stock Sold) */}
-                {transactionToEdit.type === 'Stock Sold' && (
+                {/* តម្លៃ Input (Only for Stock Sold) */}
+                {transactionToកែប្រែ.type === 'Stock Sold' && (
                   <div className="space-y-1.5">
                     <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">តម្លៃឯកតា ($)</label>
                     <input
                       type="number"
                       step="0.01"
-                      value={editTxPrice}
-                      onChange={e => setEditTxPrice(e.target.value)}
+                      value={editTxតម្លៃ}
+                      onChange={e => setកែប្រែTxតម្លៃ(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-black text-slate-800"
                       required
                       min="0"
@@ -4503,14 +4503,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 )}
 
                 {/* Customer Name & Location (Only for Stock Sold) */}
-                {transactionToEdit.type === 'Stock Sold' && (
+                {transactionToកែប្រែ.type === 'Stock Sold' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះអតិថិជន</label>
                       <input
                         type="text"
                         value={editTxCustomerName}
-                        onChange={e => setEditTxCustomerName(e.target.value)}
+                        onChange={e => setកែប្រែTxCustomerName(e.target.value)}
                         placeholder="ឈ្មោះអតិថិជន..."
                         className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                       />
@@ -4520,7 +4520,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       <input
                         type="text"
                         value={editTxLocation}
-                        onChange={e => setEditTxLocation(e.target.value)}
+                        onChange={e => setកែប្រែTxLocation(e.target.value)}
                         placeholder="ទីតាំង..."
                         className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                       />
@@ -4529,13 +4529,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 )}
 
                 {/* Note (For non-Stock Sold transactions) */}
-                {transactionToEdit.type !== 'Stock Sold' && (
+                {transactionToកែប្រែ.type !== 'Stock Sold' && (
                   <div className="space-y-1.5">
                     <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ចំណាំ (ឈ្មោះអ្នកប្រគល់/ទទួល)</label>
                     <input
                       type="text"
                       value={editNote}
-                      onChange={e => setEditNote(e.target.value)}
+                      onChange={e => setកែប្រែNote(e.target.value)}
                       placeholder="ឈ្មោះ..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
                     />
@@ -4547,7 +4547,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <div className="p-6 pt-4 border-t border-slate-100 flex space-x-3 shrink-0 bg-white rounded-b-3xl">
                 <button
                   type="button"
-                  onClick={() => setTransactionToEdit(null)}
+                  onClick={() => setTransactionToកែប្រែ(null)}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                 >
                   បោះបង់
@@ -4571,7 +4571,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           <div className="bg-white w-full max-w-2xl max-h-[85vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">ប្រវត្តិស្តុកចូល (Stock In History)</h3>
+                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">ប្រវត្តិស្តុកចូល </h3>
                 <p className="text-xs text-slate-500 font-medium">បញ្ជីរាយនាមនៃការបញ្ចូលស្តុកថ្មីចូលក្នុងឃ្លាំង</p>
               </div>
               <button 
@@ -4675,11 +4675,11 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <button
                 type="button"
                 onClick={() => {
-                  setStockInToEdit(selectedStockInRecord);
-                  setEditStockInDate(selectedStockInRecord.date);
-                  setEditStockInDeliverer(selectedStockInRecord.deliverer);
-                  setEditStockInItems(selectedStockInRecord.items.map((i: any) => ({ productName: i.productName, quantity: String(i.quantity) })));
-                  setIsEditStockInModalOpen(true);
+                  setStockInToកែប្រែ(selectedStockInRecord);
+                  setកែប្រែStockInDate(selectedStockInRecord.date);
+                  setកែប្រែStockInDeliverer(selectedStockInRecord.deliverer);
+                  setកែប្រែStockInItems(selectedStockInRecord.items.map((i: any) => ({ productName: i.productName, quantity: String(i.quantity) })));
+                  setIsកែប្រែStockInModalOpen(true);
                 }}
                 className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
               >
@@ -4688,7 +4688,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <button
                 type="button"
                 onClick={() => {
-                  setStockInToDelete(selectedStockInRecord);
+                  setStockInToលុប(selectedStockInRecord);
                   setSelectedStockInRecord(null);
                 }}
                 className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
@@ -4709,17 +4709,17 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {/* Edit Stock In Modal */}
-      {isEditStockInModalOpen && createPortal(
+      {/* កែប្រែ Stock In Modal */}
+      {isកែប្រែStockInModalOpen && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">កែប្រែស្តុកចូល (Edit Stock In)</h3>
+                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">កែប្រែស្តុកចូល </h3>
                 <p className="text-xs text-slate-500 font-medium">កែប្រែទិន្នន័យស្តុកដែលបានបញ្ចូល</p>
               </div>
               <button 
-                onClick={() => setIsEditStockInModalOpen(false)} 
+                onClick={() => setIsកែប្រែStockInModalOpen(false)} 
                 className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -4736,7 +4736,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     <input
                       type="date"
                       value={editStockInDate}
-                      onChange={e => setEditStockInDate(e.target.value)}
+                      onChange={e => setកែប្រែStockInDate(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 outline-none font-bold text-slate-800"
                       required
                     />
@@ -4746,7 +4746,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     <input
                       type="text"
                       value={editStockInDeliverer}
-                      onChange={e => setEditStockInDeliverer(e.target.value)}
+                      onChange={e => setកែប្រែStockInDeliverer(e.target.value)}
                       placeholder="ឈ្មោះ..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 outline-none font-bold text-slate-800"
                     />
@@ -4772,7 +4772,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                               onChange={e => {
                                 const newItems = [...editStockInItems];
                                 newItems[idx].quantity = e.target.value;
-                                setEditStockInItems(newItems);
+                                setកែប្រែStockInItems(newItems);
                               }}
                               className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:border-sky-400 outline-none font-bold text-slate-800 pr-8"
                               placeholder="ចំនួន"
@@ -4792,7 +4792,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <div className="p-6 pt-4 border-t border-slate-100 flex gap-3 shrink-0 bg-white rounded-b-3xl">
                 <button
                   type="button"
-                  onClick={() => setIsEditStockInModalOpen(false)}
+                  onClick={() => setIsកែប្រែStockInModalOpen(false)}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                 >
                   បោះបង់
@@ -4811,8 +4811,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         document.body
       )}
 
-      {/* Custom Confirmation Modal for Deleting Stock In History */}
-      {stockInToDelete && createPortal(
+      {/* Custom បញ្ជាក់ation Modal for Deleting Stock In History */}
+      {stockInToលុប && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
             <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
@@ -4823,13 +4823,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             
             <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុបស្តុកចូល</h3>
             <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
-              តើអ្នកពិតជាចង់លុបប្រវត្តិស្តុកចូលកាលពីថ្ងៃទី <span className="font-bold text-slate-800">"{stockInToDelete.date}"</span> នេះមែនទេ? ចំនួនទំនិញនឹងត្រូវកាត់ចេញពីឃ្លាំងវិញ។ ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+              តើអ្នកពិតជាចង់លុបប្រវត្តិស្តុកចូលកាលពីថ្ងៃទី <span className="font-bold text-slate-800">"{stockInToលុប.date}"</span> នេះមែនទេ? ចំនួនទំនិញនឹងត្រូវកាត់ចេញពីឃ្លាំងវិញ។ ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
             </p>
 
             <div className="flex space-x-3">
               <button
                 type="button"
-                onClick={() => setStockInToDelete(null)}
+                onClick={() => setStockInToលុប(null)}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
               >
                 បោះបង់
@@ -4837,7 +4837,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => handleDeleteStockIn(stockInToDelete)}
+                onClick={() => handleលុបStockIn(stockInToលុប)}
                 className="flex-1 hover:bg-rose-700 bg-rose-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-rose-600/30 transition disabled:opacity-70 cursor-pointer"
               >
                 {loading ? 'កំពុងលុប...' : 'យល់ព្រម'}
