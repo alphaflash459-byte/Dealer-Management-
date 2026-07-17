@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { User, Transaction, Product, StockOrder, PromotionTier } from '../types';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export function cleanUndefined<T extends object>(obj: T): T {
@@ -14,13 +14,93 @@ export function cleanUndefined<T extends object>(obj: T): T {
   return newObj;
 }
 
+export function calculatePromoQty(product: Product | undefined, qty: number): number {
+  if (!product) return 0;
+  
+  if (product.promotions && product.promotions.length > 0) {
+    const sortedPromos = [...product.promotions]
+      .filter(p => p.buyQty > 0 && p.getQty > 0)
+      .sort((a, b) => b.buyQty - a.buyQty);
+      
+    if (sortedPromos.length > 0) {
+      let remainingQty = qty;
+      let totalFree = 0;
+      
+      for (const promo of sortedPromos) {
+        if (remainingQty >= promo.buyQty) {
+          const multiplier = Math.floor(remainingQty / promo.buyQty);
+          totalFree += multiplier * promo.getQty;
+          remainingQty %= promo.buyQty;
+        }
+      }
+      return remainingQty === 0 ? totalFree : 0;
+    }
+  }
+  
+  if (product.promoBuyQty && product.promoGetQty && product.promoBuyQty > 0) {
+    if (qty % product.promoBuyQty === 0) {
+      return Math.floor(qty / product.promoBuyQty) * product.promoGetQty;
+    }
+    return 0;
+  }
+  
+  return 0;
+}
+
+export function calculateAutoPriceForQty(product: Product, qty: number): number {
+  const standardPrice = product.price || 0;
+  if (qty <= 0) return standardPrice;
+
+  // Check if quantity is an exact promo target number
+  const freeQty = calculatePromoQty(product, qty);
+  if (freeQty > 0) {
+    return standardPrice;
+  }
+
+  // Check if it's an apportioned quantity (buyQty + getQty)
+  const tiers: { buyQty: number; getQty: number }[] = [];
+  if (product.promotions && product.promotions.length > 0) {
+    tiers.push(...product.promotions.filter(p => p.buyQty > 0 && p.getQty > 0));
+  } else if (product.promoBuyQty && product.promoBuyQty > 0 && product.promoGetQty) {
+    tiers.push({ buyQty: product.promoBuyQty, getQty: product.promoGetQty });
+  }
+
+  // Sort descending by total (buyQty + getQty)
+  tiers.sort((a, b) => (b.buyQty + b.getQty) - (a.buyQty + a.getQty));
+
+  let remainingQty = qty;
+  for (const tier of tiers) {
+    const totalQty = tier.buyQty + tier.getQty;
+    if (remainingQty >= totalQty) {
+      remainingQty %= totalQty;
+      // If it perfectly divides by one of the tiers, return its apportioned price
+      if (remainingQty === 0) {
+        return (tier.buyQty * standardPrice) / totalQty;
+      }
+    }
+  }
+
+  return standardPrice;
+}
+
+export function calculatePromoQtyWithPriceCheck(product: Product | undefined, qty: number, priceVal: number): number {
+  if (!product || qty <= 0) return 0;
+  
+  const standardPrice = product.price || 0;
+  if (Math.abs(priceVal - standardPrice) > 0.001) {
+    return 0;
+  }
+  
+  return calculatePromoQty(product, qty);
+}
+
 interface AdminDashboardProps {
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   transactions: Transaction[];
   products: Product[];
   stockOrders: StockOrder[];
-  activeTab: 'users' | 'products' | 'transactions' | 'stockOrders';
+  activeTab: 'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn';
 }
 
 export default function AdminDashboard({ users, setUsers, transactions, products, stockOrders, activeTab }: AdminDashboardProps) {
@@ -51,12 +131,20 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [selectedTransactionDetail, setSelectedTransactionDetail] = useState<Transaction | null>(null);
+  const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<any | null>(null);
+  const [selectedRowItem, setSelectedRowItem] = useState<Transaction | null>(null);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<User | null>(null);
   const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
   const [isEditingTransaction, setIsEditingTransaction] = useState(false);
   const [isEditingUser, setIsEditingUser] = useState(false);
   const [editQuantity, setEditQuantity] = useState('');
   const [editNote, setEditNote] = useState('');
+  const [editTxProductName, setEditTxProductName] = useState('');
+  const [editTxDate, setEditTxDate] = useState('');
+  const [editTxCustomerName, setEditTxCustomerName] = useState('');
+  const [editTxLocation, setEditTxLocation] = useState('');
+  const [editTxPrice, setEditTxPrice] = useState('');
 
   // Stock Order Admin States
   const [isCreateOrderModalOpen, setIsCreateOrderModalOpen] = useState(false);
@@ -78,10 +166,15 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const [selectedOrderUser, setSelectedOrderUser] = useState<string>('all');
   const [selectedOrderStatus, setSelectedOrderStatus] = useState<'all' | 'pending' | 'delivered'>('all');
 
+  // Filter transaction states for Admin "All Transactions"
+  const [filterTxUserId, setFilterTxUserId] = useState<string>('all');
+  const [filterTxStartDate, setFilterTxStartDate] = useState<string>('');
+  const [filterTxEndDate, setFilterTxEndDate] = useState<string>('');
+
   // Edit / Delete stock order states
   const [orderToDelete, setOrderToDelete] = useState<StockOrder | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<StockOrder | null>(null);
-  const [selectedOrderDetail, setSelectedOrderDetail] = useState<StockOrder | null>(null);
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<any | null>(null);
   const [isEditingOrder, setIsEditingOrder] = useState(false);
   const [editOrderUserId, setEditOrderUserId] = useState('');
   const [editOrderProductName, setEditOrderProductName] = useState('');
@@ -176,14 +269,16 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleAdminConfirmDelivery = async (orderId: string) => {
+  const handleAdminConfirmDelivery = async (orderGroup: any) => {
     setLoading(true);
     try {
-      await setDoc(doc(db, 'stock_orders', orderId), {
-        delivered: true,
-        deliveredAt: new Date().toISOString(),
-        deliveredBy: 'Admin'
-      }, { merge: true });
+      await Promise.all(orderGroup.items.map(async (item: any) => {
+        await setDoc(doc(db, 'stock_orders', item.id), {
+          delivered: true,
+          deliveredAt: new Date().toISOString(),
+          deliveredBy: 'Admin'
+        }, { merge: true });
+      }));
       setSelectedOrderDetail(null);
     } catch (error) {
       console.error("Error confirming delivery: ", error);
@@ -193,14 +288,16 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const handleAdminUnconfirmDelivery = async (orderId: string) => {
+  const handleAdminUnconfirmDelivery = async (orderGroup: any) => {
     setLoading(true);
     try {
-      await setDoc(doc(db, 'stock_orders', orderId), {
-        delivered: false,
-        deliveredAt: null,
-        deliveredBy: null
-      }, { merge: true });
+      await Promise.all(orderGroup.items.map(async (item: any) => {
+        await setDoc(doc(db, 'stock_orders', item.id), {
+          delivered: false,
+          deliveredAt: null,
+          deliveredBy: null
+        }, { merge: true });
+      }));
       setSelectedOrderDetail(null);
     } catch (error) {
       console.error("Error marking order as pending: ", error);
@@ -537,30 +634,404 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
+  const handleEditTransactionClick = (t: Transaction) => {
+    setTransactionToEdit(t);
+    setEditTxProductName(t.productName);
+    setEditQuantity(String(t.quantity));
+    
+    const prod = products.find(p => p.name === t.productName);
+    setEditTxPrice(t.price !== undefined ? String(t.price) : (prod?.price !== undefined ? String(prod.price) : ''));
+    
+    const tDate = t.date ? new Date(t.date) : new Date();
+    const validDate = isNaN(tDate.getTime()) ? new Date() : tDate;
+    const yyyy = validDate.getFullYear();
+    const mm = String(validDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(validDate.getDate()).padStart(2, '0');
+    setEditTxDate(`${yyyy}-${mm}-${dd}`);
+    setEditNote(t.note || '');
+
+    if (t.type === 'Stock Sold') {
+      const currentNote = t.note || '';
+      const match = currentNote.match(/^(.*?)\s*\((.*?)\)$/);
+      if (match) {
+        setEditTxCustomerName(match[1].trim());
+        setEditTxLocation(match[2].trim());
+      } else {
+        setEditTxCustomerName(currentNote);
+        setEditTxLocation('');
+      }
+    } else {
+      setEditTxCustomerName('');
+      setEditTxLocation('');
+    }
+  };
+
   const handleUpdateTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetTx = transactionToEdit || selectedTransactionDetail;
-    if (!targetTx) return;
+    if (!transactionToEdit) return;
+
+    if (!editTxProductName) {
+      alert('សូមជ្រើសរើសឈ្មោះទំនិញ!');
+      return;
+    }
+    if (!editQuantity) {
+      alert('សូមបំពេញចំនួនទំនិញ!');
+      return;
+    }
+    const qty = parseInt(editQuantity);
+    if (isNaN(qty) || qty <= 0) {
+      alert('ចំនួនទំនិញត្រូវតែជាលេខវិជ្ជមាន!');
+      return;
+    }
+
     setLoading(true);
+
     try {
-      await setDoc(doc(db, 'transactions', targetTx.id), { ...targetTx, quantity: Number(editQuantity), note: editNote }, { merge: true });
+      const origDate = transactionToEdit.date ? new Date(transactionToEdit.date) : new Date();
+      const safeOrigDate = isNaN(origDate.getTime()) ? new Date() : origDate;
+      const selectedDate = new Date(editTxDate);
+      
+      if (!isNaN(selectedDate.getTime())) {
+        selectedDate.setHours(
+          safeOrigDate.getHours(),
+          safeOrigDate.getMinutes(),
+          safeOrigDate.getSeconds(),
+          safeOrigDate.getMilliseconds()
+        );
+      }
+
+      const parsedPrice = parseFloat(editTxPrice);
+
+      const product = products.find(p => p.name === editTxProductName);
+      let promoQty: number | undefined = undefined;
+      if (product && transactionToEdit.type === 'Stock Sold') {
+        promoQty = calculatePromoQtyWithPriceCheck(product, qty, isNaN(parsedPrice) ? 0 : parsedPrice);
+      }
+
+      const updatedTransaction: Partial<Transaction> = {
+        productName: editTxProductName,
+        quantity: qty,
+        price: isNaN(parsedPrice) ? undefined : parsedPrice,
+        promoQty: promoQty && promoQty > 0 ? promoQty : undefined,
+        date: selectedDate.toISOString(),
+        note: transactionToEdit.type === 'Stock Sold' ? (editTxCustomerName && editTxLocation ? `${editTxCustomerName} (${editTxLocation})` : editTxCustomerName || editTxLocation || '') : editNote
+      };
+
+      if (!promoQty || promoQty <= 0) {
+        (updatedTransaction as any).promoQty = deleteField(); 
+      }
+
+      await updateDoc(doc(db, 'transactions', transactionToEdit.id), cleanUndefined(updatedTransaction));
       setTransactionToEdit(null);
-      setSelectedTransactionDetail(null);
       setIsEditingTransaction(false);
     } catch (error) {
       console.error("Error updating transaction: ", error);
-      alert('មានបញ្ហាក្នុងការកែប្រែប្រតិបត្តិការ');
+      alert("មានបញ្ហាក្នុងការកែប្រែទិន្នន័យ");
     } finally {
       setLoading(false);
     }
   };
 
-  const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const totalItems = sortedTransactions.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const activePage = Math.min(Math.max(1, currentPage), totalPages || 1);
-  const startIndex = (activePage - 1) * pageSize;
-  const paginatedTransactions = sortedTransactions.slice(startIndex, startIndex + pageSize);
+  const handleExportSingleInvoicePDF = (invoice: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("សូមអនុញ្ញាតឲ្យបើក Popups ដើម្បីបោះពុម្ពឬទាញយកជា PDF");
+      return;
+    }
+
+    const d = new Date(invoice.date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const formattedDate = `${day}/${month}/${year}`;
+
+    const totalCost = invoice.items.reduce((sum: number, item: any) => {
+      const qty = item.quantity || 0;
+      const pr = item.price || 0;
+      return sum + (qty * pr);
+    }, 0);
+
+    const itemsHtml = invoice.items.map((item: any) => {
+      const subtotal = item.price !== undefined ? item.quantity * item.price : 0;
+      const promoInfo = item.promoQty && item.promoQty > 0 ? `
+        <div style="font-size: 11px; color: #10b981; font-weight: bold; margin-top: 2px;">
+          ថែម: ${item.promoQty}
+        </div>
+      ` : '';
+
+      return `
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 12px 16px; text-align: left;">
+            <div style="font-weight: 700; color: #1e293b; font-size: 13px;">${item.productName}</div>
+            ${promoInfo}
+          </td>
+          <td style="padding: 12px 16px; text-align: center; font-weight: 800; color: #059669; font-size: 13px;">${item.quantity}</td>
+          <td style="padding: 12px 16px; text-align: right; color: #475569; font-size: 13px;">$${item.price !== undefined ? item.price.toFixed(2) : '0.00'}</td>
+          <td style="padding: 12px 16px; text-align: right; font-weight: 800; color: #4f46e5; font-size: 13px;">$${subtotal.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>វិក្កយបត្រ - ${invoice.customerName}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Kantumruy+Pro:wght@400;500;700;900&display=swap');
+            body {
+              font-family: 'Kantumruy Pro', 'Inter', sans-serif;
+              color: #1e293b;
+              margin: 0;
+              padding: 40px;
+              background-color: #ffffff;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .invoice-card {
+              max-width: 800px;
+              margin: 0 auto;
+              border: 1px solid #e2e8f0;
+              border-radius: 24px;
+              padding: 40px;
+              box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 2px solid #f1f5f9;
+              padding-bottom: 24px;
+              margin-bottom: 24px;
+            }
+            .title {
+              font-size: 24px;
+              font-weight: 900;
+              color: #1e293b;
+              margin: 0;
+            }
+            .date {
+              font-size: 13px;
+              color: #64748b;
+              margin: 6px 0 0 0;
+              font-weight: 500;
+            }
+            .info-grid {
+              background-color: #f8fafc;
+              padding: 20px;
+              border-radius: 20px;
+              border: 1px solid #e2e8f0;
+              margin-bottom: 30px;
+            }
+            .info-row {
+              display: flex;
+              align-items: center;
+              font-size: 14px;
+            }
+            .info-label {
+              width: 100px;
+              color: #64748b;
+              font-weight: 700;
+            }
+            .info-value {
+              font-weight: 800;
+              color: #0f172a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 30px;
+            }
+            th {
+              background-color: #f8fafc;
+              color: #64748b;
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              padding: 12px 16px;
+              border-bottom: 2px solid #e2e8f0;
+            }
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              background-color: #f5f3ff;
+              border: 1px solid #ddd6fe;
+              padding: 16px 24px;
+              border-radius: 20px;
+              font-weight: 700;
+            }
+            .total-label {
+              color: #4c1d95;
+              font-size: 15px;
+              font-weight: 900;
+            }
+            .total-amount {
+              color: #4f46e5;
+              font-size: 22px;
+              font-weight: 900;
+            }
+            .signatures {
+              margin-top: 60px;
+              display: flex;
+              justify-content: space-between;
+              font-size: 12px;
+              color: #64748b;
+              border-top: 1px dashed #e2e8f0;
+              padding-top: 30px;
+              font-weight: 500;
+            }
+            .signature-block {
+              text-align: center;
+              width: 200px;
+            }
+            .signature-line {
+              margin-top: 50px;
+              border-top: 1px solid #cbd5e1;
+              padding-top: 8px;
+            }
+            @media print {
+              body {
+                padding: 0;
+                background-color: #ffffff;
+              }
+              .invoice-card {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                max-width: 100%;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-card">
+            <div class="header">
+              <div>
+                <h1 class="title">វិក្កយបត្រលក់ចេញ</h1>
+                <p class="date">កាលបរិច្ឆេទ: ${formattedDate}</p>
+              </div>
+              <div style="font-size: 32px;">🧾</div>
+            </div>
+
+            <div class="info-grid">
+              <div class="info-row">
+                <span class="info-label">អតិថិជន:</span>
+                <span class="info-value" style="font-size: 15px;">${invoice.customerName}</span>
+              </div>
+              ${invoice.location ? `
+                <div class="info-row" style="margin-top: 12px;">
+                  <span class="info-label">ទីតាំង:</span>
+                  <span class="info-value">${invoice.location}</span>
+                </div>
+              ` : ''}
+            </div>
+
+            <table>
+              <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                <tr>
+                  <th style="text-align: left;">ទំនិញ</th>
+                  <th style="text-align: center; width: 100px;">បរិមាណ</th>
+                  <th style="text-align: right; width: 120px;">តម្លៃ</th>
+                  <th style="text-align: right; width: 140px;">សរុបរង</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <div class="total-row">
+              <span class="total-label">តម្លៃសរុប (Grand Total)</span>
+              <span class="total-amount">$${totalCost.toFixed(2)}</span>
+            </div>
+            
+            <div class="signatures">
+              <div class="signature-block">
+                <div>អ្នកលក់ / Seller</div>
+                <div class="signature-line">ហត្ថលេខា / Signature</div>
+              </div>
+              <div class="signature-block">
+                <div>អ្នកទិញ / Buyer</div>
+                <div class="signature-line">ហត្ថលេខា / Signature</div>
+              </div>
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() {
+                window.close();
+              }, 1000);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // Filtered transactions for Admin tab
+  const filteredTransactions = transactions.filter(t => {
+    const matchUser = filterTxUserId === 'all' || t.userId === filterTxUserId;
+    
+    const txDateStr = t.date ? t.date.split('T')[0] : '';
+    const matchStart = !filterTxStartDate || txDateStr >= filterTxStartDate;
+    const matchEnd = !filterTxEndDate || txDateStr <= filterTxEndDate;
+    
+    return matchUser && matchStart && matchEnd;
+  });
+
+  // Grouped transactions per product for Admin
+  const txGroupedByProduct = (() => {
+    const groupedMap: {
+      [productName: string]: {
+        productName: string;
+        stockOut: number;
+        stockSold: number;
+        stockPromo: number;
+        stockReturn: number;
+      }
+    } = {};
+
+    // First populate with all active products in the system so we cover all products
+    products.forEach(p => {
+      groupedMap[p.name] = {
+        productName: p.name,
+        stockOut: 0,
+        stockSold: 0,
+        stockPromo: 0,
+        stockReturn: 0
+      };
+    });
+
+    // Process filtered transactions
+    filteredTransactions.forEach(t => {
+      if (!groupedMap[t.productName]) {
+        groupedMap[t.productName] = {
+          productName: t.productName,
+          stockOut: 0,
+          stockSold: 0,
+          stockPromo: 0,
+          stockReturn: 0
+        };
+      }
+      
+      const group = groupedMap[t.productName];
+      if (t.type === 'Stock Out') {
+        group.stockOut += t.quantity;
+      } else if (t.type === 'Stock Sold') {
+        group.stockSold += t.quantity;
+        group.stockPromo += (t.promoQty || 0);
+      } else if (t.type === 'Stock Return') {
+        group.stockReturn += t.quantity;
+      }
+    });
+
+    // Convert to array and filter out products with zero activity in the filtered range
+    return Object.values(groupedMap)
+      .filter(p => p.stockOut > 0 || p.stockSold > 0 || p.stockPromo > 0 || p.stockReturn > 0)
+      .sort((a, b) => a.productName.localeCompare(b.productName));
+  })();
 
   // Filter and sort stock orders
   const filteredStockOrders = [...stockOrders]
@@ -573,31 +1044,69 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const totalOrderItems = filteredStockOrders.length;
-  const totalOrderPages = Math.ceil(totalOrderItems / pageSize);
-  const activeOrderPage = Math.min(Math.max(1, currentPage), totalOrderPages || 1);
-  const orderStartIndex = (activeOrderPage - 1) * pageSize;
-  const paginatedStockOrders = filteredStockOrders.slice(orderStartIndex, orderStartIndex + pageSize);
+  const groupedStockOrders = (() => {
+    const groups: { [key: string]: StockOrder[] } = {};
+    filteredStockOrders.forEach(o => {
+      const parsedNote = getOrderCustomerAndLocation(o.note || '');
+      const customer = parsedNote.customer.trim() || 'ទូទៅ';
+      const location = parsedNote.location.trim();
+      const dateDay = o.date ? o.date.split('T')[0] : '';
+      const key = `${customer}-${location}-${dateDay}-${o.username}`;
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(o);
+    });
+
+    return Object.entries(groups).map(([key, items]) => {
+      const firstTx = items[0];
+      const parsedNote = getOrderCustomerAndLocation(firstTx.note || '');
+      const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+      const isDelivered = firstTx.delivered;
+
+      return {
+        id: key,
+        username: firstTx.username,
+        userId: firstTx.userId,
+        customerName: parsedNote.customer || firstTx.note || 'ទូទៅ',
+        location: parsedNote.location || '',
+        date: firstTx.date,
+        quantity: totalQty,
+        items: items,
+        note: firstTx.note,
+        delivered: isDelivered,
+        deliveredAt: firstTx.deliveredAt,
+        deliveredBy: firstTx.deliveredBy
+      };
+    });
+  })();
+
+  const sortedGroupedStockOrders = [...groupedStockOrders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const totalOrderItems = sortedGroupedStockOrders.length;
+  const paginatedStockOrders = sortedGroupedStockOrders;
 
   return (
-    <div className="h-full flex flex-col space-y-6 min-h-0">
+    <div className="w-full h-full flex flex-col">
       {activeTab === 'users' && (
-        <div className="grid grid-cols-1 gap-6">
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden max-h-full flex flex-col min-h-0">
-            <div className="px-5 md:px-6 py-5 border-b border-slate-50 flex justify-between items-center">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6">
+          <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 shrink-0">
+            <div>
               <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
-              <button
-                onClick={() => setIsCreateUserModalOpen(true)}
-                className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm px-4 py-2.5 rounded-2xl font-black shadow-md shadow-indigo-600/20 active:scale-95 transition cursor-pointer"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                </svg>
-                <span>បង្កើតអ្នកប្រើប្រាស់</span>
-              </button>
+              <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">គ្រប់គ្រងគណនីអ្នកប្រើប្រាស់ក្នុងប្រព័ន្ធ</p>
             </div>
-            <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll p-1 md:p-2">
-              <table className="w-full text-left border-collapse">
+            <button
+              onClick={() => setIsCreateUserModalOpen(true)}
+              className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm px-4 py-2.5 rounded-2xl font-black shadow-md shadow-indigo-600/20 active:scale-95 transition cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>បង្កើតអ្នកប្រើប្រាស់</span>
+            </button>
+          </div>
+          <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
+            <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះអ្នកប្រើប្រាស់</th>
@@ -629,27 +1138,28 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 </tbody>
               </table>
             </div>
-          </div>
         </div>
       )}
 
       {activeTab === 'products' && (
-        <div className="grid grid-cols-1 gap-6">
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden max-h-full flex flex-col min-h-0">
-            <div className="px-5 md:px-6 py-5 border-b border-slate-50 flex justify-between items-center">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6">
+          <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 shrink-0">
+            <div>
               <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីទំនិញ</h3>
-              <button
-                onClick={() => setIsCreateProductModalOpen(true)}
-                className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm px-4 py-2.5 rounded-2xl font-black shadow-md shadow-indigo-600/20 active:scale-95 transition cursor-pointer"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                </svg>
-                <span>បន្ថែមទំនិញ</span>
-              </button>
+              <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">គ្រប់គ្រងទំនិញ និងកម្មវិធីប្រម៉ូសិន</p>
             </div>
-            <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll p-1 md:p-2">
-              <table className="w-full text-left border-collapse">
+            <button
+              onClick={() => setIsCreateProductModalOpen(true)}
+              className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm px-4 py-2.5 rounded-2xl font-black shadow-md shadow-indigo-600/20 active:scale-95 transition cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>បន្ថែមទំនិញ</span>
+            </button>
+          </div>
+          <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
+            <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញ</th>
@@ -700,161 +1210,682 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 </tbody>
               </table>
             </div>
-          </div>
         </div>
       )}
 
       {activeTab === 'transactions' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
-          <div className="px-5 md:px-6 py-5 border-b border-slate-50 shrink-0">
-            <h3 className="text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-slate-100 pb-4 shrink-0">
+            <div>
+              <h3 className="text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
+              <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">របាយការណ៍ផ្ទៀងផ្ទាត់ និងតុល្យភាពស្តុកទំនិញ</p>
+            </div>
           </div>
-          <div ref={tableContainerRef} onTouchStart={handleTouchStart} onTouchEnd={(e) => handleTouchEnd(e, totalPages, activePage, setCurrentPage)} className="flex-1 overflow-auto custom-scroll p-1 md:p-2">
+
+          {/* Filters for Transactions */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 shrink-0">
+            {/* User Filter */}
+            <div className="flex flex-col space-y-1">
+              <label className="text-[11px] md:text-xs font-black text-slate-500">អ្នកប្រើប្រាស់</label>
+              <select
+                value={filterTxUserId}
+                onChange={(e) => setFilterTxUserId(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+              >
+                <option value="all">ទាំងអស់</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.username}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Start Date Filter */}
+            <div className="flex flex-col space-y-1">
+              <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទចាប់ផ្តើម</label>
+              <input
+                type="date"
+                value={filterTxStartDate}
+                onChange={(e) => setFilterTxStartDate(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+              />
+            </div>
+
+            {/* End Date Filter */}
+            <div className="flex flex-col space-y-1">
+              <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទបញ្ចប់</label>
+              <input
+                type="date"
+                value={filterTxEndDate}
+                onChange={(e) => setFilterTxEndDate(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
-                <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">កាលបរិច្ឆេទ</th>
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">អ្នកប្រើប្រាស់</th>
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">ប្រភេទប្រតិបត្តិការ</th>
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញ</th>
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100 text-right">ចំនួន</th>
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">ចំណាំ</th>
+                <tr className="text-slate-400 text-[10px] sm:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
+                  <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-rose-500">ស្តុកឡើង</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-emerald-600">ស្តុកលក់</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-amber-500">ស្តុកថែម</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-indigo-600">ស្តុកត្រឡប់</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-600">បញ្ជាក់</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
-                {paginatedTransactions.map(t => {
-                  const user = users.find(u => u.id === t.userId);
-                  let colorClass = 'text-slate-600';
-                  let bgClass = 'bg-slate-100 text-slate-700';
-                  
-                  if (t.type === 'Stock Sold') {
-                      colorClass = 'text-emerald-600'; bgClass = 'bg-emerald-100 text-emerald-700';
-                  } else if (t.type === 'Stock Out') {
-                      colorClass = 'text-rose-600'; bgClass = 'bg-rose-100 text-rose-700';
-                  } else if (t.type === 'Stock Return') {
-                      colorClass = 'text-amber-600'; bgClass = 'bg-amber-100 text-amber-700';
+                {txGroupedByProduct.map(p => {
+                  const diff = p.stockOut - (p.stockSold + p.stockPromo + p.stockReturn);
+                  let badge = null;
+                  if (diff === 0) {
+                    badge = <span className="inline-block px-2.5 py-1 text-xs font-black bg-emerald-50 text-emerald-600 rounded-lg">ត្រឹមត្រូវ</span>;
+                  } else if (diff > 0) {
+                    badge = <span className="inline-block px-2.5 py-1 text-xs font-black bg-rose-50 text-rose-600 rounded-lg">បាត់ ({diff})</span>;
+                  } else {
+                    badge = <span className="inline-block px-2.5 py-1 text-xs font-black bg-amber-50 text-amber-600 rounded-lg">លើស ({Math.abs(diff)})</span>;
                   }
 
                   return (
                     <tr 
-                      key={t.id} 
-                      onClick={() => setSelectedTransactionDetail(t)}
-                      className="hover:bg-slate-50 transition-colors cursor-pointer"
+                      key={p.productName} 
+                      className="hover:bg-slate-50/70 transition-all border-b border-slate-100"
                     >
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 font-medium text-slate-500 whitespace-nowrap">
-                        {(() => {
-                          const d = new Date(t.date);
-                          const day = String(d.getDate()).padStart(2, '0');
-                          const month = String(d.getMonth() + 1).padStart(2, '0');
-                          const year = d.getFullYear();
-                          return (
-                            <div className="leading-tight">
-                              <div className="font-bold text-slate-700">{day}/{month}/{year}</div>
-                            </div>
-                          );
-                        })()}
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-bold text-slate-800">
+                        {p.productName}
                       </td>
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 font-bold text-slate-800">{user?.username || 'Unknown'}</td>
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4">
-                        <span className={`px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] md:text-xs font-bold ${bgClass} whitespace-nowrap`}>
-                          {t.type === 'Stock Sold' ? 'លក់ចេញ' : t.type === 'Stock Out' ? 'ឡើងឡាន' : 'ត្រឡប់'}
-                        </span>
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-black text-xs sm:text-sm md:text-base text-rose-500">
+                        {p.stockOut || '-'}
                       </td>
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 font-bold text-slate-700">{t.productName}</td>
-                      <td className={`px-1.5 md:px-4 py-2.5 sm:py-4 text-right font-black ${colorClass}`}>
-                        {t.quantity}
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-black text-xs sm:text-sm md:text-base text-emerald-600">
+                        {p.stockSold || '-'}
                       </td>
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 text-slate-500 font-medium truncate max-w-[60px] sm:max-w-[150px]">{t.note || '-'}</td>
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-black text-xs sm:text-sm md:text-base text-amber-500">
+                        {p.stockPromo || '-'}
+                      </td>
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-black text-xs sm:text-sm md:text-base text-indigo-600">
+                        {p.stockReturn || '-'}
+                      </td>
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center">
+                        {badge}
+                      </td>
                     </tr>
                   )
                 })}
-                {transactions.length === 0 && (
+                {txGroupedByProduct.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-medium">គ្មានប្រតិបត្តិការទេ</td>
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-bold">គ្មានប្រតិបត្តិការទេ</td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-
-          {/* Pagination Section */}
-          {totalItems > 0 && (
-            <div className="hidden sm:flex justify-between items-center px-4 py-3 border-t border-slate-100 shrink-0">
-              <div className="hidden sm:flex items-center space-x-2 text-xs md:text-sm text-slate-500 font-medium">
-                <span>
-                  បង្ហាញពី {startIndex + 1} ដល់ {Math.min(startIndex + pageSize, totalItems)} នៃ {totalItems}
-                </span>
-              </div>
-
-              <div className="flex w-full sm:w-auto items-center justify-center sm:justify-end space-x-1.5">
-                <button
-                  type="button"
-                  disabled={activePage === 1}
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  className="hidden sm:flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>មុន</span>
-                </button>
-
-                <div className="hidden sm:flex items-center">
-                  {(() => {
-                    const pages = [];
-                    const maxVisible = 5;
-                    if (totalPages <= maxVisible) {
-                      for (let i = 1; i <= totalPages; i++) pages.push(i);
-                    } else {
-                      let start = Math.max(1, activePage - 2);
-                      let end = Math.min(totalPages, activePage + 2);
-                      if (activePage <= 3) {
-                        end = 5;
-                      } else if (activePage >= totalPages - 2) {
-                        start = totalPages - 4;
-                      }
-                      for (let i = start; i <= end; i++) pages.push(i);
-                    }
-                    return pages;
-                  })().map(pageNum => (
-                    <button
-                      key={pageNum}
-                      type="button"
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-xl font-bold text-[10px] sm:text-xs transition mx-0.5 cursor-pointer ${
-                        pageNum === activePage
-                          ? 'bg-emerald-600 text-white font-black shadow-md shadow-emerald-600/10'
-                          : 'hover:bg-slate-50 text-slate-600 hover:text-slate-800'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  disabled={activePage === totalPages}
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  className="hidden sm:flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
-                >
-                  <span>បន្ទាប់</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
+      {activeTab === 'stockOut' && (() => {
+        const outTxs = filteredTransactions
+          .filter(t => t.type === 'Stock Out')
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        const totalOutQty = outTxs.reduce((sum, t) => sum + t.quantity, 0);
+
+        // Group transactions by User + Customer/Note + Location + Date to form grouped invoices like User side
+        const outGroups: { [key: string]: Transaction[] } = {};
+        outTxs.forEach(t => {
+          const parsedNote = getOrderCustomerAndLocation(t.note || '');
+          const customer = parsedNote.customer.trim() || 'ទូទៅ';
+          const location = parsedNote.location.trim();
+          const dateDay = t.date ? t.date.split('T')[0] : '';
+          const key = `${t.userId}-${customer}-${location}-${dateDay}`;
+          if (!outGroups[key]) {
+            outGroups[key] = [];
+          }
+          outGroups[key].push(t);
+        });
+
+        const sortedOutInvoices = Object.entries(outGroups).map(([key, items]) => {
+          const firstTx = items[0];
+          const parsedNote = getOrderCustomerAndLocation(firstTx.note || '');
+          const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+          return {
+            id: key,
+            userId: firstTx.userId,
+            customerName: parsedNote.customer || firstTx.note || 'ទូទៅ',
+            location: parsedNote.location || '',
+            date: firstTx.date,
+            quantity: totalQty,
+            items: items,
+            note: firstTx.note
+          };
+        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        return (
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6 animate-in fade-in duration-200">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-4 shrink-0">
+              <div>
+                <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកឡើងឡានរបស់ User</h3>
+                <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យឡើងឡានរបស់ភ្នាក់ងារលក់</p>
+              </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 gap-3 mb-4 shrink-0">
+              <div className="bg-rose-50/50 border border-rose-100/50 p-4 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] sm:text-xs font-black text-slate-500">សរុបឡើងឡាន</span>
+                <span className="text-lg sm:text-2xl font-black text-rose-600 mt-1">{totalOutQty}</span>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] sm:text-xs font-black text-slate-500 font-bold">ប្រតិបត្តិការសរុប</span>
+                <span className="text-lg sm:text-2xl font-black text-slate-800 mt-1">{sortedOutInvoices.length} វិក្កយបត្រ</span>
+              </div>
+            </div>
+
+            {/* Shared Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 shrink-0">
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] md:text-xs font-black text-slate-500">អ្នកប្រើប្រាស់</label>
+                <select
+                  value={filterTxUserId}
+                  onChange={(e) => setFilterTxUserId(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                >
+                  <option value="all">ទាំងអស់</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.username}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទចាប់ផ្តើម</label>
+                <input
+                  type="date"
+                  value={filterTxStartDate}
+                  onChange={(e) => setFilterTxStartDate(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                />
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទបញ្ចប់</label>
+                <input
+                  type="date"
+                  value={filterTxEndDate}
+                  onChange={(e) => setFilterTxEndDate(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Grouped Table Layout (Matching User design exactly) */}
+            <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
+                  <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកប្រើប្រាស់</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកប្រគល់</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ទីតាំង</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-rose-600">ទំនិញ</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-rose-600">បរិមាណ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
+                  {sortedOutInvoices.map(inv => {
+                    const user = users.find(u => u.id === inv.userId);
+                    return (
+                      <tr 
+                        key={inv.id} 
+                        onClick={() => setSelectedInvoiceDetail(inv)}
+                        className="hover:bg-slate-50/70 transition-all border-b border-slate-100 cursor-pointer"
+                        title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
+                      >
+                        {/* Column 1: Salesperson / User */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-indigo-900 text-[11px] sm:text-xs md:text-sm">
+                          {user?.username || 'Unknown'}
+                        </td>
+                        {/* Column 2: Customer / Note Name */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                          {inv.customerName}
+                        </td>
+                        {/* Column 3: Location */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                          {inv.location ? (
+                            <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
+                              {inv.location}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-bold">-</span>
+                          )}
+                        </td>
+                        {/* Column 4: Date */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
+                          {(() => {
+                            const d = new Date(inv.date);
+                            const day = String(d.getDate()).padStart(2, '0');
+                            const month = String(d.getMonth() + 1).padStart(2, '0');
+                            const shortYear = String(d.getFullYear()).slice(-2);
+                            return `${day}/${month}/${shortYear}`;
+                          })()}
+                        </td>
+                        {/* Column 5: Product list stacked */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                          <div className="flex flex-col space-y-1.5">
+                            {inv.items.map((item: any, idx: number) => (
+                              <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
+                                {item.productName}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        {/* Column 6: Quantity list stacked */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                          <div className="flex flex-col space-y-1.5 items-center">
+                            {inv.items.map((item: any, idx: number) => (
+                              <div key={idx} className="h-6 flex items-center justify-center">
+                                <span className="font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap">
+                                  {item.quantity}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {sortedOutInvoices.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-bold">គ្មានទិន្នន័យឡើងឡានទេ</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
+      {activeTab === 'stockSold' && (() => {
+        const soldTxs = filteredTransactions
+          .filter(t => t.type === 'Stock Sold')
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        const totalSoldQty = soldTxs.reduce((sum, t) => sum + t.quantity, 0);
+        const totalPromoQty = soldTxs.reduce((sum, t) => sum + (t.promoQty || 0), 0);
+
+        // Group transactions by User + Customer/Note + Location + Date to form grouped invoices like User side
+        const soldGroups: { [key: string]: Transaction[] } = {};
+        soldTxs.forEach(t => {
+          const parsedNote = getOrderCustomerAndLocation(t.note || '');
+          const customer = parsedNote.customer.trim() || 'ទូទៅ';
+          const location = parsedNote.location.trim();
+          const dateDay = t.date ? t.date.split('T')[0] : '';
+          const key = `${t.userId}-${customer}-${location}-${dateDay}`;
+          if (!soldGroups[key]) {
+            soldGroups[key] = [];
+          }
+          soldGroups[key].push(t);
+        });
+
+        const sortedSoldInvoices = Object.entries(soldGroups).map(([key, items]) => {
+          const firstTx = items[0];
+          const parsedNote = getOrderCustomerAndLocation(firstTx.note || '');
+          const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+          return {
+            id: key,
+            userId: firstTx.userId,
+            customerName: parsedNote.customer || firstTx.note || 'ទូទៅ',
+            location: parsedNote.location || '',
+            date: firstTx.date,
+            quantity: totalQty,
+            items: items,
+            note: firstTx.note
+          };
+        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        return (
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6 animate-in fade-in duration-200">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-4 shrink-0">
+              <div>
+                <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកលក់ចេញរបស់ User</h3>
+                <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យលក់ចេញ និងការថែមជូនប្រម៉ូសិនរបស់ភ្នាក់ងារលក់</p>
+              </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-3 gap-2.5 mb-4 shrink-0">
+              <div className="bg-emerald-50/50 border border-emerald-100/50 p-3 sm:p-4 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] sm:text-xs font-black text-slate-500">សរុបលក់ចេញ</span>
+                <span className="text-base sm:text-2xl font-black text-emerald-600 mt-1">{totalSoldQty}</span>
+              </div>
+              <div className="bg-amber-50/50 border border-amber-100/50 p-3 sm:p-4 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] sm:text-xs font-black text-slate-500">សរុបថែម</span>
+                <span className="text-base sm:text-2xl font-black text-amber-500 mt-1">{totalPromoQty}</span>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 p-3 sm:p-4 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] sm:text-xs font-black text-slate-500 font-bold">ប្រតិបត្តិការ</span>
+                <span className="text-base sm:text-2xl font-black text-slate-800 mt-1">{sortedSoldInvoices.length} វិក្កយបត្រ</span>
+              </div>
+            </div>
+
+            {/* Shared Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 shrink-0">
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] md:text-xs font-black text-slate-500">អ្នកប្រើប្រាស់</label>
+                <select
+                  value={filterTxUserId}
+                  onChange={(e) => setFilterTxUserId(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                >
+                  <option value="all">ទាំងអស់</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.username}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទចាប់ផ្តើម</label>
+                <input
+                  type="date"
+                  value={filterTxStartDate}
+                  onChange={(e) => setFilterTxStartDate(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                />
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទបញ្ចប់</label>
+                <input
+                  type="date"
+                  value={filterTxEndDate}
+                  onChange={(e) => setFilterTxEndDate(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Grouped Table Layout (Matching User design exactly) */}
+            <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
+                  <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកប្រើប្រាស់</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អតិថិជន</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ទីតាំង</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-emerald-600">ទំនិញ</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-emerald-600">បរិមាណ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
+                  {sortedSoldInvoices.map(inv => {
+                    const user = users.find(u => u.id === inv.userId);
+                    return (
+                      <tr 
+                        key={inv.id} 
+                        onClick={() => setSelectedInvoiceDetail(inv)}
+                        className="hover:bg-slate-50/70 transition-all border-b border-slate-100 cursor-pointer"
+                        title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
+                      >
+                        {/* Column 1: Salesperson / User */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-indigo-900 text-[11px] sm:text-xs md:text-sm">
+                          {user?.username || 'Unknown'}
+                        </td>
+                        {/* Column 2: Customer / Note Name */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                          {inv.customerName}
+                        </td>
+                        {/* Column 3: Location */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                          {inv.location ? (
+                            <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
+                              {inv.location}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-bold">-</span>
+                          )}
+                        </td>
+                        {/* Column 4: Date */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
+                          {(() => {
+                            const d = new Date(inv.date);
+                            const day = String(d.getDate()).padStart(2, '0');
+                            const month = String(d.getMonth() + 1).padStart(2, '0');
+                            const shortYear = String(d.getFullYear()).slice(-2);
+                            return `${day}/${month}/${shortYear}`;
+                          })()}
+                        </td>
+                        {/* Column 5: Product list stacked */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                          <div className="flex flex-col space-y-1.5">
+                            {inv.items.map((item: any, idx: number) => (
+                              <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
+                                {item.productName}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        {/* Column 6: Quantity list stacked */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                          <div className="flex flex-col space-y-1.5 items-center">
+                            {inv.items.map((item: any, idx: number) => (
+                              <div key={idx} className="h-6 flex items-center justify-center">
+                                <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap">
+                                  {item.quantity}
+                                  {item.promoQty && item.promoQty > 0 ? (
+                                    <span className="text-amber-500 ml-1 font-bold">+{item.promoQty}</span>
+                                  ) : null}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {sortedSoldInvoices.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-bold">គ្មានទិន្នន័យលក់ចេញទេ</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
+      {activeTab === 'stockReturn' && (() => {
+        const returnTxs = filteredTransactions
+          .filter(t => t.type === 'Stock Return')
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        const totalReturnQty = returnTxs.reduce((sum, t) => sum + t.quantity, 0);
+
+        // Group transactions by User + Customer/Note + Location + Date to form grouped invoices like User side
+        const returnGroups: { [key: string]: Transaction[] } = {};
+        returnTxs.forEach(t => {
+          const parsedNote = getOrderCustomerAndLocation(t.note || '');
+          const customer = parsedNote.customer.trim() || 'ទូទៅ';
+          const location = parsedNote.location.trim();
+          const dateDay = t.date ? t.date.split('T')[0] : '';
+          const key = `${t.userId}-${customer}-${location}-${dateDay}`;
+          if (!returnGroups[key]) {
+            returnGroups[key] = [];
+          }
+          returnGroups[key].push(t);
+        });
+
+        const sortedReturnInvoices = Object.entries(returnGroups).map(([key, items]) => {
+          const firstTx = items[0];
+          const parsedNote = getOrderCustomerAndLocation(firstTx.note || '');
+          const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+          return {
+            id: key,
+            userId: firstTx.userId,
+            customerName: parsedNote.customer || firstTx.note || 'ទូទៅ',
+            location: parsedNote.location || '',
+            date: firstTx.date,
+            quantity: totalQty,
+            items: items,
+            note: firstTx.note
+          };
+        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        return (
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6 animate-in fade-in duration-200">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-4 shrink-0">
+              <div>
+                <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកត្រឡប់របស់ User</h3>
+                <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យត្រឡប់របស់ភ្នាក់ងារលក់</p>
+              </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 gap-3 mb-4 shrink-0">
+              <div className="bg-indigo-50/50 border border-indigo-100/50 p-4 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] sm:text-xs font-black text-slate-500">សរុបត្រឡប់</span>
+                <span className="text-lg sm:text-2xl font-black text-indigo-600 mt-1">{totalReturnQty}</span>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] sm:text-xs font-black text-slate-500 font-bold">ប្រតិបត្តិការសរុប</span>
+                <span className="text-lg sm:text-2xl font-black text-slate-800 mt-1">{sortedReturnInvoices.length} វិក្កយបត្រ</span>
+              </div>
+            </div>
+
+            {/* Shared Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 shrink-0">
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] md:text-xs font-black text-slate-500">អ្នកប្រើប្រាស់</label>
+                <select
+                  value={filterTxUserId}
+                  onChange={(e) => setFilterTxUserId(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                >
+                  <option value="all">ទាំងអស់</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.username}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទចាប់ផ្តើម</label>
+                <input
+                  type="date"
+                  value={filterTxStartDate}
+                  onChange={(e) => setFilterTxStartDate(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                />
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <label className="text-[11px] md:text-xs font-black text-slate-500">កាលបរិច្ឆេទបញ្ចប់</label>
+                <input
+                  type="date"
+                  value={filterTxEndDate}
+                  onChange={(e) => setFilterTxEndDate(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Grouped Table Layout (Matching User design exactly) */}
+            <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
+                  <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកប្រើប្រាស់</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកទទួល</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ទីតាំង</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-indigo-600">ទំនិញ</th>
+                    <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-indigo-600">បរិមាណ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
+                  {sortedReturnInvoices.map(inv => {
+                    const user = users.find(u => u.id === inv.userId);
+                    return (
+                      <tr 
+                        key={inv.id} 
+                        onClick={() => setSelectedInvoiceDetail(inv)}
+                        className="hover:bg-slate-50/70 transition-all border-b border-slate-100 cursor-pointer"
+                        title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
+                      >
+                        {/* Column 1: Salesperson / User */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-indigo-900 text-[11px] sm:text-xs md:text-sm">
+                          {user?.username || 'Unknown'}
+                        </td>
+                        {/* Column 2: Customer / Note Name */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                          {inv.customerName}
+                        </td>
+                        {/* Column 3: Location */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                          {inv.location ? (
+                            <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
+                              {inv.location}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-bold">-</span>
+                          )}
+                        </td>
+                        {/* Column 4: Date */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium text-slate-500 whitespace-nowrap">
+                          {(() => {
+                            const d = new Date(inv.date);
+                            const day = String(d.getDate()).padStart(2, '0');
+                            const month = String(d.getMonth() + 1).padStart(2, '0');
+                            const shortYear = String(d.getFullYear()).slice(-2);
+                            return `${day}/${month}/${shortYear}`;
+                          })()}
+                        </td>
+                        {/* Column 5: Product list stacked */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                          <div className="flex flex-col space-y-1.5">
+                            {inv.items.map((item: any, idx: number) => (
+                              <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
+                                {item.productName}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        {/* Column 6: Quantity list stacked */}
+                        <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                          <div className="flex flex-col space-y-1.5 items-center">
+                            {inv.items.map((item: any, idx: number) => (
+                              <div key={idx} className="h-6 flex items-center justify-center">
+                                <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap">
+                                  {item.quantity}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {sortedReturnInvoices.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-bold">គ្មានទិន្នន័យត្រឡប់ទេ</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
       {activeTab === 'stockOrders' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex-1 min-h-0 flex flex-col">
-          <div className="px-5 md:px-6 py-5 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-slate-100 pb-4 shrink-0">
             <div>
               <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកកម្មង់</h3>
-              <p className="text-xs text-slate-400 font-medium mt-0.5">ការកម្មង់សរុប៖ {totalOrderItems} ជួរ</p>
+              <p className="text-slate-500 text-[10px] md:text-xs mt-0.5 font-medium">ការកម្មង់សរុប៖ {totalOrderItems} ជួរ</p>
             </div>
             
             <div className="flex flex-wrap items-center gap-3">
@@ -886,56 +1917,79 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             </div>
           </div>
 
-          <div ref={tableContainerRef} onTouchStart={handleTouchStart} onTouchEnd={(e) => handleTouchEnd(e, totalOrderPages, activeOrderPage, setCurrentPage)} className="flex-1 overflow-auto custom-scroll p-1 md:p-2">
+          <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
-                <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100 text-left">កាលបរិច្ឆេទ</th>
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">អ្នកកម្មង់</th>
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញ</th>
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100 text-right">ចំនួន</th>
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100 text-left">អតិថិជន</th>
-                  <th className="px-1.5 md:px-4 py-2.5 border-b border-slate-100 text-left">ទីតាំង</th>
+                <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
+                  <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកកម្មង់</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អតិថិជន</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ទីតាំង</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-emerald-600">ទំនិញ</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-emerald-600">បរិមាណ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
-                {paginatedStockOrders.map(order => {
-                  const d = new Date(order.date);
-                  const day = String(d.getDate()).padStart(2, '0');
-                  const month = String(d.getMonth() + 1).padStart(2, '0');
-                  const year = d.getFullYear();
-                  const { customer, location } = getOrderCustomerAndLocation(order.note);
-                  
+                {paginatedStockOrders.map((orderGroup: any) => {
                   return (
                     <tr 
-                      key={order.id} 
-                      className="hover:bg-slate-50/50 transition-colors cursor-pointer"
-                      onClick={() => setSelectedOrderDetail(order)}
+                      key={orderGroup.id} 
+                      onClick={() => setSelectedOrderDetail(orderGroup)}
+                      className={`${orderGroup.delivered ? 'bg-emerald-50/50 hover:bg-emerald-50' : 'bg-amber-50/50 hover:bg-amber-50'} transition-all cursor-pointer group`}
+                      title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
                     >
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 font-medium text-slate-500 whitespace-nowrap">
-                        <div className="leading-tight">
-                          <div className="font-bold text-slate-700">{day}/{month}/{year}</div>
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-black text-slate-800 text-[11px] sm:text-xs md:text-sm">
+                        {orderGroup.username}
+                      </td>
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-bold text-slate-700 text-[11px] sm:text-xs md:text-sm">
+                        {orderGroup.customerName || <span className="text-slate-300">គ្មានឈ្មោះ</span>}
+                      </td>
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left">
+                        {orderGroup.location ? (
+                          <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">
+                            {orderGroup.location}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-bold">-</span>
+                        )}
+                      </td>
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">
+                        <div className="flex flex-col items-center justify-center space-y-1">
+                          <span className="font-medium text-slate-500">
+                            {(() => {
+                              const d = new Date(orderGroup.date);
+                              const day = String(d.getDate()).padStart(2, '0');
+                              const month = String(d.getMonth() + 1).padStart(2, '0');
+                              const shortYear = String(d.getFullYear()).slice(-2);
+                              return `${day}/${month}/${shortYear}`;
+                            })()}
+                          </span>
                         </div>
                       </td>
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 font-bold text-slate-800">
-                        {order.username}
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-left font-medium text-slate-700">
+                        <div className="flex flex-col space-y-1.5">
+                          {orderGroup.items.map((item: any, idx: number) => (
+                            <div key={idx} className="h-6 flex items-center font-bold text-slate-800 text-[10px] sm:text-xs truncate">
+                              {item.productName}
+                            </div>
+                          ))}
+                        </div>
                       </td>
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 font-bold text-slate-700">
-                        {order.productName}
-                      </td>
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 text-right font-black text-slate-900 text-sm md:text-base">
-                        {order.quantity}
-                      </td>
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 text-left font-bold text-slate-600 max-w-[120px] sm:max-w-[200px] truncate" title={customer}>
-                        {customer || '-'}
-                      </td>
-                      <td className="px-1.5 md:px-4 py-2.5 sm:py-4 text-left font-bold text-slate-600 max-w-[120px] sm:max-w-[200px] truncate" title={location}>
-                        {location || '-'}
+                      <td className="px-1.5 md:px-3 py-2.5 sm:py-4 text-center font-medium">
+                        <div className="flex flex-col space-y-1.5 items-center">
+                          {orderGroup.items.map((item: any, idx: number) => (
+                            <div key={idx} className="h-6 flex items-center justify-center">
+                              <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap">
+                                {item.quantity}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </td>
                     </tr>
                   );
                 })}
-                {filteredStockOrders.length === 0 && (
+                {paginatedStockOrders.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-6 py-24 text-center text-slate-400 font-bold">
                       គ្មានទិន្នន័យស្តុកកម្មង់ទេ
@@ -946,75 +2000,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
             </table>
           </div>
 
-          {/* Pagination Controls */}
-          {totalOrderItems > 0 && (
-            <div className="hidden sm:flex justify-between items-center px-4 py-3 border-t border-slate-100 shrink-0">
-              <div className="hidden sm:flex items-center space-x-2 text-xs md:text-sm text-slate-500 font-medium">
-                <span>
-                  បង្ហាញពី {orderStartIndex + 1} ដល់ {Math.min(orderStartIndex + pageSize, totalOrderItems)} នៃ {totalOrderItems}
-                </span>
-              </div>
 
-              <div className="flex w-full sm:w-auto items-center justify-center sm:justify-end space-x-1.5">
-                <button
-                  type="button"
-                  disabled={activeOrderPage === 1}
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  className="hidden sm:flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>មុន</span>
-                </button>
-
-                <div className="hidden sm:flex items-center">
-                  {(() => {
-                    const pages = [];
-                    const maxVisible = 5;
-                    if (totalOrderPages <= maxVisible) {
-                      for (let i = 1; i <= totalOrderPages; i++) pages.push(i);
-                    } else {
-                      let start = Math.max(1, activeOrderPage - 2);
-                      let end = Math.min(totalOrderPages, activeOrderPage + 2);
-                      if (activeOrderPage <= 3) {
-                        end = 5;
-                      } else if (activeOrderPage >= totalOrderPages - 2) {
-                        start = totalOrderPages - 4;
-                      }
-                      for (let i = start; i <= end; i++) pages.push(i);
-                    }
-                    return pages;
-                  })().map(pageNum => (
-                    <button
-                      key={pageNum}
-                      type="button"
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-xl font-bold text-[10px] sm:text-xs transition mx-0.5 cursor-pointer ${
-                        pageNum === activeOrderPage
-                          ? 'bg-emerald-600 text-white font-black shadow-md shadow-emerald-600/10'
-                          : 'hover:bg-slate-50 text-slate-600 hover:text-slate-800'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  disabled={activeOrderPage === totalOrderPages}
-                  onClick={() => setCurrentPage(prev => Math.min(totalOrderPages, prev + 1))}
-                  className="hidden sm:flex items-center justify-center space-x-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:border-slate-300 font-bold text-[10px] sm:text-xs text-slate-600 hover:text-slate-800 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 transition cursor-pointer"
-                >
-                  <span>បន្ទាប់</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -2210,13 +3196,17 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 items-start">
-                    <span className="text-xs font-bold text-slate-400">ឈ្មោះទំនិញ</span>
-                    <span className="col-span-2 text-sm font-black text-slate-800">{selectedOrderDetail.productName}</span>
+                    <span className="text-xs font-bold text-slate-400 font-black">ឈ្មោះអតិថិជន</span>
+                    <span className="col-span-2 text-sm font-bold text-slate-800">
+                      {selectedOrderDetail.customerName || <span className="text-slate-300">គ្មានឈ្មោះ</span>}
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 items-start">
-                    <span className="text-xs font-bold text-slate-400">ចំនួនទំនិញ</span>
-                    <span className="col-span-2 text-sm font-black text-emerald-600 text-base">{selectedOrderDetail.quantity}</span>
+                    <span className="text-xs font-bold text-slate-400 font-black">ទីតាំង</span>
+                    <span className="col-span-2 text-sm font-bold text-slate-800">
+                      {selectedOrderDetail.location || <span className="text-slate-300 font-bold">-</span>}
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 items-start">
@@ -2235,13 +3225,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   {selectedOrderDetail.delivered && (
                     <>
                       <div className="grid grid-cols-3 gap-2 items-start">
-                        <span className="text-xs font-bold text-slate-400">ប្រគល់នៅ</span>
+                        <span className="text-xs font-bold text-slate-400 font-black">ប្រគល់នៅ</span>
                         <span className="col-span-2 text-xs font-medium text-slate-500">
                           {selectedOrderDetail.deliveredAt ? new Date(selectedOrderDetail.deliveredAt).toLocaleString('kh-KH') : '-'}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 gap-2 items-start">
-                        <span className="text-xs font-bold text-slate-400">ប្រគល់ដោយ</span>
+                        <span className="text-xs font-bold text-slate-400 font-black">ប្រគល់ដោយ</span>
                         <span className="col-span-2 text-xs font-bold text-slate-700">
                           {selectedOrderDetail.deliveredBy || '-'}
                         </span>
@@ -2249,66 +3239,516 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     </>
                   )}
 
-                  <div className="grid grid-cols-3 gap-2 items-start">
-                    <span className="text-xs font-bold text-slate-400">ឈ្មោះអតិថិជន</span>
-                    <span className="col-span-2 text-sm text-slate-600 font-bold">
-                      {getOrderCustomerAndLocation(selectedOrderDetail.note).customer || '-'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 items-start">
-                    <span className="text-xs font-bold text-slate-400">ទីតាំង</span>
-                    <span className="col-span-2 text-sm text-slate-600 font-bold">
-                      {getOrderCustomerAndLocation(selectedOrderDetail.note).location || '-'}
-                    </span>
+                  <div className="mt-4 border border-slate-100 rounded-xl overflow-hidden bg-slate-50/50">
+                    <table className="w-full text-left">
+                      <thead className="bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] border-b border-slate-100">
+                        <tr className="text-slate-500 text-[10px] uppercase font-bold">
+                          <th className="px-3 py-2 text-left">ទំនិញ</th>
+                          <th className="px-3 py-2 text-right">បរិមាណ</th>
+                          <th className="px-3 py-2 text-center w-24">សកម្មភាព</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
+                        {selectedOrderDetail.items.map((item: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="px-3 py-2 text-left">{item.productName}</td>
+                            <td className="px-3 py-2 text-right text-emerald-600">
+                              {item.quantity}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <div className="flex justify-center items-center gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    setOrderToEdit(item);
+                                    setEditOrderUserId(item.userId);
+                                    setEditOrderProductName(item.productName);
+                                    setEditOrderQuantity(String(item.quantity));
+                                    setEditOrderDate(item.date);
+                                    const { customer, location } = getOrderCustomerAndLocation(item.note || '');
+                                    setEditOrderCustomerName(customer);
+                                    setEditOrderLocation(location);
+                                    setEditOrderDelivered(item.delivered);
+                                    setIsEditingOrder(true);
+                                  }}
+                                  className="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition cursor-pointer"
+                                  title="កែប្រែ"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setOrderToDelete(item);
+                                    setSelectedOrderDetail(null);
+                                  }}
+                                  className="p-1 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                                  title="លុប"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="bg-slate-50/70 border-t border-slate-200">
+                          <td className="px-3 py-2 font-black text-slate-800 text-right">សរុប</td>
+                          <td className="px-3 py-2 font-black text-indigo-600 text-right" colSpan={2}>
+                            {selectedOrderDetail.quantity}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
                 <div className="flex gap-2.5 pt-5 border-t border-slate-100 mt-6">
                   {!selectedOrderDetail.delivered ? (
                     <button
-                      onClick={() => handleAdminConfirmDelivery(selectedOrderDetail.id)}
+                      onClick={() => handleAdminConfirmDelivery(selectedOrderDetail)}
                       className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm py-3 rounded-2xl shadow-md shadow-emerald-600/10 active:scale-95 transition cursor-pointer"
                     >
-                      បញ្ជាក់ការប្រគល់
+                      បញ្ជាក់ការប្រគល់ទាំងអស់
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleAdminUnconfirmDelivery(selectedOrderDetail.id)}
+                      onClick={() => handleAdminUnconfirmDelivery(selectedOrderDetail)}
                       className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm py-3 rounded-2xl active:scale-95 transition cursor-pointer"
                     >
-                      ដាក់ថា «មិនទាន់ប្រគល់»
+                      ដាក់ថា «មិនទាន់ប្រគល់» ទាំងអស់
                     </button>
                   )}
-                  <button
-                    onClick={() => {
-                      setOrderToEdit(selectedOrderDetail);
-                      setEditOrderUserId(selectedOrderDetail.userId);
-                      setEditOrderProductName(selectedOrderDetail.productName);
-                      setEditOrderQuantity(String(selectedOrderDetail.quantity));
-                      setEditOrderDate(selectedOrderDetail.date);
-                      const { customer, location } = getOrderCustomerAndLocation(selectedOrderDetail.note);
-                      setEditOrderCustomerName(customer);
-                      setEditOrderLocation(location);
-                      setEditOrderDelivered(selectedOrderDetail.delivered);
-                      setIsEditingOrder(true);
-                    }}
-                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold text-xs sm:text-sm px-4 py-3 rounded-2xl transition cursor-pointer"
-                  >
-                    កែប្រែ
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOrderToDelete(selectedOrderDetail);
-                      setSelectedOrderDetail(null);
-                    }}
-                    className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs sm:text-sm px-4 py-3 rounded-2xl transition cursor-pointer"
-                  >
-                    លុប
-                  </button>
                 </div>
               </>
             )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Floating Modal for Grouped Invoice Details (Admin side matching User side exactly) */}
+      {selectedInvoiceDetail && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl">🧾</span>
+                <div>
+                  <h3 className="text-base md:text-lg font-black text-slate-800">
+                    {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? 'វិក្កយបត្រលក់ចេញ' : 
+                     selectedInvoiceDetail.items[0]?.type === 'Stock Out' ? 'កំណត់ត្រាឡើងឡាន' : 'កំណត់ត្រាស្តុកត្រឡប់'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    {(() => {
+                      const d = new Date(selectedInvoiceDetail.date);
+                      const day = String(d.getDate()).padStart(2, '0');
+                      const month = String(d.getMonth() + 1).padStart(2, '0');
+                      const year = d.getFullYear();
+                      return `កាលបរិច្ឆេទ: ${day}/${month}/${year}`;
+                    })()}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedInvoiceDetail(null)} 
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="py-4 space-y-4">
+              {/* Customer Info */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                <div className="grid grid-cols-3 gap-1">
+                  <span className="text-xs font-bold text-slate-400">
+                    {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? 'អតិថិជន' : 
+                     selectedInvoiceDetail.items[0]?.type === 'Stock Out' ? 'អ្នកប្រគល់' : 'អ្នកទទួល'}
+                  </span>
+                  <span className="col-span-2 text-sm font-black text-slate-800">{selectedInvoiceDetail.customerName}</span>
+                </div>
+                {selectedInvoiceDetail.location && (
+                  <div className="grid grid-cols-3 gap-1 mt-1.5">
+                    <span className="text-xs font-bold text-slate-400">ទីតាំង</span>
+                    <span className="col-span-2 text-xs font-semibold text-slate-600">{selectedInvoiceDetail.location}</span>
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-1 mt-1.5">
+                  <span className="text-xs font-bold text-slate-400">អ្នកលក់</span>
+                  <span className="col-span-2 text-xs font-bold text-indigo-600">
+                    {users.find(u => u.id === selectedInvoiceDetail.userId)?.username || 'Unknown'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">បញ្ជីទំនិញ (ចុចលើទំនិញដើម្បី កែប្រែ ឬលុប)</h4>
+                <div className="border border-slate-100 rounded-2xl bg-slate-50/30 p-2 sm:p-3 space-y-1">
+                  {/* Column Headers */}
+                  <div className="grid grid-cols-12 gap-2 px-2 pb-2 border-b border-slate-200 text-[10px] font-bold text-slate-400">
+                    <div className={selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? "col-span-4" : "col-span-8"}>ទំនិញ</div>
+                    <div className={selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? "col-span-2 text-center" : "col-span-4 text-center"}>បរិមាណ</div>
+                    {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' && (
+                      <>
+                        <div className="col-span-3 text-right">តម្លៃ</div>
+                        <div className="col-span-3 text-right">សរុបរង</div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* List Rows */}
+                  <div className="divide-y divide-slate-100 max-h-52 overflow-y-auto pr-1 custom-scroll">
+                    {selectedInvoiceDetail.items.map((item: Transaction) => {
+                      const subtotal = item.price !== undefined ? item.quantity * item.price : 0;
+                      return (
+                        <div 
+                          key={item.id} 
+                          onClick={() => setSelectedRowItem(item)}
+                          className="grid grid-cols-12 gap-2 py-2.5 items-center px-2 hover:bg-slate-100 rounded-lg transition animate-in fade-in duration-150 cursor-pointer"
+                        >
+                          {/* Product Name */}
+                          <div className={`${selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? "col-span-4" : "col-span-8"} flex flex-col min-w-0`}>
+                            <span className="font-bold text-slate-800 text-xs truncate" title={item.productName}>
+                              {item.productName}
+                            </span>
+                            {item.promoQty && item.promoQty > 0 ? (
+                              <span className="text-[9px] font-black text-emerald-600 animate-pulse mt-0.5">
+                                ថែម: {item.promoQty}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {/* Quantity */}
+                          <div className={`${selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? "col-span-2" : "col-span-4"} text-center`}>
+                            <span className={`font-black text-xs ${
+                                selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? 'text-emerald-600' : 
+                                selectedInvoiceDetail.items[0]?.type === 'Stock Out' ? 'text-rose-600' : 'text-amber-600'
+                              }`}>
+                              {item.quantity}
+                            </span>
+                          </div>
+
+                          {/* Price and Subtotal */}
+                          {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' && (
+                            <>
+                              <div className="col-span-3 text-right">
+                                <span className="font-semibold text-xs text-slate-600">
+                                  {item.price !== undefined ? `$${item.price.toFixed(2)}` : '-'}
+                                </span>
+                              </div>
+                              <div className="col-span-3 text-right">
+                                <span className="font-black text-xs text-indigo-600">
+                                  {item.price !== undefined ? `$${subtotal.toFixed(2)}` : '-'}
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Total Price */}
+              {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' && (() => {
+                const totalCost = selectedInvoiceDetail.items.reduce((sum: number, item: any) => {
+                  const qty = item.quantity || 0;
+                  const pr = item.price || 0;
+                  return sum + (qty * pr);
+                }, 0);
+                return (
+                  <div className="flex justify-between items-center bg-indigo-50/50 border border-indigo-100 p-3 rounded-2xl">
+                    <span className="text-xs font-black text-indigo-800">តម្លៃសរុប</span>
+                    <span className="text-base font-black text-indigo-600">${totalCost.toFixed(2)}</span>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex space-x-3">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => setInvoiceToDelete(selectedInvoiceDetail)}
+                className="flex-1 hover:bg-rose-50 border border-rose-200 text-rose-600 font-bold text-[10px] sm:text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1 cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>លុបវិក្កយបត្រទាំងមូល</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportSingleInvoicePDF(selectedInvoiceDetail)}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-lg shadow-indigo-100"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>បោះពុម្ពជា PDF</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {selectedRowItem && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xs rounded-3xl p-5 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="text-center pb-3 border-b border-slate-100">
+              <h4 className="text-sm font-black text-slate-800">សកម្មភាពលើទំនិញ</h4>
+              <p className="text-xs text-indigo-600 font-bold mt-1">{selectedRowItem.productName}</p>
+            </div>
+            <div className="py-4 space-y-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const item = selectedRowItem;
+                  setSelectedRowItem(null);
+                  setSelectedInvoiceDetail(null);
+                  handleEditTransactionClick(item);
+                }}
+                className="w-full hover:bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>កែប្រែ (Edit)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const item = selectedRowItem;
+                  setSelectedRowItem(null);
+                  setSelectedInvoiceDetail(null);
+                  setTransactionToDelete(item);
+                }}
+                className="w-full hover:bg-rose-50 border border-rose-100 text-rose-600 font-bold text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>លុប (Delete)</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedRowItem(null)}
+              className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2.5 rounded-2xl transition cursor-pointer"
+            >
+              បិទ (Close)
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Confirmation Modal for Deleting Entire Invoice */}
+      {invoiceToDelete && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[100] p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
+            <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            
+            <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុបវិក្កយបត្រ</h3>
+            <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
+              តើអ្នកពិតជាចង់លុបវិក្កយបត្ររបស់អតិថិជន <span className="font-bold text-slate-800">"{invoiceToDelete.customerName}"</span> នេះទាំងស្រុងមែនទេ? ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+            </p>
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setInvoiceToDelete(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+              >
+                បោះបង់
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    await Promise.all(invoiceToDelete.items.map((item: any) => deleteDoc(doc(db, 'transactions', item.id))));
+                    setInvoiceToDelete(null);
+                    setSelectedInvoiceDetail(null);
+                  } catch (error) {
+                    console.error("Error deleting invoice: ", error);
+                    alert("មានបញ្ហាក្នុងការលុបវិក្កយបត្រ");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="flex-1 hover:bg-rose-700 bg-rose-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-rose-600/30 transition disabled:opacity-70 cursor-pointer"
+              >
+                {loading ? 'កំពុងលុប...' : 'យល់ព្រម'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Floating Modal for Editing Transaction */}
+      {transactionToEdit && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-lg font-black text-slate-800">
+                  កែប្រែប្រតិបត្តិការ {transactionToEdit.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : transactionToEdit.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : 'ស្តុកត្រឡប់'}
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">កែប្រែព័ត៌មានខាងក្រោមដើម្បីរក្សាទុក</p>
+              </div>
+              <button 
+                onClick={() => setTransactionToEdit(null)} 
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdateTransaction} className="flex flex-col min-h-0">
+              <div className="overflow-y-auto p-6 pt-4 custom-scroll space-y-4">
+                {/* Date selection */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">កាលបរិច្ឆេទ</label>
+                  <input
+                    type="date"
+                    value={editTxDate}
+                    onChange={e => setEditTxDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
+                    required
+                  />
+                </div>
+
+                {/* Product selection */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">មុខទំនិញ</label>
+                  <div className="relative">
+                    <select
+                      value={editTxProductName}
+                      onChange={e => setEditTxProductName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800 appearance-none cursor-pointer"
+                      required
+                    >
+                      <option value="" disabled>-- ជ្រើសរើសទំនិញ --</option>
+                      {products.map(p => (
+                        <option key={p.id} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quantity Input */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ចំនួនទំនិញ</label>
+                  <input
+                    type="number"
+                    value={editQuantity}
+                    onChange={e => setEditQuantity(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-black text-slate-800"
+                    required
+                    min="1"
+                    placeholder="ចំនួន"
+                  />
+                </div>
+
+                {/* Price Input (Only for Stock Sold) */}
+                {transactionToEdit.type === 'Stock Sold' && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">តម្លៃឯកតា ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editTxPrice}
+                      onChange={e => setEditTxPrice(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-black text-slate-800"
+                      required
+                      min="0"
+                      placeholder="តម្លៃឯកតា"
+                    />
+                  </div>
+                )}
+
+                {/* Customer Name & Location (Only for Stock Sold) */}
+                {transactionToEdit.type === 'Stock Sold' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះអតិថិជន</label>
+                      <input
+                        type="text"
+                        value={editTxCustomerName}
+                        onChange={e => setEditTxCustomerName(e.target.value)}
+                        placeholder="ឈ្មោះអតិថិជន..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ទីតាំង</label>
+                      <input
+                        type="text"
+                        value={editTxLocation}
+                        onChange={e => setEditTxLocation(e.target.value)}
+                        placeholder="ទីតាំង..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Note (For non-Stock Sold transactions) */}
+                {transactionToEdit.type !== 'Stock Sold' && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ចំណាំ (ឈ្មោះអ្នកប្រគល់/ទទួល)</label>
+                    <input
+                      type="text"
+                      value={editNote}
+                      onChange={e => setEditNote(e.target.value)}
+                      placeholder="ឈ្មោះ..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="p-6 pt-4 border-t border-slate-100 flex space-x-3 shrink-0 bg-white rounded-b-3xl">
+                <button
+                  type="button"
+                  onClick={() => setTransactionToEdit(null)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+                >
+                  បោះបង់
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 hover:bg-emerald-700 bg-emerald-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-emerald-600/30 transition disabled:opacity-70 cursor-pointer"
+                >
+                  {loading ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body

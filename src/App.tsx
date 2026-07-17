@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { User, Transaction, Product, StockOrder } from './types';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
@@ -13,9 +14,10 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [stockOrders, setStockOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions' | 'stockOrders'>('users');
+  const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn'>('users');
   const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return' | 'Report' | 'Stock Order'>('Stock Out');
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const lastScrollY = useRef(0);
 
   // Initial load
@@ -95,22 +97,46 @@ export default function App() {
             <h1 className="text-base font-black text-slate-800 tracking-wide leading-tight">គ្រប់គ្រង<br/><span className="text-emerald-600">ស្តុកទំនិញ</span></h1>
         </div>
 
-        <div className="flex md:flex-col justify-around md:justify-start w-full h-[65px] md:h-auto pb-2 md:pb-0 pt-2 md:pt-4 px-2 md:px-4 md:space-y-2">
+        <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible justify-start md:justify-start flex-nowrap w-full h-[65px] md:h-auto pb-2 md:pb-0 pt-2 md:pt-4 px-2 md:px-4 md:space-y-2 custom-scroll space-x-3 md:space-x-0 shrink-0">
             {currentUser.role === 'Admin' ? (
               <>
-                <button onClick={() => setActiveAdminView('users')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeAdminView === 'users' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                <button onClick={() => setActiveAdminView('users')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all shrink-0 ${activeAdminView === 'users' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
                     <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeAdminView === 'users' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                     </div>
                     <span className="text-[10px] md:text-sm font-bold">អ្នកប្រើប្រាស់</span>
                 </button>
-                <button onClick={() => setActiveAdminView('products')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeAdminView === 'products' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                <button onClick={() => setActiveAdminView('products')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all shrink-0 ${activeAdminView === 'products' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
                     <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeAdminView === 'products' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                     </div>
                     <span className="text-[10px] md:text-sm font-bold">គ្រប់គ្រងទំនិញ</span>
                 </button>
-                 <button onClick={() => setActiveAdminView('stockOrders')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeAdminView === 'stockOrders' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                <button onClick={() => setActiveAdminView('stockOut')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all shrink-0 ${activeAdminView === 'stockOut' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                    <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeAdminView === 'stockOut' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 16H5a2 2 0 01-2-2V6a2 2 0 012-2h9M14 16h4.5a1.5 1.5 0 001.5-1.5v-3.5L17 7h-3M5.5 18.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zm13 0a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+                        </svg>
+                    </div>
+                    <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">ស្តុកឡើងឡាន</span>
+                </button>
+                <button onClick={() => setActiveAdminView('stockSold')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all shrink-0 ${activeAdminView === 'stockSold' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                    <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeAdminView === 'stockSold' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9h18M3 9l1.285-4.5A1.5 1.5 0 015.735 3h12.53a1.5 1.5 0 011.45 1.5L21 9M3 9v10a2 2 0 002 2h14a2 2 0 002-2V9M9 21V13h6v8" />
+                        </svg>
+                    </div>
+                    <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">ស្តុកលក់ចេញ</span>
+                </button>
+                <button onClick={() => setActiveAdminView('stockReturn')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all shrink-0 ${activeAdminView === 'stockReturn' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                    <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeAdminView === 'stockReturn' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </div>
+                    <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">ស្តុកត្រឡប់</span>
+                </button>
+                <button onClick={() => setActiveAdminView('stockOrders')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all shrink-0 ${activeAdminView === 'stockOrders' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
                     <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeAdminView === 'stockOrders' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -118,7 +144,7 @@ export default function App() {
                     </div>
                     <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">ស្តុកកម្មង់</span>
                 </button>
-                 <button onClick={() => setActiveAdminView('transactions')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeAdminView === 'transactions' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                <button onClick={() => setActiveAdminView('transactions')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all shrink-0 ${activeAdminView === 'transactions' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
                     <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeAdminView === 'transactions' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                     </div>
@@ -184,24 +210,27 @@ export default function App() {
       {/* MAIN RIGHT AREA (Header + Content) */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[#f1f5f9] order-1 md:order-2 relative">
           {/* Sleek Mobile Header */}
-          <header className={`md:hidden bg-emerald-600 border-b border-emerald-700 px-5 flex justify-between items-center shrink-0 relative z-20 shadow-md transition-all duration-300 ease-in-out ${
+          <header className={`md:hidden bg-emerald-600 border-b border-emerald-700 px-4 sm:px-5 flex items-center shrink-0 relative z-20 shadow-md transition-all duration-300 ease-in-out ${
             isHeaderVisible 
               ? 'h-[72px] py-4 opacity-100 translate-y-0' 
               : 'h-0 py-0 opacity-0 -translate-y-full overflow-hidden border-b-0'
           }`}>
-              <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-white/20 border border-white/30 text-white flex items-center justify-center font-black text-sm shadow-sm backdrop-blur-sm">
+              <button 
+                onClick={() => setIsUserMenuOpen(true)}
+                className="flex items-center space-x-2.5 sm:space-x-3 text-left cursor-pointer group relative z-10 shrink-0"
+              >
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/20 border border-white/30 text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-sm backdrop-blur-sm transition-transform group-active:scale-95">
                       {currentUser.username.charAt(0).toUpperCase()}
                   </div>
-                  <div>
+                  <div className="hidden sm:block">
                       <h4 className="text-[10px] text-emerald-100/80 font-bold uppercase tracking-wider leading-none">គណនី</h4>
                       <h2 className="text-sm font-bold text-white mt-1">{currentUser.username}</h2>
                   </div>
-              </div>
-              <button onClick={handleLogout} className="flex items-center space-x-1.5 bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition active:scale-95 border border-white/20 backdrop-blur-sm">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                  <span>ចាកចេញ</span>
               </button>
+              
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
+                  <h1 className="text-white font-black text-[13px] sm:text-base drop-shadow-sm whitespace-nowrap">ប្រព័ន្ធគ្រប់គ្រងទំនិញ</h1>
+              </div>
           </header>
 
           <main 
@@ -244,6 +273,42 @@ export default function App() {
             </div>
           </main>
       </div>
+
+      {isUserMenuOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-in fade-in duration-200">
+          <div className="bg-white rounded-[28px] w-full max-w-sm shadow-2xl overflow-hidden p-6 relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setIsUserMenuOpen(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 p-2 rounded-full transition cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+            <div className="flex flex-col items-center mb-6">
+                <div className="w-20 h-20 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-600 flex items-center justify-center font-black text-3xl shadow-sm mb-4">
+                    {currentUser.username.charAt(0).toUpperCase()}
+                </div>
+                <h3 className="text-lg font-black text-slate-800">{currentUser.username}</h3>
+                <p className="text-xs text-slate-500 font-bold mt-1">តួនាទី៖ {currentUser.role}</p>
+            </div>
+            
+            <div className="space-y-3">
+              <button onClick={handleLogout} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 p-3.5 rounded-2xl text-sm font-bold transition active:scale-95 flex items-center justify-center space-x-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                  <span>ចាកចេញពីគណនី</span>
+              </button>
+              <button
+                onClick={() => setIsUserMenuOpen(false)}
+                className="w-full hover:bg-slate-50 border border-slate-200 text-slate-500 font-bold text-sm py-3.5 rounded-2xl transition active:scale-95 cursor-pointer"
+              >
+                បិទផ្ទាំងនេះ
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
