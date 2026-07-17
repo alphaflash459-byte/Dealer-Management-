@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { User, Transaction, Product, StockOrder, PromotionTier } from '../types';
-import { doc, setDoc, deleteDoc, updateDoc, deleteField, increment } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, updateDoc, deleteField, increment, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export function cleanUndefined<T extends object>(obj: T): T {
@@ -206,6 +206,103 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const [stockInItems, setStockInItems] = useState<StockItemInput[]>([]);
   const [actualStockDrafts, setActualStockDrafts] = useState<{ [productId: string]: string }>({});
   const [warehouseSearchQuery, setWarehouseSearchQuery] = useState('');
+  const [warehouseStockIns, setWarehouseStockIns] = useState<any[]>([]);
+  const [isStockInHistoryOpen, setIsStockInHistoryOpen] = useState(false);
+  const [stockInToDelete, setStockInToDelete] = useState<any | null>(null);
+  
+  // New States for Stock In History Row details and Edit
+  const [selectedStockInRecord, setSelectedStockInRecord] = useState<any | null>(null);
+  const [isEditStockInModalOpen, setIsEditStockInModalOpen] = useState(false);
+  const [stockInToEdit, setStockInToEdit] = useState<any | null>(null);
+  const [editStockInDate, setEditStockInDate] = useState('');
+  const [editStockInDeliverer, setEditStockInDeliverer] = useState('');
+  const [editStockInItems, setEditStockInItems] = useState<StockItemInput[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'warehouse_stock_ins'), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a: any, b: any) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+      setWarehouseStockIns(data);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleUpdateStockIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stockInToEdit) return;
+
+    const validItems = editStockInItems.filter(item => item.productName && item.quantity);
+    if (validItems.length === 0) {
+      alert("សូមជ្រើសរើសទំនិញយ៉ាងហោចណាស់មួយ និងបញ្ចូលចំនួន");
+      return;
+    }
+
+    // Validate
+    for (let i = 0; i < validItems.length; i++) {
+      const item = validItems[i];
+      if (!item.productName) {
+        alert(`សូមជ្រើសរើសឈ្មោះទំនិញនៅជួរទី ${i + 1}`);
+        return;
+      }
+      if (!item.quantity) {
+        alert(`សូមបំពេញចំនួនទំនិញនៅជួរទី ${i + 1}`);
+        return;
+      }
+      const qty = parseInt(item.quantity);
+      if (isNaN(qty) || qty <= 0) {
+        alert(`ចំនួនសម្រាប់ទំនិញ "${item.productName}" ត្រូវតែជាលេខវិជ្ជមាន!`);
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      // 1. Revert old items
+      await Promise.all(stockInToEdit.items.map(async (oldItem: any) => {
+        const product = products.find(p => p.name === oldItem.productName);
+        if (product) {
+          await updateDoc(doc(db, 'products', product.id), {
+            warehouseStock: increment(-oldItem.quantity)
+          });
+        }
+      }));
+
+      // 2. Apply new items
+      await Promise.all(validItems.map(async (newItem) => {
+        const product = products.find(p => p.name === newItem.productName);
+        if (product) {
+          await updateDoc(doc(db, 'products', product.id), {
+            warehouseStock: increment(parseInt(newItem.quantity))
+          });
+        }
+      }));
+
+      // 3. Update record
+      const updatedRecord = {
+        ...stockInToEdit,
+        date: editStockInDate,
+        deliverer: editStockInDeliverer,
+        items: validItems.map(item => ({
+          productName: item.productName,
+          quantity: parseInt(item.quantity)
+        }))
+      };
+      await updateDoc(doc(db, 'warehouse_stock_ins', stockInToEdit.id), updatedRecord);
+
+      setIsEditStockInModalOpen(false);
+      setStockInToEdit(null);
+      setSelectedStockInRecord(updatedRecord);
+    } catch (err) {
+      console.error("Error updating stock in: ", err);
+      alert("មានបញ្ហាក្នុងការកែប្រែ");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSaveWarehouseStock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -324,11 +421,46 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }
       }));
 
+      // Add Stock In history record
+      const stockInRecord = {
+        id: `stock-in-${Date.now()}`,
+        date: stockInDate,
+        deliverer: stockInDeliverer || 'Admin',
+        items: validItems.map(item => ({
+          productName: item.productName,
+          quantity: parseInt(item.quantity)
+        })),
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'warehouse_stock_ins', stockInRecord.id), stockInRecord);
+
       setIsStockInModalOpen(false);
       setStockInItems([]);
     } catch (err) {
       console.error("Error saving stock in: ", err);
       alert("មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យ");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteStockIn = async (record: any) => {
+    setLoading(true);
+    try {
+      await Promise.all(record.items.map(async (item: any) => {
+        const product = products.find(p => p.name === item.productName);
+        if (product) {
+          const currentStock = product.warehouseStock || 0;
+          await updateDoc(doc(db, 'products', product.id), {
+            warehouseStock: currentStock - item.quantity
+          });
+        }
+      }));
+      await deleteDoc(doc(db, 'warehouse_stock_ins', record.id));
+      setStockInToDelete(null);
+    } catch (err) {
+      console.error("Error deleting stock in record: ", err);
+      alert("មានបញ្ហាក្នុងការលុបប្រវត្តិស្តុកចូល");
     } finally {
       setLoading(false);
     }
@@ -2321,6 +2453,16 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
               />
             </div>
+            <button
+              type="button"
+              onClick={() => setIsStockInHistoryOpen(true)}
+              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-black px-4 py-3 rounded-2xl shadow-sm active:scale-95 transition cursor-pointer shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>ប្រវត្តិស្តុកចូល</span>
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -4419,6 +4561,288 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 </button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {isStockInHistoryOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-2xl max-h-[85vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">ប្រវត្តិស្តុកចូល (Stock In History)</h3>
+                <p className="text-xs text-slate-500 font-medium">បញ្ជីរាយនាមនៃការបញ្ចូលស្តុកថ្មីចូលក្នុងឃ្លាំង</p>
+              </div>
+              <button 
+                onClick={() => setIsStockInHistoryOpen(false)} 
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-6 pt-4 custom-scroll space-y-4 flex-1">
+              {warehouseStockIns.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 font-bold">
+                  គ្មានប្រវត្តិស្តុកចូលឡើយ
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                  <div className="overflow-x-auto custom-scroll">
+                    <table className="w-full text-left border-collapse whitespace-nowrap">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 text-[10px] sm:text-xs font-bold border-b border-slate-100">
+                          <th className="px-4 py-3">កាលបរិច្ឆេទ</th>
+                          <th className="px-4 py-3">ឈ្មោះអ្នកប្រគល់</th>
+                          <th className="px-4 py-3">ឈ្មោះទំនិញ</th>
+                          <th className="px-4 py-3">បរិមាណ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {warehouseStockIns.map((record: any) => (
+                          <tr 
+                            key={record.id} 
+                            onClick={() => setSelectedStockInRecord(record)}
+                            className="border-b border-slate-50 hover:bg-slate-50 transition cursor-pointer text-xs sm:text-sm font-bold text-slate-700"
+                          >
+                            <td className="px-4 py-3">{record.date}</td>
+                            <td className="px-4 py-3">{record.deliverer}</td>
+                            <td className="px-4 py-3">
+                              {record.items.map((item: any, idx: number) => (
+                                <div key={idx} className="py-0.5">{item.productName}</div>
+                              ))}
+                            </td>
+                            <td className="px-4 py-3">
+                              {record.items.map((item: any, idx: number) => (
+                                <div key={idx} className="py-0.5 text-emerald-600">+{item.quantity}</div>
+                              ))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 pt-4 border-t border-slate-100 flex justify-end shrink-0 bg-white rounded-b-3xl">
+              <button
+                type="button"
+                onClick={() => setIsStockInHistoryOpen(false)}
+                className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm px-6 py-3 rounded-2xl transition cursor-pointer"
+              >
+                បិទ
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Detail Modal */}
+      {selectedStockInRecord && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-black text-slate-800 mb-4">ព័ត៌មានលម្អិតស្តុកចូល</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-[10px] text-slate-400 font-bold mb-1">កាលបរិច្ឆេទ</div>
+                  <div className="text-sm font-bold text-slate-700">{selectedStockInRecord.date}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400 font-bold mb-1">អ្នកប្រគល់</div>
+                  <div className="text-sm font-bold text-slate-700">{selectedStockInRecord.deliverer}</div>
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400 font-bold mb-2">ទំនិញដែលបានបញ្ចូល</div>
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
+                  {selectedStockInRecord.items.map((item: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-slate-700">{item.productName}</span>
+                      <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">+{item.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setStockInToEdit(selectedStockInRecord);
+                  setEditStockInDate(selectedStockInRecord.date);
+                  setEditStockInDeliverer(selectedStockInRecord.deliverer);
+                  setEditStockInItems(selectedStockInRecord.items.map((i: any) => ({ productName: i.productName, quantity: String(i.quantity) })));
+                  setIsEditStockInModalOpen(true);
+                }}
+                className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+              >
+                កែប្រែ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStockInToDelete(selectedStockInRecord);
+                  setSelectedStockInRecord(null);
+                }}
+                className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+              >
+                លុប
+              </button>
+            </div>
+            <button
+              onClick={() => setSelectedStockInRecord(null)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Edit Stock In Modal */}
+      {isEditStockInModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">កែប្រែស្តុកចូល (Edit Stock In)</h3>
+                <p className="text-xs text-slate-500 font-medium">កែប្រែទិន្នន័យស្តុកដែលបានបញ្ចូល</p>
+              </div>
+              <button 
+                onClick={() => setIsEditStockInModalOpen(false)} 
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStockIn} className="flex flex-col min-h-0">
+              <div className="overflow-y-auto p-6 pt-4 custom-scroll space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">កាលបរិច្ឆេទ</label>
+                    <input
+                      type="date"
+                      value={editStockInDate}
+                      onChange={e => setEditStockInDate(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 outline-none font-bold text-slate-800"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">អ្នកប្រគល់ស្តុក</label>
+                    <input
+                      type="text"
+                      value={editStockInDeliverer}
+                      onChange={e => setEditStockInDeliverer(e.target.value)}
+                      placeholder="ឈ្មោះ..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">
+                      បញ្ជីទំនិញ
+                    </label>
+                    <div className="space-y-2">
+                      {editStockInItems.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                          <div className="flex-1">
+                            <div className="text-xs font-bold text-slate-700 mb-1">{item.productName}</div>
+                          </div>
+                          <div className="w-28 relative">
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={e => {
+                                const newItems = [...editStockInItems];
+                                newItems[idx].quantity = e.target.value;
+                                setEditStockInItems(newItems);
+                              }}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:border-sky-400 outline-none font-bold text-slate-800 pr-8"
+                              placeholder="ចំនួន"
+                              required
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold pointer-events-none">
+                              ឯកតា
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 pt-4 border-t border-slate-100 flex gap-3 shrink-0 bg-white rounded-b-3xl">
+                <button
+                  type="button"
+                  onClick={() => setIsEditStockInModalOpen(false)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+                >
+                  បោះបង់
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-sky-500/30 transition disabled:opacity-70 cursor-pointer"
+                >
+                  {loading ? 'កំពុងរក្សាទុក...' : 'រក្សាទុកការកែប្រែ'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Custom Confirmation Modal for Deleting Stock In History */}
+      {stockInToDelete && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200 text-center">
+            <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            
+            <h3 className="text-lg font-black text-slate-800 mb-2">បញ្ជាក់ការលុបស្តុកចូល</h3>
+            <p className="text-xs md:text-sm text-slate-500 font-medium mb-6 px-2">
+              តើអ្នកពិតជាចង់លុបប្រវត្តិស្តុកចូលកាលពីថ្ងៃទី <span className="font-bold text-slate-800">"{stockInToDelete.date}"</span> នេះមែនទេ? ចំនួនទំនិញនឹងត្រូវកាត់ចេញពីឃ្លាំងវិញ។ ការលុបនេះមិនអាចសង្គ្រោះវិញបានឡើយ។
+            </p>
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setStockInToDelete(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+              >
+                បោះបង់
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleDeleteStockIn(stockInToDelete)}
+                className="flex-1 hover:bg-rose-700 bg-rose-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-rose-600/30 transition disabled:opacity-70 cursor-pointer"
+              >
+                {loading ? 'កំពុងលុប...' : 'យល់ព្រម'}
+              </button>
+            </div>
           </div>
         </div>,
         document.body

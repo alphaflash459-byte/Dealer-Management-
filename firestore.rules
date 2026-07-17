@@ -13,5 +13,8 @@ service cloud.firestore {
     match /stock_orders/{orderId} {
       allow read, write: if true;
     }
+    match /warehouse_stock_ins/{recordId} {
+      allow read, write: if true;
+    }
   }
 }
