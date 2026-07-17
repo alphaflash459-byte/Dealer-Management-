@@ -2373,64 +2373,64 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-3.5 sm:p-5 md:p-6 animate-in fade-in duration-300">
           
           {/* Header */}
-          <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-4 shrink-0">
+          <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2 shrink-0">
             <div>
-              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកឃ្លាំង </h3>
-              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងចំនួនស្តុកប្រព័ន្ធ ផ្ទៀងផ្ទាត់ស្តុកជាក់ស្តែង និងបញ្ចូលស្តុកថ្មី</p>
+              <h3 className="text-sm sm:text-base font-black text-slate-800">ស្តុកឃ្លាំង </h3>
+              <p className="text-slate-500 text-[9px] sm:text-[10px] mt-0.5 font-medium">គ្រប់គ្រងចំនួនស្តុកប្រព័ន្ធ ផ្ទៀងផ្ទាត់ស្តុកជាក់ស្តែង និងបញ្ចូលស្តុកថ្មី</p>
             </div>
           </div>
 
           {/* Metrics Dashboard Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5 shrink-0">
-            <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-2xl flex items-center space-x-3">
-              <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex overflow-x-auto custom-scroll gap-2 mb-3 shrink-0 pb-1">
+            <div className="bg-slate-50/50 border border-slate-100 p-2 rounded-xl flex items-center space-x-2 min-w-[140px] flex-1">
+              <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">មុខទំនិញសរុប</p>
-                <h4 className="text-sm sm:text-base font-black text-slate-700">{products.length} មុខ</h4>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">មុខទំនិញសរុប</p>
+                <h4 className="text-xs sm:text-sm font-black text-slate-700">{products.length} មុខ</h4>
               </div>
             </div>
 
-            <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-2xl flex items-center space-x-3">
-              <div className="p-2.5 rounded-xl bg-sky-50 text-sky-600">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="bg-slate-50/50 border border-slate-100 p-2 rounded-xl flex items-center space-x-2 min-w-[140px] flex-1">
+              <div className="p-1.5 rounded-lg bg-sky-50 text-sky-600">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2a4 4 0 00-4-4H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v8m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">ស្តុកប្រព័ន្ធសរុប</p>
-                <h4 className="text-sm sm:text-base font-black text-sky-600">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">ស្តុកប្រព័ន្ធសរុប</p>
+                <h4 className="text-xs sm:text-sm font-black text-sky-600">
                   {products.reduce((acc, p) => acc + (p.warehouseStock || 0), 0).toLocaleString()} ឯកតា
                 </h4>
               </div>
             </div>
 
-            <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-2xl flex items-center space-x-3">
-              <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="bg-slate-50/50 border border-slate-100 p-2 rounded-xl flex items-center space-x-2 min-w-[140px] flex-1">
+              <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">ស្តុកជាក់ស្តែងសរុប</p>
-                <h4 className="text-sm sm:text-base font-black text-emerald-600">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">ស្តុកជាក់ស្តែងសរុប</p>
+                <h4 className="text-xs sm:text-sm font-black text-emerald-600">
                   {products.reduce((acc, p) => acc + (p.actualStock !== undefined ? p.actualStock : 0), 0).toLocaleString()} ឯកតា
                 </h4>
               </div>
             </div>
 
-            <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-2xl flex items-center space-x-3">
-              <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="bg-slate-50/50 border border-slate-100 p-2 rounded-xl flex items-center space-x-2 min-w-[140px] flex-1">
+              <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">ចំនួនលម្អៀង</p>
-                <h4 className="text-sm sm:text-base font-black text-amber-600">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">ចំនួនលម្អៀង</p>
+                <h4 className="text-xs sm:text-sm font-black text-amber-600">
                   {products.filter(p => p.actualStock !== undefined && p.actualStock !== (p.warehouseStock || 0)).length} មុខ
                 </h4>
               </div>
@@ -2438,10 +2438,10 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           </div>
 
           {/* ស្វែងរក bar and Stock In Button */}
-          <div className="mb-4 flex gap-3 shrink-0 items-center">
+          <div className="mb-2 flex gap-2 shrink-0 items-center">
             <div className="relative flex-1">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </span>
@@ -2450,18 +2450,18 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 placeholder="ស្វែងរកទំនិញក្នុងឃ្លាំង..."
                 value={warehouseSearchQuery}
                 onChange={(e) => setWarehouseSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
               />
             </div>
             <button
               type="button"
               onClick={() => setIsStockInHistoryOpen(true)}
-              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-black px-4 py-3 rounded-2xl shadow-sm active:scale-95 transition cursor-pointer shrink-0"
+              className="flex items-center space-x-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] sm:text-xs font-black px-3 py-2 rounded-xl shadow-sm active:scale-95 transition cursor-pointer shrink-0"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>ប្រវត្តិស្តុកចូល</span>
+              <span className="hidden sm:inline">ប្រវត្តិស្តុកចូល</span>
             </button>
             <button
               type="button"
@@ -2477,9 +2477,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 setStockInItems([]);
                 setIsStockInModalOpen(true);
               }}
-              className="flex items-center space-x-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs sm:text-sm font-black px-4 py-3 rounded-2xl shadow-md shadow-sky-600/10 active:scale-95 transition cursor-pointer shrink-0"
+              className="flex items-center space-x-1 bg-sky-600 hover:bg-sky-700 text-white text-[10px] sm:text-xs font-black px-3 py-2 rounded-xl shadow-md shadow-sky-600/10 active:scale-95 transition cursor-pointer shrink-0"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
               </svg>
               <span>ស្តុកចូល</span>
@@ -2490,20 +2490,21 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
-                <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
-                  <th className="px-2 md:px-4 py-3 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
-                  <th className="px-2 md:px-4 py-3 text-center font-bold text-sky-600 bg-sky-50/10">ស្តុកប្រព័ន្ធ </th>
-                  <th className="px-2 md:px-4 py-3 text-center font-bold text-emerald-600 bg-emerald-50/10">ស្តុកជាក់ស្តែង </th>
-                  <th className="px-2 md:px-4 py-3 text-center font-bold text-slate-500">កម្រិតលម្អៀង </th>
+                <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-[11px] uppercase font-bold tracking-wider border-b border-slate-100">
+                  <th className="px-1 md:px-3 py-2 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-sky-600 bg-sky-50/10">ស្តុកប្រព័ន្ធ </th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-emerald-600 bg-emerald-50/10">ស្តុកជាក់ស្តែង </th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-slate-500">កម្រិតលម្អៀង </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
+              <tbody className="divide-y divide-slate-50 text-[10px] sm:text-[11px] md:text-xs">
                 {filteredWarehouseProducts.map(product => {
                   const sysStock = product.warehouseStock || 0;
                   const actStock = product.actualStock;
-                  const hasTake = actStock !== undefined;
-                  const variance = hasTake ? actStock - sysStock : 0;
                   const draftVal = actualStockDrafts[product.id];
+                  const currentActualVal = draftVal !== undefined ? (draftVal === '' ? undefined : parseInt(draftVal)) : actStock;
+                  const hasTake = currentActualVal !== undefined && !isNaN(currentActualVal);
+                  const variance = hasTake ? currentActualVal - sysStock : 0;
                   const isDirty = draftVal !== undefined && draftVal !== String(actStock ?? '');
 
                   return (
@@ -2516,19 +2517,19 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       }}
                       className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
                     >
-                      <td className="px-2 md:px-4 py-3">
+                      <td className="px-1 md:px-3 py-1.5">
                         <div className="font-bold text-slate-800">{product.name}</div>
                         {product.lastStockTake && (
-                          <div className="text-[9px] text-slate-400 font-medium mt-0.5">
+                          <div className="text-[8px] text-slate-400 font-medium mt-0.5">
                             ផ្ទៀងផ្ទាត់ចុងក្រោយ៖ {new Date(product.lastStockTake).toLocaleDateString('kh-KH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
                       </td>
-                      <td className="px-2 md:px-4 py-3 text-center font-black text-sky-600 bg-sky-50/5">
+                      <td className="px-1 md:px-3 py-1.5 text-center font-black text-sky-600 bg-sky-50/5">
                         {sysStock.toLocaleString()}
                       </td>
-                      <td className="px-2 md:px-4 py-3 bg-emerald-50/5" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center space-x-1.5 max-w-[150px] mx-auto">
+                      <td className="px-1 md:px-3 py-1.5 bg-emerald-50/5" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center mx-auto">
                           <input
                             type="number"
                             min="0"
@@ -2538,26 +2539,21 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                               ...actualStockDrafts,
                               [product.id]: e.target.value
                             })}
-                            className="w-16 sm:w-20 text-center py-1 px-1.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs font-black text-slate-800"
+                            onBlur={() => {
+                              if (isDirty) {
+                                handleរក្សាទុកActualStock(product);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && isDirty) {
+                                handleរក្សាទុកActualStock(product);
+                              }
+                            }}
+                            className="w-16 sm:w-20 text-center py-1 px-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs font-black text-slate-800"
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleរក្សាទុកActualStock(product)}
-                            disabled={!isDirty || loading}
-                            className={`p-1.5 rounded-xl transition-all cursor-pointer ${
-                              isDirty 
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm scale-105' 
-                                : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed'
-                            }`}
-                            title="កត់ត្រាស្តុកជាក់ស្តែង"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </button>
                         </div>
                       </td>
-                      <td className="px-2 md:px-4 py-3 text-center font-bold">
+                      <td className="px-1 md:px-3 py-1.5 text-center font-bold">
                         {hasTake ? (
                           variance === 0 ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
