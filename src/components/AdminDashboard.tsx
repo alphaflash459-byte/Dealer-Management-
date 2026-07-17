@@ -1087,9 +1087,9 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const paginatedStockOrders = sortedGroupedStockOrders;
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col min-w-0 overflow-hidden">
       {activeTab === 'users' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6">
           <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 shrink-0">
             <div>
               <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
@@ -1142,7 +1142,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       )}
 
       {activeTab === 'products' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6">
           <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 shrink-0">
             <div>
               <h3 className="text-base md:text-lg font-black text-slate-800">បញ្ជីទំនិញ</h3>
@@ -1214,7 +1214,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       )}
 
       {activeTab === 'transactions' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-slate-100 pb-4 shrink-0">
             <div>
               <h3 className="text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
@@ -1361,7 +1361,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6 animate-in fade-in duration-200">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-4 shrink-0">
               <div>
                 <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកឡើងឡានរបស់ User</h3>
@@ -1545,7 +1545,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6 animate-in fade-in duration-200">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-4 shrink-0">
               <div>
                 <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកលក់ចេញរបស់ User</h3>
@@ -1735,7 +1735,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6 animate-in fade-in duration-200">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-slate-100 pb-4 shrink-0">
               <div>
                 <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកត្រឡប់របស់ User</h3>
@@ -1881,7 +1881,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       })()}
 
       {activeTab === 'stockOrders' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6">
+        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-5 md:p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-slate-100 pb-4 shrink-0">
             <div>
               <h3 className="text-base md:text-lg font-black text-slate-800">ស្តុកកម្មង់</h3>
