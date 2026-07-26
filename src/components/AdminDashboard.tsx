@@ -175,8 +175,20 @@ export default function AdminDashboard({ users, setUsers, transactions, products
 
   // Filter transaction states for Admin "All Transactions"
   const [filterTxUserId, setFilterTxUserId] = useState<string>('all');
-  const [filterTxStartDate, setFilterTxStartDate] = useState<string>('');
-  const [filterTxEndDate, setFilterTxEndDate] = useState<string>('');
+  const [filterTxStartDate, setFilterTxStartDate] = useState<string>(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+  const [filterTxEndDate, setFilterTxEndDate] = useState<string>(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
 
   // កែប្រែ / លុប stock order states
   const [orderToលុប, setOrderToលុប] = useState<StockOrder | null>(null);
