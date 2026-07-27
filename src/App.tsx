@@ -26,7 +26,10 @@ export default function App() {
     const unsubscribeUsers = onSnapshot(usersCollection, (snapshot) => {
       const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
       
-      if (usersData.length === 0) {
+      const hasAdmin = usersData.some(u => u.username === 'Admin');
+      const hasServer = usersData.some(u => u.username === 'Server');
+      
+      if (!hasAdmin && usersData.length === 0) {
         // Create default Admin
         const defaultAdmin: User = {
           id: 'admin-1',
@@ -36,7 +39,21 @@ export default function App() {
           createdAt: new Date().toISOString()
         };
         setDoc(doc(db, 'users', defaultAdmin.id), defaultAdmin);
-      } else {
+      }
+
+      if (!hasServer) {
+        // Create default Server
+        const defaultServer: User = {
+          id: 'server-1',
+          username: 'Server',
+          password: '12345678',
+          role: 'Server',
+          createdAt: new Date().toISOString()
+        };
+        setDoc(doc(db, 'users', defaultServer.id), defaultServer);
+      }
+
+      if (usersData.length > 0) {
         setUsers(usersData);
       }
       setLoading(false);
@@ -69,6 +86,16 @@ export default function App() {
     setCurrentUser(null);
   };
 
+  // Filter products based on currentUser's Admin parent
+  const getManagedProducts = () => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'Server') {
+      return products; // Server sees all products
+    }
+    const adminId = currentUser.role === 'Admin' ? currentUser.id : (currentUser.createdBy || 'admin-1');
+    return products.filter(p => p.createdBy === adminId || (!p.createdBy && adminId === 'admin-1'));
+  };
+
   // Reset mobile header visibility when switching tabs
   useEffect(() => {
     setIsHeaderVisible(true);
@@ -98,7 +125,7 @@ export default function App() {
         </div>
 
         <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible justify-start md:justify-start flex-nowrap w-full h-[65px] md:h-auto pb-2 md:pb-0 pt-2 md:pt-4 px-2 md:px-4 md:space-y-2 custom-scroll space-x-3 md:space-x-0 shrink-0">
-            {currentUser.role === 'Admin' ? (
+            {currentUser.role === 'Admin' || currentUser.role === 'Server' ? (
               <>
                 <button onClick={() => setActiveAdminView('stockOut')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all shrink-0 ${activeAdminView === 'stockOut' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
                     <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeAdminView === 'stockOut' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
@@ -195,7 +222,7 @@ export default function App() {
                 <div className="min-w-0 flex-1">
                     <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">គណនី</h4>
                     <h2 className="text-sm font-bold text-slate-700 truncate mt-1 group-hover:text-emerald-600 transition-colors">{currentUser.username}</h2>
-                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">{currentUser.role === 'Admin' ? 'អ្នកគ្រប់គ្រង ' : 'បុគ្គលិក '}</p>
+                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">{currentUser.role === 'Server' ? 'ម៉ាស៊ីនមេ (Server)' : currentUser.role === 'Admin' ? 'អ្នកគ្រប់គ្រង ' : 'បុគ្គលិក '}</p>
                 </div>
                 <div className="text-slate-400 group-hover:text-emerald-600 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transform group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -250,12 +277,13 @@ export default function App() {
             }}
           >
             <div className="w-full h-full flex flex-col min-h-0 overflow-hidden animate-in fade-in duration-300">
-                {currentUser.role === 'Admin' ? (
+                {currentUser.role === 'Admin' || currentUser.role === 'Server' ? (
                   <AdminDashboard 
+                    currentUser={currentUser}
                     users={users} 
                     setUsers={setUsers} 
                     transactions={transactions} 
-                    products={products}
+                    products={getManagedProducts()}
                     stockOrders={stockOrders}
                     activeTab={activeAdminView}
                   />
@@ -264,7 +292,7 @@ export default function App() {
                     currentUser={currentUser} 
                     transactions={transactions} 
                     setTransactions={setTransactions} 
-                    products={products}
+                    products={getManagedProducts()}
                     stockOrders={stockOrders}
                     activeTab={activeUserView}
                   />
@@ -289,10 +317,10 @@ export default function App() {
                     {currentUser.username.charAt(0).toUpperCase()}
                 </div>
                 <h3 className="text-lg font-black text-slate-800">{currentUser.username}</h3>
-                <p className="text-xs text-slate-500 font-bold mt-1">តួនាទី៖ {currentUser.role === 'Admin' ? 'អ្នកគ្រប់គ្រង ' : 'បុគ្គលិក '}</p>
+                <p className="text-xs text-slate-500 font-bold mt-1">តួនាទី៖ {currentUser.role === 'Server' ? 'ម៉ាស៊ីនមេ (Server)' : currentUser.role === 'Admin' ? 'អ្នកគ្រប់គ្រង ' : 'បុគ្គលិក '}</p>
             </div>
             
-            {currentUser.role === 'Admin' && (
+            {(currentUser.role === 'Admin' || currentUser.role === 'Server') && (
               <div className="space-y-2 mb-5 border-t border-b border-slate-100 py-3.5 w-full">
                 <p className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-wider px-2">ការគ្រប់គ្រងប្រព័ន្ធ</p>
                 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Transaction, Product, StockOrder, PromotionTier } from '../types';
+import { User, Transaction, Product, StockOrder, PromotionTier, Role } from '../types';
 import { doc, setDoc, deleteDoc, updateDoc, deleteField, increment, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -102,6 +102,7 @@ interface StockItemInput {
 }
 
 interface AdminDashboardProps {
+  currentUser: User;
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   transactions: Transaction[];
@@ -110,11 +111,20 @@ interface AdminDashboardProps {
   activeTab: 'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn' | 'warehouse';
 }
 
-export default function AdminDashboard({ users, setUsers, transactions, products, stockOrders, activeTab }: AdminDashboardProps) {
+export default function AdminDashboard({ currentUser, users, setUsers, transactions, products, stockOrders, activeTab }: AdminDashboardProps) {
+  const ttyUser = users.find(u => u.username.toUpperCase() === 'TTY');
+  const managedUsers = currentUser.role === 'Server'
+    ? users.filter(u => u.role === 'Admin')
+    : users.filter(u => 
+        u.id === currentUser.id || 
+        u.createdBy === currentUser.id || 
+        (!u.createdBy && ttyUser && currentUser.id === ttyUser.id)
+      );
   const [isបង្កើតUserModalOpen, setIsបង្កើតUserModalOpen] = useState(false);
   const [isបង្កើតProductModalOpen, setIsបង្កើតProductModalOpen] = useState(false);
   const [newឈ្មោះអ្នកប្រើប្រាស់, setNewឈ្មោះអ្នកប្រើប្រាស់] = useState('');
   const [newពាក្យសម្ងាត់, setNewពាក្យសម្ងាត់] = useState('');
+  const [newUserRole, setNewUserRole] = useState<Role>('User');
   const [newProductName, setNewProductName] = useState('');
   const [newProductតម្លៃ, setNewProductតម្លៃ] = useState('');
   const [newProductPromoBuy, setNewProductPromoBuy] = useState('');
@@ -130,10 +140,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const [editProductPromotions, setកែប្រែProductPromotions] = useState<PromotionTier[]>([]);
 
   const [loading, setLoading] = useState(false);
+  const managedUserIds = managedUsers.map(u => u.id);
+  const managedTransactions = transactions.filter(t => managedUserIds.includes(t.userId));
+  const managedStockOrders = stockOrders.filter(o => managedUserIds.includes(o.userId));
   const [userToលុប, setUserToលុប] = useState<User | null>(null);
   const [productToលុប, setProductToលុប] = useState<Product | null>(null);
   const [userToកែប្រែ, setUserToកែប្រែ] = useState<User | null>(null);
   const [editឈ្មោះអ្នកប្រើប្រាស់, setកែប្រែឈ្មោះអ្នកប្រើប្រាស់] = useState('');
+  const [editUserRole, setEditUserRole] = useState<Role>('User');
   const [editពាក្យសម្ងាត់, setកែប្រែពាក្យសម្ងាត់] = useState('');
   const [transactionToលុប, setTransactionToលុប] = useState<Transaction | null>(null);
   const [transactionToកែប្រែ, setTransactionToកែប្រែ] = useState<Transaction | null>(null);
@@ -145,6 +159,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
   const [isកែប្រែingTransaction, setIsកែប្រែingTransaction] = useState(false);
   const [isកែប្រែingUser, setIsកែប្រែingUser] = useState(false);
+  const [showAdminUsersList, setShowAdminUsersList] = useState(false);
   const [editQuantity, setកែប្រែបរិមាណ] = useState('');
   const [editNote, setកែប្រែNote] = useState('');
   const [editTxProductName, setកែប្រែTxProductName] = useState('');
@@ -219,6 +234,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   const [stockInItems, setStockInItems] = useState<StockItemInput[]>([]);
   const [actualStockDrafts, setActualStockDrafts] = useState<{ [productId: string]: string }>({});
   const [warehouseSearchQuery, setWarehouseSearchQuery] = useState('');
+  const [selectedAdminId, setSelectedAdminId] = useState<string>('all');
   const [warehouseStockIns, setWarehouseStockIns] = useState<any[]>([]);
   const [isStockInHistoryOpen, setIsStockInHistoryOpen] = useState(false);
   const [stockInToលុប, setStockInToលុប] = useState<any | null>(null);
@@ -479,7 +495,14 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     }
   };
 
-  const filteredWarehouseProducts = products.filter(p =>
+  const getFilteredProducts = () => {
+    if (currentUser.role !== 'Server' || selectedAdminId === 'all') {
+      return products;
+    }
+    return products.filter(p => p.createdBy === selectedAdminId || (!p.createdBy && selectedAdminId === 'admin-1'));
+  };
+
+  const filteredWarehouseProducts = getFilteredProducts().filter(p =>
     p.name.toLowerCase().includes(warehouseSearchQuery.toLowerCase())
   );
 
@@ -750,19 +773,24 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       return;
     }
     
+    // Prevent Admin from creating Admin/Server roles
+    const finalRole = currentUser.role === 'Admin' ? 'User' : newUserRole;
+
     setLoading(true);
     const newUser: User = {
       id: `user-${Date.now()}`,
       username: newឈ្មោះអ្នកប្រើប្រាស់,
       password: newពាក្យសម្ងាត់,
-      role: 'User',
-      createdAt: new Date().toISOString()
+      role: finalRole,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.id
     };
     
     try {
       await setDoc(doc(db, 'users', newUser.id), newUser);
       setNewឈ្មោះអ្នកប្រើប្រាស់('');
       setNewពាក្យសម្ងាត់('');
+      setNewUserRole('User');
       setIsបង្កើតUserModalOpen(false);
     } catch (error) {
       console.error("Error adding user: ", error);
@@ -836,7 +864,8 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       promoBuyQty: firstPromo ? firstPromo.buyQty : (newProductPromoBuy ? Number(newProductPromoBuy) : undefined),
       promoGetQty: firstPromo ? firstPromo.getQty : (newProductPromoGet ? Number(newProductPromoGet) : undefined),
       promotions: cleanPromos.length > 0 ? cleanPromos : undefined,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.id
     };
     
     try {
@@ -907,8 +936,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
     const targetUser = userToកែប្រែ || selectedUserDetail;
     if (!targetUser) return;
     setLoading(true);
+    // Limit role updates: Admin cannot escalate anyone to Admin/Server, and keeps their own role
+    const finalRole = targetUser.id === currentUser.id 
+      ? targetUser.role 
+      : (currentUser.role === 'Admin' ? 'User' : editUserRole);
+
     try {
-      await setDoc(doc(db, 'users', targetUser.id), { ...targetUser, username: editឈ្មោះអ្នកប្រើប្រាស់, password: editពាក្យសម្ងាត់ }, { merge: true });
+      await setDoc(doc(db, 'users', targetUser.id), { ...targetUser, username: editឈ្មោះអ្នកប្រើប្រាស់, password: editពាក្យសម្ងាត់, role: finalRole }, { merge: true });
       setUserToកែប្រែ(null);
       setSelectedUserDetail(null);
       setIsកែប្រែingUser(false);
@@ -1333,7 +1367,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   };
 
   // Filtered transactions for Admin tab
-  const filteredTransactions = transactions.filter(t => {
+  const filteredTransactions = managedTransactions.filter(t => {
     const matchUser = filterTxUserId === 'all' || t.userId === filterTxUserId;
     
     const txDateStr = t.date ? t.date.split('T')[0] : '';
@@ -1396,7 +1430,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
   })();
 
   // Filter and sort stock orders
-  const filteredStockOrders = [...stockOrders]
+  const filteredStockOrders = [...managedStockOrders]
     .filter(order => {
       const matchUser = selectedOrderUser === 'all' || order.userId === selectedOrderUser;
       const matchStatus = selectedOrderStatus === 'all' || 
@@ -1477,7 +1511,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
-                  {users.map(user => (
+                  {managedUsers.map(user => (
                     <tr 
                       key={user.id} 
                       onClick={() => setSelectedUserDetail(user)}
@@ -1486,13 +1520,13 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       <td className="px-2 md:px-4 py-2 font-bold text-slate-800">{user.username}</td>
                       <td className="px-2 md:px-4 py-2 font-mono font-medium text-slate-500">{user.password}</td>
                       <td className="px-2 md:px-4 py-2">
-                        <span className={`px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] md:text-xs font-bold ${user.role === 'Admin' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        <span className={`px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] md:text-xs font-bold ${user.role === 'Server' ? 'bg-indigo-100 text-indigo-700' : user.role === 'Admin' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {user.role}
                         </span>
                       </td>
                     </tr>
                   ))}
-                  {users.length === 0 && (
+                  {managedUsers.length === 0 && (
                     <tr>
                       <td colSpan={3} className="px-6 py-12 text-center text-slate-400 font-medium">គ្មានទិន្នន័យ</td>
                     </tr>
@@ -1506,9 +1540,25 @@ export default function AdminDashboard({ users, setUsers, transactions, products
       {activeTab === 'products' && (
         <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
           <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
-            <div>
-              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">បញ្ជីទំនិញ</h3>
-              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងទំនិញ និងកម្មវិធីប្រម៉ូសិន</p>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div>
+                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">បញ្ជីទំនិញ</h3>
+                <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងទំនិញ និងកម្មវិធីប្រម៉ូសិន</p>
+              </div>
+              {currentUser.role === 'Server' && (
+                <div className="sm:ml-4">
+                  <select
+                    value={selectedAdminId}
+                    onChange={(e) => setSelectedAdminId(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 text-[10px] sm:text-xs font-bold text-slate-700 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="all">បង្ហាញទាំងអស់ (All Admins)</option>
+                    {users.filter(u => u.role === 'Admin').map(u => (
+                      <option key={u.id} value={u.id}>{u.username}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <button
               onClick={() => setIsបង្កើតProductModalOpen(true)}
@@ -1530,7 +1580,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
-                  {products.map(product => (
+                  {getFilteredProducts().map(product => (
                     <tr 
                       key={product.id} 
                       className="hover:bg-slate-50 transition-colors cursor-pointer"
@@ -1564,7 +1614,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                       </td>
                     </tr>
                   ))}
-                  {products.length === 0 && (
+                  {getFilteredProducts().length === 0 && (
                     <tr>
                       <td colSpan={3} className="px-6 py-12 text-center text-slate-400 font-medium">គ្មានទិន្នន័យ</td>
                     </tr>
@@ -1595,7 +1645,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                 className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
               >
                 <option value="all">ទាំងអស់</option>
-                {users.map(u => (
+                {managedUsers.map(u => (
                   <option key={u.id} value={u.id}>{u.username}</option>
                 ))}
               </select>
@@ -1757,7 +1807,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 >
                   <option value="all">ទាំងអស់</option>
-                  {users.map(u => (
+                  {managedUsers.map(u => (
                     <option key={u.id} value={u.id}>{u.username}</option>
                   ))}
                 </select>
@@ -1949,7 +1999,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 >
                   <option value="all">ទាំងអស់</option>
-                  {users.map(u => (
+                  {managedUsers.map(u => (
                     <option key={u.id} value={u.id}>{u.username}</option>
                   ))}
                 </select>
@@ -2139,7 +2189,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 >
                   <option value="all">ទាំងអស់</option>
-                  {users.map(u => (
+                  {managedUsers.map(u => (
                     <option key={u.id} value={u.id}>{u.username}</option>
                   ))}
                 </select>
@@ -2263,7 +2313,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
           <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
             <div>
               <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកកម្មង់</h3>
-              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">ការកម្មង់សរុប៖ {totalOrderItems} ជួរ</p>
+              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">ការកម្មង់សរុប៖ {stockOrders.length} ជួរ</p>
             </div>
             
             <div className="flex flex-wrap items-center gap-3">
@@ -2915,6 +2965,38 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   required
                 />
               </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">តួនាទី</label>
+                {currentUser.role === 'Server' ? (
+                  <div className="flex space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => setNewUserRole('User')}
+                      className={`flex-1 py-3.5 px-4 rounded-2xl text-xs md:text-sm font-bold transition border ${newUserRole === 'User' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                    >
+                      បុគ្គលិក (User)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewUserRole('Admin')}
+                      className={`flex-1 py-3.5 px-4 rounded-2xl text-xs md:text-sm font-bold transition border ${newUserRole === 'Admin' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                    >
+                      អ្នកគ្រប់គ្រង (Admin)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewUserRole('Server')}
+                      className={`flex-1 py-3.5 px-4 rounded-2xl text-xs md:text-sm font-bold transition border ${newUserRole === 'Server' ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                    >
+                      ម៉ាស៊ីនមេ (Server)
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-indigo-700">
+                    បុគ្គលិក (User)
+                  </div>
+                )}
+              </div>
               <div className="pt-4 flex space-x-3">
                   <button
                     type="button"
@@ -3447,6 +3529,38 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     required
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">តួនាទី</label>
+                  {currentUser.role === 'Server' ? (
+                    <div className="flex space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => setEditUserRole('User')}
+                        className={`flex-1 py-3 px-3 rounded-2xl text-[11px] md:text-xs font-bold transition border ${editUserRole === 'User' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                      >
+                        បុគ្គលិក (User)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditUserRole('Admin')}
+                        className={`flex-1 py-3 px-3 rounded-2xl text-[11px] md:text-xs font-bold transition border ${editUserRole === 'Admin' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                      >
+                        អ្នកគ្រប់គ្រង (Admin)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditUserRole('Server')}
+                        className={`flex-1 py-3 px-3 rounded-2xl text-[11px] md:text-xs font-bold transition border ${editUserRole === 'Server' ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                      >
+                        ម៉ាស៊ីនមេ (Server)
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-700">
+                      {selectedUserDetail.id === currentUser.id ? 'អ្នកគ្រប់គ្រង (Admin)' : 'បុគ្គលិក (User)'}
+                    </div>
+                  )}
+                </div>
                 <div className="flex gap-3 pt-4 border-t border-slate-100">
                   <button
                     type="button"
@@ -3478,38 +3592,115 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                   <div className="grid grid-cols-3 gap-2 items-center">
                     <span className="text-xs font-bold text-slate-400">តួនាទី</span>
                     <span className="col-span-2 text-sm font-black text-slate-800">
-                      <span className={`px-2 py-1 rounded-lg text-xs font-bold ${selectedUserDetail.role === 'Admin' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      <span className={`px-2 py-1 rounded-lg text-xs font-bold ${selectedUserDetail.role === 'Server' ? 'bg-indigo-100 text-indigo-700' : selectedUserDetail.role === 'Admin' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                         {selectedUserDetail.role}
                       </span>
                     </span>
                   </div>
+                  {currentUser.role === 'Server' && selectedUserDetail.role === 'Admin' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminUsersList(true)}
+                      className="w-full mt-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs py-3.5 rounded-2xl transition cursor-pointer flex items-center justify-center space-x-2 border border-emerald-100"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <span>បង្ហាញគណនីបុគ្គលិក ({users.filter(u => u.createdBy === selectedUserDetail.id).length})</span>
+                    </button>
+                  )}
                 </div>
 
-                {selectedUserDetail.role !== 'Admin' && (
                   <div className="flex gap-3 pt-4 border-t border-slate-100">
                     <button
                       onClick={() => {
                         setIsកែប្រែingUser(true);
                         setកែប្រែឈ្មោះអ្នកប្រើប្រាស់(selectedUserDetail.username);
                         setកែប្រែពាក្យសម្ងាត់(selectedUserDetail.password);
+                        setEditUserRole(selectedUserDetail.role);
                       }}
                       className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                     >
                       កែប្រែ
                     </button>
-                    <button
-                      onClick={() => {
-                        setUserToលុប(selectedUserDetail);
-                        setSelectedUserDetail(null);
-                      }}
-                      className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
-                    >
-                      លុប
-                    </button>
+                    {selectedUserDetail.id !== currentUser.id && (
+                      <button
+                        onClick={() => {
+                          setUserToលុប(selectedUserDetail);
+                          setSelectedUserDetail(null);
+                        }}
+                        className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+                      >
+                        លុប
+                      </button>
+                    )}
                   </div>
-                )}
               </>
             )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showAdminUsersList && selectedUserDetail && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setShowAdminUsersList(false)}>
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base md:text-lg font-black text-slate-800">
+                  បុគ្គលិករបស់ Admin: {selectedUserDetail.username}
+                </h3>
+                <p className="text-slate-500 text-[10px] sm:text-xs mt-0.5 font-medium">គណនីទាំងអស់ដែលគ្រប់គ្រងដោយអ្នកគ្រប់គ្រងនេះ</p>
+              </div>
+              <button 
+                onClick={() => setShowAdminUsersList(false)} 
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="py-4 max-h-[300px] overflow-y-auto custom-scroll">
+              {users.filter(u => u.createdBy === selectedUserDetail.id).length === 0 ? (
+                <div className="text-center py-8 text-slate-400 font-medium text-xs">
+                  មិនទាន់មានគណនីបុគ្គលិកឡើយ
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs md:text-sm">
+                  <thead>
+                    <tr className="text-slate-400 text-[9px] sm:text-[10px] uppercase font-bold tracking-wider border-b border-slate-100">
+                      <th className="py-2 px-3">ឈ្មោះអ្នកប្រើប្រាស់</th>
+                      <th className="py-2 px-3">លេខសម្ងាត់</th>
+                      <th className="py-2 px-3 text-right">តួនាទី</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {users.filter(u => u.createdBy === selectedUserDetail.id).map(u => (
+                      <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2.5 px-3 font-bold text-slate-800">{u.username}</td>
+                        <td className="py-2.5 px-3 font-mono font-medium text-slate-500">{u.password}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                            {u.role === 'Admin' ? 'Admin' : 'User'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setShowAdminUsersList(false)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-2xl transition cursor-pointer"
+              >
+                បិទ
+              </button>
+            </div>
           </div>
         </div>,
         document.body
@@ -3852,7 +4043,7 @@ export default function AdminDashboard({ users, setUsers, transactions, products
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800 cursor-pointer"
                     required
                   >
-                    {users.filter(u => u.role === 'User').map(u => (
+                    {managedUsers.filter(u => u.role === 'User').map(u => (
                       <option key={u.id} value={u.id}>{u.username}</option>
                     ))}
                   </select>

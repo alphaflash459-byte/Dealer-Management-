@@ -1,4 +1,4 @@
-export type Role = 'Admin' | 'User';
+export type Role = 'Admin' | 'User' | 'Server';
 
 export interface User {
   id: string;
@@ -6,6 +6,7 @@ export interface User {
   password?: string; // only for Admin to see/manage, usually we wouldn't store plaintext but this is local
   role: Role;
   createdAt: string;
+  createdBy?: string;
 }
 
 export type TransactionType = 'Stock Out' | 'Stock Sold' | 'Stock Return';
@@ -26,6 +27,7 @@ export interface Product {
   warehouseStock?: number;
   actualStock?: number;
   lastStockTake?: string;
+  createdBy?: string;
 }
 
 export interface Transaction {
