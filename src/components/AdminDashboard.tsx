@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Transaction, Product, StockOrder, PromotionTier, Role } from '../types';
+import { User, Transaction, Product, StockOrder, PromotionTier, Role, TransactionType } from '../types';
 import { doc, setDoc, deleteDoc, updateDoc, deleteField, increment, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -109,9 +109,11 @@ interface AdminDashboardProps {
   products: Product[];
   stockOrders: StockOrder[];
   activeTab: 'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn' | 'warehouse';
+  isAIScannerModalOpen: boolean;
+  setIsAIScannerModalOpen: (val: boolean) => void;
 }
 
-export default function AdminDashboard({ currentUser, users, setUsers, transactions, products, stockOrders, activeTab }: AdminDashboardProps) {
+export default function AdminDashboard({ currentUser, users, setUsers, transactions, products, stockOrders, activeTab, isAIScannerModalOpen, setIsAIScannerModalOpen }: AdminDashboardProps) {
   const ttyUser = users.find(u => u.username.toUpperCase() === 'TTY');
   const managedUsers = currentUser.role === 'Server'
     ? users.filter(u => u.role === 'Admin')
@@ -122,6 +124,15 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       );
   const [isបង្កើតUserModalOpen, setIsបង្កើតUserModalOpen] = useState(false);
   const [isបង្កើតProductModalOpen, setIsបង្កើតProductModalOpen] = useState(false);
+  
+  // AI Scanner State
+  const [aiScannerUserId, setAiScannerUserId] = useState('');
+  const [aiScannerType, setAiScannerType] = useState<TransactionType>('Stock Out');
+  const [aiScannerImage, setAiScannerImage] = useState<string>('');
+  const [aiScannerLoading, setAiScannerLoading] = useState(false);
+  const [aiScannerResults, setAiScannerResults] = useState<{ id: string, productName: string, quantity: number, unit?: string, description?: string, matchedProductId?: string, actualProduct?: Product }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [newឈ្មោះអ្នកប្រើប្រាស់, setNewឈ្មោះអ្នកប្រើប្រាស់] = useState('');
   const [newពាក្យសម្ងាត់, setNewពាក្យសម្ងាត់] = useState('');
   const [newUserRole, setNewUserRole] = useState<Role>('User');
@@ -1128,6 +1139,121 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     }
   };
 
+  const handleAIImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setAiScannerImage(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAIScan = async () => {
+    if (!aiScannerImage) {
+      alert("សូមបញ្ចូលរូបភាពជាមុនសិន");
+      return;
+    }
+    setAiScannerLoading(true);
+    try {
+      const response = await fetch('/api/extract-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: aiScannerImage, targetType: aiScannerType })
+      });
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || "Failed to extract");
+      }
+      
+      const parsedItems = result.data.map((item: any) => {
+        // match product
+        const matchedProduct = products.find(p => p.name.toLowerCase().includes((item.productName || '').toLowerCase()) || (item.productName || '').toLowerCase().includes(p.name.toLowerCase()));
+        return {
+          id: Date.now().toString() + Math.random().toString(),
+          productName: matchedProduct ? matchedProduct.name : item.productName || '',
+          quantity: item.quantity || 0,
+          unit: item.unit || '',
+          description: item.description || '',
+          matchedProductId: matchedProduct?.id,
+          actualProduct: matchedProduct
+        };
+      });
+      
+      setAiScannerResults(parsedItems);
+    } catch (error: any) {
+      alert("មានបញ្ហាក្នុងការស្កេន: " + error.message);
+    } finally {
+      setAiScannerLoading(false);
+    }
+  };
+
+  const handleAISave = async () => {
+    if (!aiScannerUserId) {
+      alert("សូមជ្រើសរើសអ្នកប្រើប្រាស់");
+      return;
+    }
+    if (aiScannerResults.length === 0) {
+      alert("សូមស្កេនរូបភាព ដើម្បីបានទិន្នន័យ");
+      return;
+    }
+    
+    setAiScannerLoading(true);
+    try {
+      const targetUser = users.find(u => u.id === aiScannerUserId);
+      if (!targetUser) throw new Error("រកមិនឃើញអ្នកប្រើប្រាស់");
+
+      // Generate Invoice Date
+      const offsetDate = new Date();
+      offsetDate.setMinutes(offsetDate.getMinutes() - offsetDate.getTimezoneOffset());
+
+      for (const item of aiScannerResults) {
+        if (!item.productName || item.quantity <= 0) continue;
+        
+        const newTransaction: Transaction = {
+          id: Date.now().toString() + Math.random().toString(),
+          userId: aiScannerUserId,
+          type: aiScannerType,
+          productName: item.productName,
+          quantity: item.quantity,
+          date: offsetDate.toISOString(),
+          note: item.description ? "AI Scan: " + item.description : "AI Scan"
+        };
+        
+        if (item.actualProduct && item.actualProduct.price !== undefined) {
+          newTransaction.price = item.actualProduct.price;
+        }
+
+        await setDoc(doc(db, 'transactions', newTransaction.id), cleanUndefined(newTransaction));
+        
+        // Update Warehouse Stock if matching product exists
+        if (item.actualProduct) {
+          if (aiScannerType === 'Stock Out') {
+            await updateDoc(doc(db, 'products', item.actualProduct.id), {
+              warehouseStock: increment(-item.quantity)
+            });
+          } else if (aiScannerType === 'Stock Return') {
+            await updateDoc(doc(db, 'products', item.actualProduct.id), {
+              warehouseStock: increment(item.quantity)
+            });
+          }
+        }
+      }
+
+      alert("រក្សាទុកបានជោគជ័យ");
+      setIsAIScannerModalOpen(false);
+      setAiScannerResults([]);
+      setAiScannerImage('');
+      setAiScannerUserId('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch(err: any) {
+      alert("រក្សាទុកបរាជ័យ: " + err.message);
+    } finally {
+      setAiScannerLoading(false);
+    }
+  };
+
   const handleExportSingleInvoicePDF = (invoice: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -1491,15 +1617,17 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
               <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">គ្រប់គ្រងគណនីអ្នកប្រើប្រាស់ក្នុងប្រព័ន្ធ</p>
             </div>
-            <button
-              onClick={() => setIsបង្កើតUserModalOpen(true)}
-              className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm px-4 py-2.5 rounded-2xl font-black shadow-md shadow-indigo-600/20 active:scale-95 transition cursor-pointer"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>បង្កើតអ្នកប្រើប្រាស់</span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsបង្កើតUserModalOpen(true)}
+                className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm px-4 py-2.5 rounded-2xl font-black shadow-md shadow-indigo-600/20 active:scale-95 transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>បង្កើតអ្នកប្រើប្រាស់</span>
+              </button>
+            </div>
           </div>
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
             <table className="w-full text-left border-collapse">
@@ -2922,6 +3050,157 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 className="flex-1 hover:bg-rose-700 bg-rose-600 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-rose-600/30 transition disabled:opacity-70 cursor-pointer"
               >
                 {loading ? 'កំពុងលុប...' : 'យល់ព្រម'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {isAIScannerModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-0">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAIScannerModalOpen(false)}></div>
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center shrink-0">
+              <h3 className="text-lg font-black text-slate-800">បញ្ចូលទិន្នន័យវៃឆ្លាត (AI Scanner)</h3>
+              <button onClick={() => setIsAIScannerModalOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto custom-scroll flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 px-1">អ្នកប្រើប្រាស់</label>
+                  <select
+                    value={aiScannerUserId}
+                    onChange={e => setAiScannerUserId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition outline-none font-bold text-slate-700 cursor-pointer"
+                  >
+                    <option value="">-- ជ្រើសរើសអ្នកប្រើប្រាស់ --</option>
+                    {users.filter(u => u.role !== 'Admin').map(u => (
+                      <option key={u.id} value={u.id}>{u.username}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 px-1">ប្រភេទប្រតិបត្តិការ</label>
+                  <select
+                    value={aiScannerType}
+                    onChange={e => setAiScannerType(e.target.value as TransactionType)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition outline-none font-bold text-slate-700 cursor-pointer"
+                  >
+                    <option value="Stock Out">ស្តុកឡើងឡាន (Stock Out)</option>
+                    <option value="Stock Sold">ស្តុកលក់ចេញ (Stock Sold)</option>
+                    <option value="Stock Return">ស្តុកត្រឡប់ (Stock Return)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 mb-4">
+                <label className="text-xs font-bold text-slate-500 px-1">រូបភាពវិក្កយបត្រ ឬកំណត់ត្រា</label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    ref={fileInputRef}
+                    onChange={handleAIImageUpload}
+                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-sky-50 file:text-sky-600 hover:file:bg-sky-100 file:transition cursor-pointer border border-slate-200 rounded-2xl p-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAIScan}
+                    disabled={aiScannerLoading || !aiScannerImage}
+                    className="bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-xs py-3 px-6 rounded-2xl transition shadow-md shadow-sky-500/20 whitespace-nowrap"
+                  >
+                    {aiScannerLoading ? 'កំពុងស្កេន...' : 'ស្កេនទាញយកទិន្នន័យ'}
+                  </button>
+                </div>
+              </div>
+
+              {aiScannerImage && (
+                <div className="mb-4 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 relative h-48 md:h-64 flex items-center justify-center">
+                   <img src={aiScannerImage} alt="Scanned Note" className="max-h-full object-contain" />
+                </div>
+              )}
+
+              {aiScannerResults.length > 0 && (
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-slate-500 px-1">លទ្ធផលដែលទាញយកបាន</label>
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs">
+                        <tr>
+                          <th className="p-3">ឈ្មោះទំនិញ / ផលិតផល</th>
+                          <th className="p-3 w-24">បរិមាណ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {aiScannerResults.map((item, idx) => (
+                          <tr key={item.id} className={item.actualProduct ? 'bg-emerald-50/30' : 'bg-rose-50/30'}>
+                            <td className="p-2">
+                              <select
+                                value={item.actualProduct ? item.actualProduct.name : item.productName}
+                                onChange={(e) => {
+                                  const newResults = [...aiScannerResults];
+                                  const selectedName = e.target.value;
+                                  const prod = products.find(p => p.name === selectedName);
+                                  if (prod) {
+                                    newResults[idx].productName = prod.name;
+                                    newResults[idx].matchedProductId = prod.id;
+                                    newResults[idx].actualProduct = prod;
+                                  } else {
+                                    newResults[idx].productName = selectedName;
+                                    newResults[idx].matchedProductId = undefined;
+                                    newResults[idx].actualProduct = undefined;
+                                  }
+                                  setAiScannerResults(newResults);
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:border-sky-400 outline-none font-bold text-slate-700 cursor-pointer"
+                              >
+                                {item.actualProduct ? null : <option value={item.productName}>{item.productName} (មិនមានក្នុងស្តុក)</option>}
+                                {products.map(p => (
+                                  <option key={p.id} value={p.name}>{p.name}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newResults = [...aiScannerResults];
+                                  newResults[idx].quantity = Number(e.target.value) || 0;
+                                  setAiScannerResults(newResults);
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:border-sky-400 outline-none font-bold text-slate-700 text-center"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 border-t border-slate-50 bg-slate-50/50 flex space-x-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAIScannerModalOpen(false)}
+                className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition shadow-sm"
+              >
+                បោះបង់
+              </button>
+              <button
+                type="button"
+                disabled={aiScannerLoading || aiScannerResults.length === 0}
+                onClick={handleAISave}
+                className="flex-[2] bg-sky-500 hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm py-3 rounded-2xl shadow-md shadow-sky-500/20 active:scale-[0.98] transition"
+              >
+                {aiScannerLoading ? 'កំពុងរក្សាទុក...' : 'យល់ព្រមរក្សាទុក'}
               </button>
             </div>
           </div>

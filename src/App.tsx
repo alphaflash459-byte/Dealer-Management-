@@ -18,6 +18,7 @@ export default function App() {
   const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return' | 'Report' | 'Stock Order'>('Stock Out');
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isAIScannerModalOpen, setIsAIScannerModalOpen] = useState(false);
   const lastScrollY = useRef(0);
 
   // Initial load
@@ -286,6 +287,8 @@ export default function App() {
                     products={getManagedProducts()}
                     stockOrders={stockOrders}
                     activeTab={activeAdminView}
+                    isAIScannerModalOpen={isAIScannerModalOpen}
+                    setIsAIScannerModalOpen={setIsAIScannerModalOpen}
                   />
                 ) : (
                   <UserDashboard 
@@ -394,6 +397,22 @@ export default function App() {
                     </svg>
                   </div>
                   <span className="text-xs font-black">ស្តុកឃ្លាំង </span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    setIsAIScannerModalOpen(true);
+                  }} 
+                  className={`w-full flex items-center p-2.5 rounded-2xl transition-all cursor-pointer text-sky-600 bg-sky-50 border border-sky-100`}
+                >
+                  <div className={`p-1.5 rounded-xl mr-3 bg-sky-100 text-sky-600`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-black">បញ្ចូលឯកសារ (AI)</span>
                 </button>
               </div>
             )}
