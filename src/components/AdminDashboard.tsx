@@ -1189,7 +1189,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       const response = await fetch('/api/extract-note', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: aiScannerImage, targetType: aiScannerType })
+        body: JSON.stringify({ 
+          image: aiScannerImage, 
+          targetType: aiScannerType,
+          productNames: products.map(p => p.name)
+        })
       });
       
       let result;
