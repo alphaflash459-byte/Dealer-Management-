@@ -1149,7 +1149,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_DIMENSION = 1200;
+        const MAX_DIMENSION = 800;
 
         if (width > height) {
           if (width > MAX_DIMENSION) {
@@ -1168,7 +1168,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.4);
           setAiScannerImage(compressedBase64);
         } else {
           setAiScannerImage(event.target?.result as string);
@@ -1191,7 +1191,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: aiScannerImage, targetType: aiScannerType })
       });
-      const result = await response.json();
+      
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        throw new Error(`Server returned an invalid response (Status: ${response.status}). This might be because the image is too large.`);
+      }
       
       if (!result.success) {
         throw new Error(result.error || "Failed to extract");

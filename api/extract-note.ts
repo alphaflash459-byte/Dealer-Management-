@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '50mb',
+      sizeLimit: '4mb',
     },
   },
 };
