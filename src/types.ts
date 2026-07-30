@@ -5,6 +5,9 @@ export interface User {
   username: string;
   password?: string; // only for Admin to see/manage, usually we wouldn't store plaintext but this is local
   role: Role;
+  phone?: string;
+  carPlate?: string;
+  salesArea?: string;
   createdAt: string;
   createdBy?: string;
 }

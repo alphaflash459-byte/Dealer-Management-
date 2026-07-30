@@ -371,6 +371,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               padding-top: 8px;
             }
             @media print {
+              @page { margin: 15mm; }
               body {
                 padding: 0;
                 background-color: #ffffff;
@@ -1336,6 +1337,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               page-break-after: always;
             }
             @media print {
+              @page { margin: 15mm; }
               body {
                 padding: 0;
                 background-color: #ffffff;
@@ -1382,7 +1384,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     }
 
     let dateRangeText = "ទាំងអស់";
-    if (filterStartDate && filterEndDate) {
+    if (filterStartDate) {
       const formatDate = (dateStr: string) => {
         const d = new Date(dateStr);
         const day = String(d.getDate()).padStart(2, '0');
@@ -1390,16 +1392,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         const year = d.getFullYear();
         return `${day}/${month}/${year}`;
       };
-      dateRangeText = `${formatDate(filterStartDate)} ដល់ ${formatDate(filterEndDate)}`;
-    } else if (filterStartDate) {
-      const formatDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        return `${day}/${month}/${year}`;
-      };
-      dateRangeText = `ចាប់ពី ${formatDate(filterStartDate)}`;
+      dateRangeText = `${formatDate(filterStartDate)}`;
     } else if (filterEndDate) {
       const formatDate = (dateStr: string) => {
         const d = new Date(dateStr);
@@ -1408,7 +1401,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         const year = d.getFullYear();
         return `${day}/${month}/${year}`;
       };
-      dateRangeText = `រហូតដល់ ${formatDate(filterEndDate)}`;
+      dateRangeText = `${formatDate(filterEndDate)}`;
     }
 
     const printWindow = window.open('', '_blank');
@@ -1417,26 +1410,33 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
       return;
     }
 
+    const hasAnySalesActivity = activeProducts.some(p => p.soldTotal > 0 || p.returned > 0);
+
     const rowsHtml = activeProducts.map(({ product, loaded, soldOnly, promosGiven, soldTotal, returned }) => {
       const balance = loaded - soldTotal - returned;
-      let statusText = `ត្រឹមត្រូវ ${balance}`;
-      let statusColor = "color: #059669;"; 
-      if (balance < 0) {
-        statusText = `លើស ${Math.abs(balance)}`;
-        statusColor = "color: #d97706;"; 
+      
+      let statusText = `ត្រឹមត្រូវ`;
+      let statusColor = "color: #059669; background-color: #ecfdf5; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;"; 
+      
+      if (!hasAnySalesActivity && balance > 0) {
+        statusText = `-`;
+        statusColor = "color: #94a3b8; background-color: transparent; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;";
+      } else if (balance < 0) {
+        statusText = `លើស (${Math.abs(balance)})`;
+        statusColor = "color: #d97706; background-color: #fffbeb; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;"; 
       } else if (balance > 0) {
-        statusText = `បាត់ ${balance}`;
-        statusColor = "color: #e11d48;"; 
+        statusText = `បាត់ (${balance})`;
+        statusColor = "color: #e11d48; background-color: #fff1f2; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;"; 
       }
 
       return `
         <tr style="border-bottom: 1px solid #e2e8f0;">
           <td style="padding: 12px; font-weight: bold; text-align: left; color: #1e293b;">${product.name}</td>
-          <td style="padding: 12px; font-weight: bold; color: #e11d48; text-align: center;">${loaded}</td>
-          <td style="padding: 12px; font-weight: bold; color: #059669; text-align: center;">${soldOnly}</td>
-          <td style="padding: 12px; font-weight: bold; color: #0d9488; text-align: center;">${promosGiven}</td>
-          <td style="padding: 12px; font-weight: bold; color: #d97706; text-align: center;">${returned}</td>
-          <td style="padding: 12px; font-weight: bold; text-align: right; ${statusColor}">${statusText}</td>
+          <td style="padding: 12px; font-weight: bold; color: #e11d48; text-align: center;">${loaded || '-'}</td>
+          <td style="padding: 12px; font-weight: bold; color: #059669; text-align: center;">${soldOnly || '-'}</td>
+          <td style="padding: 12px; font-weight: bold; color: #f59e0b; text-align: center;">${promosGiven || '-'}</td>
+          <td style="padding: 12px; font-weight: bold; color: #4f46e5; text-align: center;">${returned || '-'}</td>
+          <td style="padding: 12px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
         </tr>
       `;
     }).join('');
@@ -1455,16 +1455,24 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               padding: 40px;
               line-height: 1.5;
             }
+            .custom-print-header {
+              display: flex;
+              justify-content: space-between;
+              font-size: 11px;
+              color: #64748b;
+              margin-bottom: 20px;
+              font-family: 'Inter', sans-serif;
+            }
             .header {
               text-align: center;
-              margin-bottom: 40px;
+              margin-bottom: 24px;
               border-bottom: 2px solid #f1f5f9;
-              padding-bottom: 20px;
+              padding-bottom: 12px;
             }
             .header h1 {
               font-size: 24px;
               color: #0f172a;
-              margin: 0 0 10px 0;
+              margin: 0;
               font-weight: 700;
             }
             .header p {
@@ -1473,17 +1481,34 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               margin: 0;
             }
             .meta-info {
+              display: grid;
+              grid-template-columns: repeat(5, 1fr);
+              gap: 16px;
               margin-bottom: 30px;
-              font-size: 14px;
+              font-size: 13px;
+              border: 1px solid #e2e8f0;
+              padding: 12px 16px;
+              border-radius: 8px;
+              background-color: #f8fafc;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
             }
-            .meta-info div {
-              margin-bottom: 8px;
+            .meta-item {
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              gap: 6px;
             }
-            .meta-info span.label {
+            .meta-item span.label {
+              font-size: 11px;
+              color: #64748b;
+              font-weight: 500;
+              width: auto;
+            }
+            .meta-item span.value {
+              font-size: 13px;
               font-weight: 700;
-              color: #475569;
-              display: inline-block;
-              width: 140px;
+              color: #1e293b;
             }
             table {
               width: 100%;
@@ -1503,11 +1528,15 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             }
             .footer {
               margin-top: 60px;
-              text-align: right;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
               font-size: 12px;
               color: #94a3b8;
+              font-weight: 500;
             }
             @media print {
+              @page { margin: 15mm; }
               body {
                 padding: 0;
               }
@@ -1518,15 +1547,21 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           </style>
         </head>
         <body>
+          <div class="custom-print-header">
+            <span>${currentUser?.username || 'User'}</span>
+            <span>Dealer Management System</span>
+          </div>
           <div class="header">
             <h1>របាយការណ៍ស្តុកសរុប</h1>
-            <p>ប្រព័ន្ធគ្រប់គ្រងការលក់ និងស្តុកទំនិញ</p>
+            
           </div>
 
           <div class="meta-info">
-            <div><span class="label">កាលបរិច្ឆេទរបាយការណ៍៖</span> ${dateRangeText}</div>
-            <div><span class="label">ថ្ងៃទីនាំចេញ៖</span> ${new Date().toLocaleString('km-KH')}</div>
-            <div><span class="label">អ្នកនាំចេញ៖</span> ${currentUser.username || 'អ្នកប្រើប្រាស់'}</div>
+            <div class="meta-item"><span class="label">ឈ្មោះអ្នកលក់៖</span> <span class="value" style="color:#e11d48;">${currentUser.username}</span></div>
+            <div class="meta-item"><span class="label">កាលបរិច្ឆេទ៖</span> <span class="value">${dateRangeText}</span></div>
+            <div class="meta-item"><span class="label">លេខទូរសព្ទ៖</span> <span class="value">${currentUser.phone || '...............'}</span></div>
+            <div class="meta-item"><span class="label">ផ្លាកលេខឡាន៖</span> <span class="value">${currentUser.carPlate || '...............'}</span></div>
+            <div class="meta-item"><span class="label">តំបន់លក់៖</span> <span class="value">${currentUser.salesArea || '...............'}</span></div>
           </div>
 
           <table>
@@ -1546,7 +1581,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           </table>
 
           <div class="footer">
-            <p>នាំចេញដោយស្វ័យប្រវត្តិចេញពីប្រព័ន្ធគ្រប់គ្រងស្តុក</p>
           </div>
 
           <script>
@@ -1805,12 +1839,19 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                           );
                         }
 
-                        return activeProducts.map(({ product, loaded, soldOnly, promosGiven, soldTotal, returned }) => {
-                          const balance = loaded - soldTotal - returned;
+                        return (() => {
+                          const hasAnySalesActivity = activeProducts.some(p => p.soldTotal > 0 || p.returned > 0);
+                          
+                          return activeProducts.map(({ product, loaded, soldOnly, promosGiven, soldTotal, returned }) => {
+                            const balance = loaded - soldTotal - returned;
 
-                          let badgeColorClass = "bg-emerald-50 text-emerald-700 border border-emerald-100";
-                          let statusText = `ត្រូវ ${balance}`;
-                          if (balance < 0) {
+                            let badgeColorClass = "bg-emerald-50 text-emerald-700 border border-emerald-100";
+                            let statusText = `ត្រូវ ${balance}`;
+                            
+                            if (!hasAnySalesActivity && balance > 0) {
+                            badgeColorClass = "text-slate-400";
+                            statusText = `-`;
+                          } else if (balance < 0) {
                             badgeColorClass = "bg-amber-50 text-amber-700 border border-amber-100";
                             statusText = `លើស ${Math.abs(balance)}`;
                           } else if (balance > 0) {
@@ -1837,6 +1878,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                             </tr>
                           );
                         });
+                        })();
                       })()}
                     </tbody>
                   </table>

@@ -129,6 +129,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [aiScannerUserId, setAiScannerUserId] = useState('');
   const [aiScannerType, setAiScannerType] = useState<TransactionType>('Stock Out');
   const [aiScannerImage, setAiScannerImage] = useState<string>('');
+  const [aiScannerFileName, setAiScannerFileName] = useState<string>('');
   const [aiScannerLoading, setAiScannerLoading] = useState(false);
   const [aiScannerResults, setAiScannerResults] = useState<{ id: string, productName: string, quantity: number, unit?: string, description?: string, matchedProductId?: string, actualProduct?: Product }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -136,6 +137,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [newឈ្មោះអ្នកប្រើប្រាស់, setNewឈ្មោះអ្នកប្រើប្រាស់] = useState('');
   const [newពាក្យសម្ងាត់, setNewពាក្យសម្ងាត់] = useState('');
   const [newUserRole, setNewUserRole] = useState<Role>('User');
+  const [newPhone, setNewPhone] = useState('');
+  const [newCarPlate, setNewCarPlate] = useState('');
+  const [newSalesArea, setNewSalesArea] = useState('');
   const [newProductName, setNewProductName] = useState('');
   const [newProductតម្លៃ, setNewProductតម្លៃ] = useState('');
   const [newProductPromoBuy, setNewProductPromoBuy] = useState('');
@@ -160,6 +164,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [editឈ្មោះអ្នកប្រើប្រាស់, setកែប្រែឈ្មោះអ្នកប្រើប្រាស់] = useState('');
   const [editUserRole, setEditUserRole] = useState<Role>('User');
   const [editពាក្យសម្ងាត់, setកែប្រែពាក្យសម្ងាត់] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editCarPlate, setEditCarPlate] = useState('');
+  const [editSalesArea, setEditSalesArea] = useState('');
   const [transactionToលុប, setTransactionToលុប] = useState<Transaction | null>(null);
   const [transactionToកែប្រែ, setTransactionToកែប្រែ] = useState<Transaction | null>(null);
   const [selectedTransactionDetail, setSelectedTransactionDetail] = useState<Transaction | null>(null);
@@ -793,6 +800,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       username: newឈ្មោះអ្នកប្រើប្រាស់,
       password: newពាក្យសម្ងាត់,
       role: finalRole,
+      phone: newPhone,
+      carPlate: newCarPlate,
+      salesArea: newSalesArea,
       createdAt: new Date().toISOString(),
       createdBy: currentUser.id
     };
@@ -802,6 +812,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       setNewឈ្មោះអ្នកប្រើប្រាស់('');
       setNewពាក្យសម្ងាត់('');
       setNewUserRole('User');
+      setNewPhone('');
+      setNewCarPlate('');
+      setNewSalesArea('');
       setIsបង្កើតUserModalOpen(false);
     } catch (error) {
       console.error("Error adding user: ", error);
@@ -953,7 +966,15 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       : (currentUser.role === 'Admin' ? 'User' : editUserRole);
 
     try {
-      await setDoc(doc(db, 'users', targetUser.id), { ...targetUser, username: editឈ្មោះអ្នកប្រើប្រាស់, password: editពាក្យសម្ងាត់, role: finalRole }, { merge: true });
+      await setDoc(doc(db, 'users', targetUser.id), { 
+        ...targetUser, 
+        username: editឈ្មោះអ្នកប្រើប្រាស់, 
+        password: editពាក្យសម្ងាត់, 
+        role: finalRole,
+        phone: editPhone,
+        carPlate: editCarPlate,
+        salesArea: editSalesArea
+      }, { merge: true });
       setUserToកែប្រែ(null);
       setSelectedUserDetail(null);
       setIsកែប្រែingUser(false);
@@ -1142,6 +1163,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const handleAIImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setAiScannerFileName(file.name);
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -1200,11 +1222,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       try {
         result = await response.json();
       } catch (e) {
-        throw new Error(`Server returned an invalid response (Status: ${response.status}). This might be because the image is too large.`);
+        throw new Error(`ម៉ាស៊ីនបម្រើបានបញ្ជូនការឆ្លើយតបមិនត្រឹមត្រូវ (ស្ថានភាព៖ ${response.status})។ នេះអាចបណ្តាលមកពីរូបភាពមានទំហំធំពេក។`);
       }
       
       if (!result.success) {
-        throw new Error(result.error || "Failed to extract");
+        throw new Error(result.error || "ការទាញយកទិន្នន័យបានបរាជ័យ");
       }
       
       const parsedItems = result.data.map((item: any) => {
@@ -1285,6 +1307,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       setIsAIScannerModalOpen(false);
       setAiScannerResults([]);
       setAiScannerImage('');
+      setAiScannerFileName('');
       setAiScannerUserId('');
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch(err: any) {
@@ -1452,6 +1475,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               padding-top: 8px;
             }
             @media print {
+              @page { margin: 15mm; }
               body {
                 padding: 0;
                 background-color: #ffffff;
@@ -1529,6 +1553,306 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         </body>
       </html>
     `);
+    printWindow.document.close();
+  };
+
+  const handleExportSelectedUserStockPDF = () => {
+    let dateRangeText = "ទាំងអស់";
+    if (filterTxStartDate) {
+      const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
+      dateRangeText = `${formatDate(filterTxStartDate)}`;
+    } else if (filterTxEndDate) {
+      const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
+      dateRangeText = `${formatDate(filterTxEndDate)}`;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("សូមអនុញ្ញាតឲ្យបើក Pop-up ដើម្បីទាញយក PDF");
+      return;
+    }
+
+    const renderUserPage = (user: User) => {
+      // Filter transactions for this specific user
+      const userTxs = managedTransactions.filter(t => {
+        const matchUser = t.userId === user.id;
+        const txDateStr = t.date ? t.date.split('T')[0] : '';
+        const matchStart = !filterTxStartDate || txDateStr >= filterTxStartDate;
+        const matchEnd = !filterTxEndDate || txDateStr <= filterTxEndDate;
+        return matchUser && matchStart && matchEnd;
+      });
+
+      // Group by product
+      const groupedMap: {
+        [productName: string]: {
+          productName: string;
+          stockOut: number;
+          stockSold: number;
+          stockPromo: number;
+          stockReturn: number;
+        }
+      } = {};
+
+      products.forEach(p => {
+        groupedMap[p.name] = { productName: p.name, stockOut: 0, stockSold: 0, stockPromo: 0, stockReturn: 0 };
+      });
+
+      userTxs.forEach(t => {
+        if (!groupedMap[t.productName]) {
+          groupedMap[t.productName] = { productName: t.productName, stockOut: 0, stockSold: 0, stockPromo: 0, stockReturn: 0 };
+        }
+        const group = groupedMap[t.productName];
+        if (t.type === 'Stock Out') group.stockOut += t.quantity;
+        else if (t.type === 'Stock Sold') { group.stockSold += t.quantity; group.stockPromo += (t.promoQty || 0); }
+        else if (t.type === 'Stock Return') group.stockReturn += t.quantity;
+      });
+
+      const userGrouped = Object.values(groupedMap)
+        .filter(p => p.stockOut > 0 || p.stockSold > 0 || p.stockPromo > 0 || p.stockReturn > 0)
+        .sort((a, b) => a.productName.localeCompare(b.productName));
+
+      if (userGrouped.length === 0) return ''; // No data for this user
+
+      const hasAnySalesActivity = userGrouped.some(p => (p.stockSold + p.stockPromo + p.stockReturn) > 0);
+
+      const rowsHtml = userGrouped.map(p => {
+        const diff = p.stockOut - (p.stockSold + p.stockPromo + p.stockReturn);
+        let statusText = `ត្រឹមត្រូវ`;
+        let statusColor = "color: #059669; background-color: #ecfdf5; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;"; 
+        
+        if (!hasAnySalesActivity && diff > 0) {
+          statusText = `-`;
+          statusColor = "color: #94a3b8; background-color: transparent; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;";
+        } else if (diff < 0) {
+          statusText = `លើស (${Math.abs(diff)})`;
+          statusColor = "color: #d97706; background-color: #fffbeb; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;"; 
+        } else if (diff > 0) {
+          statusText = `បាត់ (${diff})`;
+          statusColor = "color: #e11d48; background-color: #fff1f2; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;"; 
+        }
+
+        return `
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 12px; font-weight: bold; text-align: left; color: #1e293b;">${p.productName}</td>
+            <td style="padding: 12px; font-weight: bold; color: #e11d48; text-align: center;">${p.stockOut || '-'}</td>
+            <td style="padding: 12px; font-weight: bold; color: #059669; text-align: center;">${p.stockSold || '-'}</td>
+            <td style="padding: 12px; font-weight: bold; color: #f59e0b; text-align: center;">${p.stockPromo || '-'}</td>
+            <td style="padding: 12px; font-weight: bold; color: #4f46e5; text-align: center;">${p.stockReturn || '-'}</td>
+            <td style="padding: 12px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      return `
+        <div class="page-break">
+          <div class="custom-print-header">
+            <span>${currentUser?.username || 'Admin'}</span>
+            <span>Dealer Management System</span>
+          </div>
+          <div class="header">
+            <h1>របាយការណ៍ស្តុកសរុប</h1>
+            
+          </div>
+
+          <div class="meta-info">
+            <div class="meta-item"><span class="label">ឈ្មោះអ្នកលក់៖</span> <span class="value" style="color:#e11d48;">${user.username}</span></div>
+            <div class="meta-item"><span class="label">កាលបរិច្ឆេទ៖</span> <span class="value">${dateRangeText}</span></div>
+            <div class="meta-item"><span class="label">លេខទូរសព្ទ៖</span> <span class="value">${user.phone || '...............'}</span></div>
+            <div class="meta-item"><span class="label">ផ្លាកលេខឡាន៖</span> <span class="value">${user.carPlate || '...............'}</span></div>
+            <div class="meta-item"><span class="label">តំបន់លក់៖</span> <span class="value">${user.salesArea || '...............'}</span></div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left;">ឈ្មោះទំនិញ</th>
+                <th style="text-align: center;">ស្តុកឡើង</th>
+                <th style="text-align: center;">ស្តុកលក់</th>
+                <th style="text-align: center;">ស្តុកថែម</th>
+                <th style="text-align: center;">ស្តុកត្រឡប់</th>
+                <th style="text-align: right;">បញ្ជាក់</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <div class="footer">
+          </div>
+        </div>
+      `;
+    };
+
+    let pagesHtml = '';
+
+    if (filterTxUserId === 'all') {
+      const activeUsers = users.filter(u => u.role === 'User' || u.role === 'Admin' || u.role === 'Server');
+      const renderedPages = activeUsers.map(u => renderUserPage(u)).filter(html => html !== '');
+      
+      if (renderedPages.length === 0) {
+        printWindow.close();
+        alert("គ្មានទិន្នន័យសម្រាប់នាំចេញឡើយ");
+        return;
+      }
+      pagesHtml = renderedPages.join('');
+    } else {
+      const selectedUser = users.find(u => u.id === filterTxUserId);
+      if (selectedUser) {
+        pagesHtml = renderUserPage(selectedUser);
+      }
+      
+      if (!pagesHtml) {
+        printWindow.close();
+        alert("គ្មានទិន្នន័យសម្រាប់នាំចេញឡើយ");
+        return;
+      }
+    }
+
+    const documentContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>របាយការណ៍ស្តុកសរុប</title>
+          <meta charset="utf-8">
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;700&family=Inter:wght@400;500;700&display=swap');
+            body {
+              font-family: 'Kantumruy Pro', 'Inter', sans-serif;
+              color: #334155;
+              padding: 40px;
+              line-height: 1.5;
+            }
+            .page-break {
+              page-break-after: always;
+              margin-bottom: 60px;
+            }
+            .page-break:last-child {
+              page-break-after: auto;
+              margin-bottom: 0;
+            }
+            .custom-print-header {
+              display: flex;
+              justify-content: space-between;
+              font-size: 11px;
+              color: #64748b;
+              margin-bottom: 20px;
+              font-family: 'Inter', sans-serif;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 24px;
+              border-bottom: 2px solid #f1f5f9;
+              padding-bottom: 12px;
+            }
+            .header h1 {
+              font-size: 24px;
+              color: #0f172a;
+              margin: 0;
+              font-weight: 700;
+            }
+            .header p {
+              font-size: 14px;
+              color: #64748b;
+              margin: 0;
+            }
+            .meta-info {
+              display: grid;
+              grid-template-columns: repeat(5, 1fr);
+              gap: 16px;
+              margin-bottom: 30px;
+              font-size: 13px;
+              border: 1px solid #e2e8f0;
+              padding: 12px 16px;
+              border-radius: 8px;
+              background-color: #f8fafc;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .meta-item {
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              gap: 6px;
+            }
+            .meta-item span.label {
+              font-size: 11px;
+              color: #64748b;
+              font-weight: 500;
+              width: auto;
+            }
+            .meta-item span.value {
+              font-size: 13px;
+              font-weight: 700;
+              color: #1e293b;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th {
+              background-color: #f8fafc;
+              color: #475569;
+              font-weight: 700;
+              padding: 12px;
+              border-bottom: 2px solid #e2e8f0;
+              font-size: 13px;
+            }
+            td {
+              font-size: 13px;
+            }
+            .footer {
+              margin-top: 60px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-size: 12px;
+              color: #94a3b8;
+              font-weight: 500;
+            }
+            @media print {
+              @page { margin: 15mm; }
+              body {
+                padding: 0;
+              }
+              .no-print {
+                display: none;
+              }
+              .page-break {
+                margin-bottom: 0;
+                padding-bottom: 12px;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${pagesHtml}
+          
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(documentContent);
     printWindow.document.close();
   };
 
@@ -1676,6 +2000,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះអ្នកប្រើប្រាស់</th>
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">លេខសម្ងាត់</th>
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">តួនាទី</th>
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">លេខទូរសព្ទ</th>
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ផ្លាកលេខឡាន</th>
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">តំបន់លក់</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
@@ -1689,14 +2016,17 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       <td className="px-2 md:px-4 py-2 font-mono font-medium text-slate-500">{user.password}</td>
                       <td className="px-2 md:px-4 py-2">
                         <span className={`px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] md:text-xs font-bold ${user.role === 'Server' ? 'bg-indigo-100 text-indigo-700' : user.role === 'Admin' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                          {user.role}
+                          {user.role === 'Server' ? 'ប្រព័ន្ធមេ' : user.role === 'Admin' ? 'អ្នកគ្រប់គ្រង' : 'បុគ្គលិកលក់'}
                         </span>
                       </td>
+                      <td className="px-2 md:px-4 py-2 text-slate-600">{user.phone || '-'}</td>
+                      <td className="px-2 md:px-4 py-2 text-slate-600">{user.carPlate || '-'}</td>
+                      <td className="px-2 md:px-4 py-2 text-slate-600">{user.salesArea || '-'}</td>
                     </tr>
                   ))}
                   {managedUsers.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-6 py-12 text-center text-slate-400 font-medium">គ្មានទិន្នន័យ</td>
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-medium">គ្មានទិន្នន័យ</td>
                     </tr>
                   )}
                 </tbody>
@@ -1720,7 +2050,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     onChange={(e) => setSelectedAdminId(e.target.value)}
                     className="bg-slate-50 border border-slate-200 text-[10px] sm:text-xs font-bold text-slate-700 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
                   >
-                    <option value="all">បង្ហាញទាំងអស់ (All Admins)</option>
+                    <option value="all">បង្ហាញអ្នកគ្រប់គ្រងទាំងអស់</option>
                     {users.filter(u => u.role === 'Admin').map(u => (
                       <option key={u.id} value={u.id}>{u.username}</option>
                     ))}
@@ -1795,11 +2125,20 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
       {activeTab === 'transactions' && (
         <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
-          <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0 gap-2">
             <div>
               <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
               <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">របាយការណ៍ផ្ទៀងផ្ទាត់ និងតុល្យភាពស្តុកទំនិញ</p>
             </div>
+            <button
+              onClick={handleExportSelectedUserStockPDF}
+              className="flex items-center space-x-1.5 bg-rose-500 hover:bg-rose-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-rose-500/20 active:scale-95 transition cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              <span>នាំចេញ PDF</span>
+            </button>
           </div>
 
           {/* Filters for Transactions */}
@@ -1813,7 +2152,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
               >
                 <option value="all">ទាំងអស់</option>
-                {managedUsers.map(u => (
+                {(currentUser.role === 'Server'
+                  ? users.filter(u => u.role === 'User')
+                  : managedUsers.filter(u => u.role === 'User')
+                ).map(u => (
                   <option key={u.id} value={u.id}>{u.username}</option>
                 ))}
               </select>
@@ -1859,10 +2201,16 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
-                {txGroupedByProduct.map(p => {
-                  const diff = p.stockOut - (p.stockSold + p.stockPromo + p.stockReturn);
-                  let badge = null;
-                  if (diff === 0) {
+                {(() => {
+                  const hasAnySalesActivity = txGroupedByProduct.some(p => (p.stockSold + p.stockPromo + p.stockReturn) > 0);
+                  
+                  return txGroupedByProduct.map(p => {
+                    const diff = p.stockOut - (p.stockSold + p.stockPromo + p.stockReturn);
+                    let badge = null;
+                    
+                    if (!hasAnySalesActivity && diff > 0) {
+                    badge = <span className="inline-block px-2.5 py-1 text-xs font-black text-slate-400">-</span>;
+                  } else if (diff === 0) {
                     badge = <span className="inline-block px-2.5 py-1 text-xs font-black bg-emerald-50 text-emerald-600 rounded-lg">ត្រឹមត្រូវ</span>;
                   } else if (diff > 0) {
                     badge = <span className="inline-block px-2.5 py-1 text-xs font-black bg-rose-50 text-rose-600 rounded-lg">បាត់ ({diff})</span>;
@@ -1895,7 +2243,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       </td>
                     </tr>
                   )
-                })}
+                  });
+                })()}
                 {txGroupedByProduct.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-bold">គ្មានប្រតិបត្តិការទេ</td>
@@ -1975,7 +2324,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 >
                   <option value="all">ទាំងអស់</option>
-                  {managedUsers.map(u => (
+                  {(currentUser.role === 'Server'
+                    ? users.filter(u => u.role === 'User')
+                    : managedUsers.filter(u => u.role === 'User')
+                  ).map(u => (
                     <option key={u.id} value={u.id}>{u.username}</option>
                   ))}
                 </select>
@@ -2167,7 +2519,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 >
                   <option value="all">ទាំងអស់</option>
-                  {managedUsers.map(u => (
+                  {(currentUser.role === 'Server'
+                    ? users.filter(u => u.role === 'User')
+                    : managedUsers.filter(u => u.role === 'User')
+                  ).map(u => (
                     <option key={u.id} value={u.id}>{u.username}</option>
                   ))}
                 </select>
@@ -2357,7 +2712,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
                 >
                   <option value="all">ទាំងអស់</option>
-                  {managedUsers.map(u => (
+                  {(currentUser.role === 'Server'
+                    ? users.filter(u => u.role === 'User')
+                    : managedUsers.filter(u => u.role === 'User')
+                  ).map(u => (
                     <option key={u.id} value={u.id}>{u.username}</option>
                   ))}
                 </select>
@@ -3102,7 +3460,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAIScannerModalOpen(false)}></div>
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center shrink-0">
-              <h3 className="text-lg font-black text-slate-800">បញ្ចូលទិន្នន័យវៃឆ្លាត (AI Scanner)</h3>
+              <h3 className="text-lg font-black text-slate-800">បញ្ចូលទិន្នន័យវៃឆ្លាត (ស្កេន AI)</h3>
               <button onClick={() => setIsAIScannerModalOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
@@ -3118,7 +3476,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition outline-none font-bold text-slate-700 cursor-pointer"
                   >
                     <option value="">-- ជ្រើសរើសអ្នកប្រើប្រាស់ --</option>
-                    {users.filter(u => u.role !== 'Admin').map(u => (
+                    {(currentUser.role === 'Server'
+                      ? users.filter(u => u.role === 'User')
+                      : managedUsers.filter(u => u.role === 'User')
+                    ).map(u => (
                       <option key={u.id} value={u.id}>{u.username}</option>
                     ))}
                   </select>
@@ -3130,9 +3491,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     onChange={e => setAiScannerType(e.target.value as TransactionType)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition outline-none font-bold text-slate-700 cursor-pointer"
                   >
-                    <option value="Stock Out">ស្តុកឡើងឡាន (Stock Out)</option>
-                    <option value="Stock Sold">ស្តុកលក់ចេញ (Stock Sold)</option>
-                    <option value="Stock Return">ស្តុកត្រឡប់ (Stock Return)</option>
+                    <option value="Stock Out">ស្តុកឡើងឡាន</option>
+                    <option value="Stock Sold">ស្តុកលក់ចេញ</option>
+                    <option value="Stock Return">ស្តុកត្រឡប់</option>
                   </select>
                 </div>
               </div>
@@ -3140,19 +3501,31 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               <div className="space-y-1.5 mb-4">
                 <label className="text-xs font-bold text-slate-500 px-1">រូបភាពវិក្កយបត្រ ឬកំណត់ត្រា</label>
                 <div className="flex items-center gap-4">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    ref={fileInputRef}
-                    onChange={handleAIImageUpload}
-                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-sky-50 file:text-sky-600 hover:file:bg-sky-100 file:transition cursor-pointer border border-slate-200 rounded-2xl p-1"
-                  />
+                  <div className="flex-1 flex items-center justify-between border border-slate-200 rounded-2xl p-1 bg-slate-50">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer border border-transparent whitespace-nowrap"
+                    >
+                      ជ្រើសរើសរូបភាព
+                    </button>
+                    <span className="text-xs text-slate-500 font-bold px-4 truncate max-w-[180px] sm:max-w-[280px]">
+                      {aiScannerFileName || "មិនទាន់ជ្រើសរើសឯកសារឡើយ"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      ref={fileInputRef}
+                      onChange={handleAIImageUpload}
+                      className="hidden"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={handleAIScan}
                     disabled={aiScannerLoading || !aiScannerImage}
-                    className="bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-xs py-3 px-6 rounded-2xl transition shadow-md shadow-sky-500/20 whitespace-nowrap"
+                    className="bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-xs py-3 px-6 rounded-2xl transition shadow-md shadow-sky-500/20 whitespace-nowrap animate-in fade-in"
                   >
                     {aiScannerLoading ? 'កំពុងស្កេន...' : 'ស្កេនទាញយកទិន្នន័យ'}
                   </button>
@@ -3293,28 +3666,55 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       onClick={() => setNewUserRole('User')}
                       className={`flex-1 py-3.5 px-4 rounded-2xl text-xs md:text-sm font-bold transition border ${newUserRole === 'User' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                     >
-                      បុគ្គលិក (User)
+                      បុគ្គលិកលក់
                     </button>
                     <button
                       type="button"
                       onClick={() => setNewUserRole('Admin')}
                       className={`flex-1 py-3.5 px-4 rounded-2xl text-xs md:text-sm font-bold transition border ${newUserRole === 'Admin' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                     >
-                      អ្នកគ្រប់គ្រង (Admin)
+                      អ្នកគ្រប់គ្រង
                     </button>
                     <button
                       type="button"
                       onClick={() => setNewUserRole('Server')}
                       className={`flex-1 py-3.5 px-4 rounded-2xl text-xs md:text-sm font-bold transition border ${newUserRole === 'Server' ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                     >
-                      ម៉ាស៊ីនមេ (Server)
+                      ប្រព័ន្ធមេ
                     </button>
                   </div>
                 ) : (
                   <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-indigo-700">
-                    បុគ្គលិក (User)
+                    បុគ្គលិកលក់
                   </div>
                 )}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">លេខទូរសព្ទ (Phone)</label>
+                <input
+                  type="text"
+                  value={newPhone}
+                  onChange={e => setNewPhone(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ផ្លាកលេខឡាន (Car Plate)</label>
+                <input
+                  type="text"
+                  value={newCarPlate}
+                  onChange={e => setNewCarPlate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">តំបន់លក់ (Sales Area)</label>
+                <input
+                  type="text"
+                  value={newSalesArea}
+                  onChange={e => setNewSalesArea(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
+                />
               </div>
               <div className="pt-4 flex space-x-3">
                   <button
@@ -3857,28 +4257,55 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                         onClick={() => setEditUserRole('User')}
                         className={`flex-1 py-3 px-3 rounded-2xl text-[11px] md:text-xs font-bold transition border ${editUserRole === 'User' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                       >
-                        បុគ្គលិក (User)
+                        បុគ្គលិកលក់
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditUserRole('Admin')}
                         className={`flex-1 py-3 px-3 rounded-2xl text-[11px] md:text-xs font-bold transition border ${editUserRole === 'Admin' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                       >
-                        អ្នកគ្រប់គ្រង (Admin)
+                        អ្នកគ្រប់គ្រង
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditUserRole('Server')}
                         className={`flex-1 py-3 px-3 rounded-2xl text-[11px] md:text-xs font-bold transition border ${editUserRole === 'Server' ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                       >
-                        ម៉ាស៊ីនមេ (Server)
+                        ប្រព័ន្ធមេ
                       </button>
                     </div>
                   ) : (
                     <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-700">
-                      {selectedUserDetail.id === currentUser.id ? 'អ្នកគ្រប់គ្រង (Admin)' : 'បុគ្គលិក (User)'}
+                      {selectedUserDetail.id === currentUser.id ? 'អ្នកគ្រប់គ្រង' : 'បុគ្គលិកលក់'}
                     </div>
                   )}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">លេខទូរសព្ទ</label>
+                  <input
+                    type="text"
+                    value={editPhone}
+                    onChange={e => setEditPhone(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition outline-none font-bold text-slate-800"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ផ្លាកលេខឡាន</label>
+                  <input
+                    type="text"
+                    value={editCarPlate}
+                    onChange={e => setEditCarPlate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition outline-none font-bold text-slate-800"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">តំបន់លក់</label>
+                  <input
+                    type="text"
+                    value={editSalesArea}
+                    onChange={e => setEditSalesArea(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition outline-none font-bold text-slate-800"
+                  />
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-slate-100">
                   <button
@@ -3916,6 +4343,18 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       </span>
                     </span>
                   </div>
+                  <div className="grid grid-cols-3 gap-2 items-center">
+                    <span className="text-xs font-bold text-slate-400">លេខទូរសព្ទ</span>
+                    <span className="col-span-2 text-sm font-black text-slate-800">{selectedUserDetail.phone || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 items-center">
+                    <span className="text-xs font-bold text-slate-400">ផ្លាកលេខឡាន</span>
+                    <span className="col-span-2 text-sm font-black text-slate-800">{selectedUserDetail.carPlate || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 items-center">
+                    <span className="text-xs font-bold text-slate-400">តំបន់លក់</span>
+                    <span className="col-span-2 text-sm font-black text-slate-800">{selectedUserDetail.salesArea || '-'}</span>
+                  </div>
                   {currentUser.role === 'Server' && selectedUserDetail.role === 'Admin' && (
                     <button
                       type="button"
@@ -3935,8 +4374,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       onClick={() => {
                         setIsកែប្រែingUser(true);
                         setកែប្រែឈ្មោះអ្នកប្រើប្រាស់(selectedUserDetail.username);
-                        setកែប្រែពាក្យសម្ងាត់(selectedUserDetail.password);
+                        setកែប្រែពាក្យសម្ងាត់(selectedUserDetail.password || '');
                         setEditUserRole(selectedUserDetail.role);
+                        setEditPhone(selectedUserDetail.phone || '');
+                        setEditCarPlate(selectedUserDetail.carPlate || '');
+                        setEditSalesArea(selectedUserDetail.salesArea || '');
                       }}
                       className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
                     >
@@ -3992,6 +4434,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     <tr className="text-slate-400 text-[9px] sm:text-[10px] uppercase font-bold tracking-wider border-b border-slate-100">
                       <th className="py-2 px-3">ឈ្មោះអ្នកប្រើប្រាស់</th>
                       <th className="py-2 px-3">លេខសម្ងាត់</th>
+                      <th className="py-2 px-3">លេខទូរសព្ទ</th>
+                      <th className="py-2 px-3">ផ្លាកលេខឡាន</th>
+                      <th className="py-2 px-3">តំបន់លក់</th>
                       <th className="py-2 px-3 text-right">តួនាទី</th>
                     </tr>
                   </thead>
@@ -4000,6 +4445,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-2.5 px-3 font-bold text-slate-800">{u.username}</td>
                         <td className="py-2.5 px-3 font-mono font-medium text-slate-500">{u.password}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{u.phone || '-'}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{u.carPlate || '-'}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{u.salesArea || '-'}</td>
                         <td className="py-2.5 px-3 text-right">
                           <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 font-bold text-[10px]">
                             {u.role === 'Admin' ? 'Admin' : 'User'}
