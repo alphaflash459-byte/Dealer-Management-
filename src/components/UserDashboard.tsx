@@ -1431,12 +1431,13 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
       return `
         <tr style="border-bottom: 1px solid #e2e8f0;">
-          <td style="padding: 12px; font-weight: bold; text-align: left; color: #1e293b;">${product.name}</td>
-          <td style="padding: 12px; font-weight: bold; color: #e11d48; text-align: center;">${loaded || '-'}</td>
-          <td style="padding: 12px; font-weight: bold; color: #059669; text-align: center;">${soldOnly || '-'}</td>
-          <td style="padding: 12px; font-weight: bold; color: #f59e0b; text-align: center;">${promosGiven || '-'}</td>
-          <td style="padding: 12px; font-weight: bold; color: #4f46e5; text-align: center;">${returned || '-'}</td>
-          <td style="padding: 12px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
+          <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; text-align: left; color: #1e293b;">${product.name}</td>
+          <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #e11d48; text-align: center;">${loaded || ''}</td>
+          <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #059669; text-align: center;">${soldOnly || ''}</td>
+          <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #8b5cf6; text-align: center;"></td>
+          <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #f59e0b; text-align: center;">${promosGiven || ''}</td>
+          <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #4f46e5; text-align: center;">${returned || ''}</td>
+          <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
         </tr>
       `;
     }).join('');
@@ -1567,12 +1568,13 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           <table>
             <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
               <tr>
-                <th style="text-align: left;">ឈ្មោះទំនិញ</th>
-                <th style="text-align: center;">ឡើងឡាន</th>
-                <th style="text-align: center;">លក់ចេញ</th>
-                <th style="text-align: center;">ថែម</th>
-                <th style="text-align: center;">ត្រឡប់</th>
-                <th style="text-align: right;">ស្ថានភាពបញ្ជាក់</th>
+                <th style="border: 1px solid #e2e8f0; text-align: left;">ឈ្មោះទំនិញ</th>
+                <th style="border: 1px solid #e2e8f0; text-align: center;">ឡើងឡាន</th>
+                <th style="border: 1px solid #e2e8f0; text-align: center;">លក់ចេញ</th>
+                <th style="border: 1px solid #e2e8f0; text-align: center;">ប្ដូរប្រវិល</th>
+                <th style="border: 1px solid #e2e8f0; text-align: center;">ថែម</th>
+                <th style="border: 1px solid #e2e8f0; text-align: center;">ត្រឡប់</th>
+                <th style="border: 1px solid #e2e8f0; text-align: right;">ស្ថានភាពបញ្ជាក់</th>
               </tr>
             </thead>
             <tbody>

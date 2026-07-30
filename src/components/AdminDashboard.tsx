@@ -1645,12 +1645,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
         return `
           <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 12px; font-weight: bold; text-align: left; color: #1e293b;">${p.productName}</td>
-            <td style="padding: 12px; font-weight: bold; color: #e11d48; text-align: center;">${p.stockOut || '-'}</td>
-            <td style="padding: 12px; font-weight: bold; color: #059669; text-align: center;">${p.stockSold || '-'}</td>
-            <td style="padding: 12px; font-weight: bold; color: #f59e0b; text-align: center;">${p.stockPromo || '-'}</td>
-            <td style="padding: 12px; font-weight: bold; color: #4f46e5; text-align: center;">${p.stockReturn || '-'}</td>
-            <td style="padding: 12px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
+            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; text-align: left; color: #1e293b;">${p.productName}</td>
+            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #e11d48; text-align: center;">${p.stockOut || ''}</td>
+            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #059669; text-align: center;">${p.stockSold || ''}</td>
+            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #8b5cf6; text-align: center;"></td>
+            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #f59e0b; text-align: center;">${p.stockPromo || ''}</td>
+            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #4f46e5; text-align: center;">${p.stockReturn || ''}</td>
+            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
           </tr>
         `;
       }).join('');
@@ -1677,12 +1678,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           <table>
             <thead>
               <tr>
-                <th style="text-align: left;">ឈ្មោះទំនិញ</th>
-                <th style="text-align: center;">ស្តុកឡើង</th>
-                <th style="text-align: center;">ស្តុកលក់</th>
-                <th style="text-align: center;">ស្តុកថែម</th>
-                <th style="text-align: center;">ស្តុកត្រឡប់</th>
-                <th style="text-align: right;">បញ្ជាក់</th>
+                <th style="border: 1px solid #e2e8f0; text-align: left;">ឈ្មោះទំនិញ</th>
+                <th style="border: 1px solid #e2e8f0; text-align: center;">ស្តុកឡើង</th>
+                <th style="border: 1px solid #e2e8f0; text-align: center;">ស្តុកលក់</th>
+                <th style="border: 1px solid #e2e8f0; text-align: center;">ប្ដូរប្រវិល</th>
+                <th style="border: 1px solid #e2e8f0; text-align: center;">ស្តុកថែម</th>
+                <th style="border: 1px solid #e2e8f0; text-align: center;">ស្តុកត្រឡប់</th>
+                <th style="border: 1px solid #e2e8f0; text-align: right;">បញ្ជាក់</th>
               </tr>
             </thead>
             <tbody>
@@ -2195,6 +2197,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
                   <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-rose-500">ស្តុកឡើង</th>
                   <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-emerald-600">ស្តុកលក់</th>
+                  <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-violet-500">ប្ដូរប្រវិល</th>
                   <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-amber-500">ស្តុកថែម</th>
                   <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-indigo-600">ស្តុកត្រឡប់</th>
                   <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-600">បញ្ជាក់</th>
@@ -2231,6 +2234,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       </td>
                       <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-emerald-600">
                         {p.stockSold || '-'}
+                      </td>
+                      <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-violet-500">
+                        -
                       </td>
                       <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-amber-500">
                         {p.stockPromo || '-'}
