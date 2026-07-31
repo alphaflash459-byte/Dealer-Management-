@@ -1668,8 +1668,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
       `;
     }).join('');
     
-    const rowsPerPage = 18; const emptyRowCountUser = rowsPerPage - (activeProducts.length % rowsPerPage);
-    const emptyRowsHtmlUser = emptyRowCountUser === 18 && activeProducts.length > 0 ? '' : Array.from({ length: emptyRowCountUser }).map(() => `
+    const rowsPerPage = 19; const emptyRowCountUser = rowsPerPage - (activeProducts.length % rowsPerPage);
+    const emptyRowsHtmlUser = emptyRowCountUser === 19 && activeProducts.length > 0 ? '' : Array.from({ length: emptyRowCountUser }).map(() => `
       <tr style="border-bottom: 1px solid #000;">
         <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
         <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
@@ -1823,8 +1823,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             </tbody>
           </table>
 
-          <div class="footer">
-          </div>
+          
 
           <script>
             window.onload = function() {

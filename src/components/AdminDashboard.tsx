@@ -1898,8 +1898,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           </tr>
         `;
       }).join('');
-      const rowsPerPage = 18; const emptyRowCount = rowsPerPage - (userGrouped.length % rowsPerPage);
-      const emptyRowsHtml = emptyRowCount === 18 && userGrouped.length > 0 ? '' : Array.from({ length: emptyRowCount }).map(() => `
+      const rowsPerPage = 19; const emptyRowCount = rowsPerPage - (userGrouped.length % rowsPerPage);
+      const emptyRowsHtml = emptyRowCount === 19 && userGrouped.length > 0 ? '' : Array.from({ length: emptyRowCount }).map(() => `
         <tr style="border-bottom: 1px solid #000;">
           <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
           <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
@@ -1948,8 +1948,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             </tbody>
           </table>
 
-          <div class="footer">
-          </div>
+          
         </div>
       `;
     };
@@ -1997,7 +1996,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               page-break-after: always;
               margin-bottom: 60px;
             }
-            .page-break:last-child {
+            .page-break:last-of-type {
               page-break-after: auto;
               margin-bottom: 0;
             }
