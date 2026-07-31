@@ -125,9 +125,20 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [isបង្កើតUserModalOpen, setIsបង្កើតUserModalOpen] = useState(false);
   const [isបង្កើតProductModalOpen, setIsបង្កើតProductModalOpen] = useState(false);
   
+  const getNowLocalDateTime = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${mins}`;
+  };
+
   // AI Scanner State
   const [aiScannerUserId, setAiScannerUserId] = useState('');
   const [aiScannerType, setAiScannerType] = useState<TransactionType>('Stock Out');
+  const [aiScannerDate, setAiScannerDate] = useState<string>(getNowLocalDateTime());
   const [aiScannerImage, setAiScannerImage] = useState<string>('');
   const [aiScannerFileName, setAiScannerFileName] = useState<string>('');
   const [aiScannerLoading, setAiScannerLoading] = useState(false);
@@ -171,6 +182,21 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [transactionToកែប្រែ, setTransactionToកែប្រែ] = useState<Transaction | null>(null);
   const [selectedTransactionDetail, setSelectedTransactionDetail] = useState<Transaction | null>(null);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<any | null>(null);
+  const [editingFullInvoice, setEditingFullInvoice] = useState<{
+    id: string;
+    type: TransactionType;
+    originalItems: Transaction[];
+    customerName: string;
+    location: string;
+    date: string;
+    items: {
+      id?: string;
+      productName: string;
+      quantity: number | string;
+      price: number | string;
+      promoQty?: number | string;
+    }[];
+  } | null>(null);
   const [selectedRowItem, setSelectedRowItem] = useState<Transaction | null>(null);
   const [invoiceToលុប, setInvoiceToលុប] = useState<any | null>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<User | null>(null);
@@ -1160,6 +1186,206 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     }
   };
 
+  const handleStartEditFullInvoice = (inv: any) => {
+    if (!inv || !inv.items || inv.items.length === 0) return;
+    const firstItem = inv.items[0];
+    const txType: TransactionType = firstItem?.type || 'Stock Sold';
+
+    let formattedDate = '';
+    if (inv.date) {
+      const d = new Date(inv.date);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const mins = String(d.getMinutes()).padStart(2, '0');
+        formattedDate = `${year}-${month}-${day}T${hours}:${mins}`;
+      }
+    }
+
+    setEditingFullInvoice({
+      id: inv.id,
+      type: txType,
+      originalItems: [...inv.items],
+      customerName: inv.customerName || '',
+      location: inv.location || '',
+      date: formattedDate || new Date().toISOString().slice(0, 16),
+      items: inv.items.map((item: Transaction) => ({
+        id: item.id,
+        productName: item.productName,
+        quantity: item.quantity,
+        price: item.price !== undefined ? item.price : '',
+        promoQty: item.promoQty !== undefined ? item.promoQty : ''
+      }))
+    });
+  };
+
+  const handleSaveFullInvoice = async () => {
+    if (!editingFullInvoice) return;
+    if (editingFullInvoice.items.length === 0) {
+      alert("វិក្កយបត្រត្រូវតែមានយ៉ាងហោចណាស់ទំនិញមួយ");
+      return;
+    }
+
+    for (const item of editingFullInvoice.items) {
+      const qty = parseInt(String(item.quantity));
+      if (isNaN(qty) || qty <= 0) {
+        alert("សូមបញ្ចូលបរិមាណដែលត្រឹមត្រូវសម្រាប់ទំនិញទាំងអស់");
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      const note = editingFullInvoice.type === 'Stock Sold'
+        ? (editingFullInvoice.customerName && editingFullInvoice.location
+            ? `${editingFullInvoice.customerName} (${editingFullInvoice.location})`
+            : editingFullInvoice.customerName || editingFullInvoice.location || '')
+        : (editingFullInvoice.customerName || '');
+
+      const selectedDate = editingFullInvoice.date ? new Date(editingFullInvoice.date) : new Date();
+      const isoDate = selectedDate.toISOString();
+
+      const origItemIds = new Set(editingFullInvoice.originalItems.map(i => i.id));
+      const currentItemIds = new Set(editingFullInvoice.items.filter(i => i.id).map(i => i.id));
+
+      // 1. Delete removed items
+      const itemsToDelete = editingFullInvoice.originalItems.filter(i => !currentItemIds.has(i.id));
+      for (const oldItem of itemsToDelete) {
+        const product = products.find(p => p.name === oldItem.productName);
+        if (product) {
+          if (oldItem.type === 'Stock Out') {
+            await updateDoc(doc(db, 'products', product.id), {
+              warehouseStock: increment(oldItem.quantity)
+            });
+          } else if (oldItem.type === 'Stock Return') {
+            await updateDoc(doc(db, 'products', product.id), {
+              warehouseStock: increment(-oldItem.quantity)
+            });
+          }
+        }
+        await deleteDoc(doc(db, 'transactions', oldItem.id));
+      }
+
+      // 2. Update existing & create new items
+      for (const item of editingFullInvoice.items) {
+        const qty = parseInt(String(item.quantity)) || 0;
+        const pr = parseFloat(String(item.price));
+        const parsedPrice = isNaN(pr) ? undefined : pr;
+        const product = products.find(p => p.name === item.productName);
+
+        let promoQty: number | undefined = undefined;
+        if (product && editingFullInvoice.type === 'Stock Sold') {
+          promoQty = calculatePromoQtyWithតម្លៃCheck(product, qty, parsedPrice || 0);
+        }
+
+        if (item.id && origItemIds.has(item.id)) {
+          // Update
+          const origItem = editingFullInvoice.originalItems.find(i => i.id === item.id)!;
+
+          if (editingFullInvoice.type === 'Stock Out') {
+            const oldProduct = products.find(p => p.name === origItem.productName);
+            const newProduct = product;
+            if (oldProduct && newProduct && oldProduct.id === newProduct.id) {
+              const diff = origItem.quantity - qty;
+              if (diff !== 0) {
+                await updateDoc(doc(db, 'products', oldProduct.id), {
+                  warehouseStock: increment(diff)
+                });
+              }
+            } else {
+              if (oldProduct) {
+                await updateDoc(doc(db, 'products', oldProduct.id), {
+                  warehouseStock: increment(origItem.quantity)
+                });
+              }
+              if (newProduct) {
+                await updateDoc(doc(db, 'products', newProduct.id), {
+                  warehouseStock: increment(-qty)
+                });
+              }
+            }
+          } else if (editingFullInvoice.type === 'Stock Return') {
+            const oldProduct = products.find(p => p.name === origItem.productName);
+            const newProduct = product;
+            if (oldProduct && newProduct && oldProduct.id === newProduct.id) {
+              const diff = qty - origItem.quantity;
+              if (diff !== 0) {
+                await updateDoc(doc(db, 'products', oldProduct.id), {
+                  warehouseStock: increment(diff)
+                });
+              }
+            } else {
+              if (oldProduct) {
+                await updateDoc(doc(db, 'products', oldProduct.id), {
+                  warehouseStock: increment(-origItem.quantity)
+                });
+              }
+              if (newProduct) {
+                await updateDoc(doc(db, 'products', newProduct.id), {
+                  warehouseStock: increment(qty)
+                });
+              }
+            }
+          }
+
+          const updatedTx: Partial<Transaction> = {
+            productName: item.productName,
+            quantity: qty,
+            price: parsedPrice,
+            promoQty: promoQty && promoQty > 0 ? promoQty : undefined,
+            date: isoDate,
+            note: note
+          };
+          if (!promoQty || promoQty <= 0) {
+            (updatedTx as any).promoQty = deleteField();
+          }
+
+          await updateDoc(doc(db, 'transactions', item.id), cleanUndefined(updatedTx));
+        } else {
+          // Create new
+          const firstOrig = editingFullInvoice.originalItems[0];
+          const newTxId = `tx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+          const newTx: Transaction = {
+            id: newTxId,
+            userId: firstOrig?.userId || currentUser.id,
+            productName: item.productName,
+            quantity: qty,
+            type: editingFullInvoice.type,
+            price: parsedPrice,
+            promoQty: promoQty && promoQty > 0 ? promoQty : undefined,
+            date: isoDate,
+            note: note,
+            createdBy: firstOrig?.createdBy || currentUser.username
+          };
+
+          if (product) {
+            if (editingFullInvoice.type === 'Stock Out') {
+              await updateDoc(doc(db, 'products', product.id), {
+                warehouseStock: increment(-qty)
+              });
+            } else if (editingFullInvoice.type === 'Stock Return') {
+              await updateDoc(doc(db, 'products', product.id), {
+                warehouseStock: increment(qty)
+              });
+            }
+          }
+
+          await setDoc(doc(db, 'transactions', newTxId), cleanUndefined(newTx));
+        }
+      }
+
+      setEditingFullInvoice(null);
+      setSelectedInvoiceDetail(null);
+    } catch (error) {
+      console.error("Error updating full invoice: ", error);
+      alert("មានបញ្ហាក្នុងការកែប្រែវិក្កយបត្រ");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAIImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1267,8 +1493,17 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       if (!targetUser) throw new Error("រកមិនឃើញអ្នកប្រើប្រាស់");
 
       // Generate Invoice Date
-      const offsetDate = new Date();
-      offsetDate.setMinutes(offsetDate.getMinutes() - offsetDate.getTimezoneOffset());
+      let isoDate = new Date().toISOString();
+      if (aiScannerDate) {
+        const selectedD = new Date(aiScannerDate);
+        if (!isNaN(selectedD.getTime())) {
+          isoDate = selectedD.toISOString();
+        }
+      } else {
+        const offsetDate = new Date();
+        offsetDate.setMinutes(offsetDate.getMinutes() - offsetDate.getTimezoneOffset());
+        isoDate = offsetDate.toISOString();
+      }
 
       for (const item of aiScannerResults) {
         if (!item.productName || item.quantity <= 0) continue;
@@ -1279,7 +1514,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           type: aiScannerType,
           productName: item.productName,
           quantity: item.quantity,
-          date: offsetDate.toISOString(),
+          date: isoDate,
           note: item.description ? "AI Scan: " + item.description : "AI Scan"
         };
         
@@ -3473,13 +3708,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             </div>
             
             <div className="p-6 overflow-y-auto custom-scroll flex-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 px-1">អ្នកប្រើប្រាស់</label>
                   <select
                     value={aiScannerUserId}
                     onChange={e => setAiScannerUserId(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition outline-none font-bold text-slate-700 cursor-pointer"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs sm:text-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition outline-none font-bold text-slate-700 cursor-pointer"
                   >
                     <option value="">-- ជ្រើសរើសអ្នកប្រើប្រាស់ --</option>
                     {(currentUser.role === 'Server'
@@ -3495,12 +3730,21 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   <select
                     value={aiScannerType}
                     onChange={e => setAiScannerType(e.target.value as TransactionType)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition outline-none font-bold text-slate-700 cursor-pointer"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs sm:text-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition outline-none font-bold text-slate-700 cursor-pointer"
                   >
                     <option value="Stock Out">ស្តុកឡើងឡាន</option>
                     <option value="Stock Sold">ស្តុកលក់ចេញ</option>
                     <option value="Stock Return">ស្តុកត្រឡប់</option>
                   </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 px-1">កាលបរិច្ឆេទ & ម៉ោង</label>
+                  <input
+                    type="datetime-local"
+                    value={aiScannerDate || getNowLocalDateTime()}
+                    onChange={e => setAiScannerDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs sm:text-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition outline-none font-bold text-slate-700 cursor-pointer"
+                  />
                 </div>
               </div>
 
@@ -5236,12 +5480,22 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               })()}
             </div>
 
-            <div className="pt-4 border-t border-slate-100 flex space-x-3">
+            <div className="pt-4 border-t border-slate-100 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => handleStartEditFullInvoice(selectedInvoiceDetail)}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs sm:text-sm py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-lg shadow-amber-500/10 min-w-[120px]"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>កែប្រែវិក្កយបត្រ</span>
+              </button>
               <button
                 type="button"
                 disabled={loading}
                 onClick={() => setInvoiceToលុប(selectedInvoiceDetail)}
-                className="flex-1 hover:bg-rose-50 border border-rose-200 text-rose-600 font-bold text-[10px] sm:text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1 cursor-pointer"
+                className="flex-1 hover:bg-rose-50 border border-rose-200 text-rose-600 font-bold text-[10px] sm:text-xs py-2.5 rounded-2xl transition flex items-center justify-center space-x-1 cursor-pointer min-w-[120px]"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -5251,12 +5505,278 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               <button
                 type="button"
                 onClick={() => handleExportSingleInvoicePDF(selectedInvoiceDetail)}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-lg shadow-indigo-100"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm py-2.5 rounded-2xl transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-lg shadow-indigo-100 min-w-[120px]"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <span>បោះពុម្ពជា PDF</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Floating Modal for Editing Entire Invoice */}
+      {editingFullInvoice && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-5 sm:p-6 pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-800">
+                  កែប្រែវិក្កយបត្រទាំងមូល ({editingFullInvoice.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : editingFullInvoice.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : 'ស្តុកត្រឡប់'})
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  កែប្រែព័ត៌មានអតិថិជន កាលបរិច្ឆេទ និងទំនិញទាំងអស់ក្នុងវិក្កយបត្រនេះ
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingFullInvoice(null)}
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 custom-scroll">
+              {/* Header Metadata Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-100">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-500">
+                    {editingFullInvoice.type === 'Stock Sold' ? 'ឈ្មោះអតិថិជន' : editingFullInvoice.type === 'Stock Out' ? 'អ្នកប្រគល់' : 'អ្នកទទួល'}
+                  </label>
+                  <input
+                    type="text"
+                    value={editingFullInvoice.customerName}
+                    onChange={e => setEditingFullInvoice({ ...editingFullInvoice, customerName: e.target.value })}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-amber-400"
+                    placeholder="ឈ្មោះអតិថិជន..."
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-500">ទីតាំង</label>
+                  <input
+                    type="text"
+                    value={editingFullInvoice.location}
+                    onChange={e => setEditingFullInvoice({ ...editingFullInvoice, location: e.target.value })}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-amber-400"
+                    placeholder="ទីតាំង..."
+                  />
+                </div>
+
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-[11px] font-bold text-slate-500">កាលបរិច្ឆេទ & ម៉ោង</label>
+                  <input
+                    type="datetime-local"
+                    value={editingFullInvoice.date}
+                    onChange={e => setEditingFullInvoice({ ...editingFullInvoice, date: e.target.value })}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Item Rows Table */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                    បញ្ជីទំនិញក្នុងវិក្កយបត្រ ({editingFullInvoice.items.length})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const defaultProd = products[0];
+                      const newPrice = defaultProd?.price || 0;
+                      setEditingFullInvoice({
+                        ...editingFullInvoice,
+                        items: [
+                          ...editingFullInvoice.items,
+                          {
+                            productName: defaultProd?.name || '',
+                            quantity: 1,
+                            price: editingFullInvoice.type === 'Stock Sold' ? newPrice : '',
+                            promoQty: 0
+                          }
+                        ]
+                      });
+                    }}
+                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black rounded-xl transition flex items-center space-x-1 cursor-pointer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>+ ថែមទំនិញ</span>
+                  </button>
+                </div>
+
+                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+                  <div className="divide-y divide-slate-100">
+                    {editingFullInvoice.items.map((item, idx) => {
+                      const qtyNum = parseFloat(String(item.quantity)) || 0;
+                      const prNum = parseFloat(String(item.price)) || 0;
+                      const prodObj = products.find(p => p.name === item.productName);
+                      const computedPromo = (editingFullInvoice.type === 'Stock Sold' && prodObj)
+                        ? calculatePromoQtyWithតម្លៃCheck(prodObj, qtyNum, prNum)
+                        : 0;
+
+                      return (
+                        <div key={idx} className="p-3 bg-slate-50/50 hover:bg-slate-50 transition space-y-2">
+                          <div className="grid grid-cols-12 gap-2 items-center">
+                            {/* Product selection */}
+                            <div className="col-span-11 sm:col-span-5">
+                              <label className="text-[10px] font-bold text-slate-400 block sm:hidden">ឈ្មោះទំនិញ</label>
+                              <select
+                                value={item.productName}
+                                onChange={e => {
+                                  const newProdName = e.target.value;
+                                  const newProd = products.find(p => p.name === newProdName);
+                                  const newPrice = newProd?.price !== undefined ? newProd.price : item.price;
+                                  const updated = [...editingFullInvoice.items];
+                                  updated[idx] = {
+                                    ...updated[idx],
+                                    productName: newProdName,
+                                    price: editingFullInvoice.type === 'Stock Sold' ? newPrice : item.price
+                                  };
+                                  setEditingFullInvoice({ ...editingFullInvoice, items: updated });
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-amber-400"
+                              >
+                                {products.map(p => (
+                                  <option key={p.id} value={p.name}>
+                                    {p.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Quantity */}
+                            <div className="col-span-6 sm:col-span-2">
+                              <label className="text-[10px] font-bold text-slate-400 block sm:hidden">បរិមាណ</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={e => {
+                                  const updated = [...editingFullInvoice.items];
+                                  updated[idx] = { ...updated[idx], quantity: e.target.value };
+                                  setEditingFullInvoice({ ...editingFullInvoice, items: updated });
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-black text-center text-slate-800 outline-none focus:border-amber-400"
+                                placeholder="ចំនួន"
+                              />
+                            </div>
+
+                            {/* Price (if Stock Sold) */}
+                            {editingFullInvoice.type === 'Stock Sold' ? (
+                              <div className="col-span-5 sm:col-span-2">
+                                <label className="text-[10px] font-bold text-slate-400 block sm:hidden">តម្លៃ ($)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={item.price}
+                                  onChange={e => {
+                                    const updated = [...editingFullInvoice.items];
+                                    updated[idx] = { ...updated[idx], price: e.target.value };
+                                    setEditingFullInvoice({ ...editingFullInvoice, items: updated });
+                                  }}
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-right text-slate-800 outline-none focus:border-amber-400"
+                                  placeholder="តម្លៃ"
+                                />
+                              </div>
+                            ) : (
+                              <div className="col-span-5 sm:col-span-4" />
+                            )}
+
+                            {/* Subtotal & Delete button */}
+                            <div className="col-span-12 sm:col-span-3 flex items-center justify-between sm:justify-end space-x-2 pt-1 sm:pt-0">
+                              {editingFullInvoice.type === 'Stock Sold' && (
+                                <div className="text-right">
+                                  <span className="text-[10px] text-slate-400 sm:hidden">សរុបរង: </span>
+                                  <span className="text-xs font-black text-indigo-600">
+                                    ${(qtyNum * prNum).toFixed(2)}
+                                  </span>
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (editingFullInvoice.items.length <= 1) {
+                                    alert("វិក្កយបត្រត្រូវតែមានយ៉ាងហោចណាស់ទំនិញមួយ");
+                                    return;
+                                  }
+                                  const updated = editingFullInvoice.items.filter((_, i) => i !== idx);
+                                  setEditingFullInvoice({ ...editingFullInvoice, items: updated });
+                                }}
+                                className="p-1.5 hover:bg-rose-100 text-rose-500 rounded-lg transition cursor-pointer ml-auto"
+                                title="លុបទំនិញនេះ"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Promo display if computedPromo > 0 */}
+                          {computedPromo > 0 && (
+                            <div className="text-[10px] font-black text-emerald-600 pl-1">
+                              🎁 ថែមឥតគិតថ្លៃ: +{computedPromo}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Total Cost Summary */}
+              {editingFullInvoice.type === 'Stock Sold' && (() => {
+                const grandTotal = editingFullInvoice.items.reduce((sum, item) => {
+                  const q = parseFloat(String(item.quantity)) || 0;
+                  const p = parseFloat(String(item.price)) || 0;
+                  return sum + (q * p);
+                }, 0);
+                return (
+                  <div className="flex justify-between items-center bg-indigo-50 border border-indigo-100 p-3.5 rounded-2xl">
+                    <span className="text-xs font-black text-indigo-900">តម្លៃសរុបវិក្កយបត្រ</span>
+                    <span className="text-lg font-black text-indigo-600">${grandTotal.toFixed(2)}</span>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-6 pt-3 border-t border-slate-100 flex space-x-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setEditingFullInvoice(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm py-2.5 rounded-2xl transition cursor-pointer"
+              >
+                បោះបង់
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleSaveFullInvoice}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs sm:text-sm py-2.5 rounded-2xl shadow-lg shadow-amber-500/20 transition disabled:opacity-70 cursor-pointer flex items-center justify-center space-x-1.5"
+              >
+                {loading ? (
+                  <span>កំពុងរក្សាទុក...</span>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>រក្សាទុកវិក្កយបត្រ</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

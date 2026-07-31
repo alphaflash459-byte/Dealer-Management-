@@ -43,6 +43,7 @@ export interface Transaction {
   price?: number;
   date: string;
   note?: string;
+  createdBy?: string;
 }
 
 export interface StockOrder {
