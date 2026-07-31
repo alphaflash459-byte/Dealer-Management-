@@ -394,7 +394,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               padding-top: 8px;
             }
             @media print {
-              @page { margin: 5mm 15mm; }
+              @page { size: A4 landscape; margin: 10mm; }
               body {
                 padding: 0;
                 background-color: #ffffff;
@@ -1563,7 +1563,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               page-break-after: always;
             }
             @media print {
-              @page { margin: 5mm 15mm; }
+              @page { size: A4 landscape; margin: 10mm; }
               body {
                 padding: 0;
                 background-color: #ffffff;
@@ -1667,6 +1667,20 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
         </tr>
       `;
     }).join('');
+    
+    const rowsPerPage = 18; const emptyRowCountUser = rowsPerPage - (activeProducts.length % rowsPerPage);
+    const emptyRowsHtmlUser = emptyRowCountUser === 18 && activeProducts.length > 0 ? '' : Array.from({ length: emptyRowCountUser }).map(() => `
+      <tr style="border-bottom: 1px solid #000;">
+        <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+      </tr>
+    `).join('');
+    const finalRowsHtmlUser = rowsHtml + emptyRowsHtmlUser;
 
     const documentContent = `
       <!DOCTYPE html>
@@ -1764,7 +1778,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               font-weight: 500;
             }
             @media print {
-              @page { margin: 5mm 15mm; }
+              @page { size: A4 landscape; margin: 10mm; }
               body {
                 padding: 0;
               }
@@ -1805,7 +1819,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               </tr>
             </thead>
             <tbody>
-              ${rowsHtml}
+              ${finalRowsHtmlUser}
             </tbody>
           </table>
 

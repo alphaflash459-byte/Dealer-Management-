@@ -1718,7 +1718,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               padding-top: 8px;
             }
             @media print {
-              @page { margin: 5mm 15mm; }
+              @page { size: A4 landscape; margin: 10mm; }
               body {
                 padding: 0;
                 background-color: #ffffff;
@@ -1898,6 +1898,19 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           </tr>
         `;
       }).join('');
+      const rowsPerPage = 18; const emptyRowCount = rowsPerPage - (userGrouped.length % rowsPerPage);
+      const emptyRowsHtml = emptyRowCount === 18 && userGrouped.length > 0 ? '' : Array.from({ length: emptyRowCount }).map(() => `
+        <tr style="border-bottom: 1px solid #000;">
+          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+        </tr>
+      `).join('');
+      const finalRowsHtml = rowsHtml + emptyRowsHtml;
 
       return `
         <div class="page-break">
@@ -1931,7 +1944,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               </tr>
             </thead>
             <tbody>
-              ${rowsHtml}
+              ${finalRowsHtml}
             </tbody>
           </table>
 
@@ -2070,7 +2083,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               font-weight: 500;
             }
             @media print {
-              @page { margin: 5mm 15mm; }
+              @page { size: A4 landscape; margin: 10mm; }
               body {
                 padding: 0;
               }
