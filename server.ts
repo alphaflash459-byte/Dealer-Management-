@@ -32,7 +32,7 @@ async function startServer() {
       const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
       
       const availableProductsStr = productNames && productNames.length > 0 
-        ? `\nHere is the list of available product names in the system:\n[${productNames.join(', ')}]\nWhen extracting the product name, please map it to the closest match from this list. If there is no good match, use the original text.`
+        ? `\nHere is the exact list of available product names in the system:\n[${productNames.join(', ')}]\nCRITICAL: When extracting the product name, please map it EXACTLY to a name from this list. If the note says 'CBL ORD', you MUST map it to 'CBL ORD' (if it exists in the list) and NOT just 'CBL'. Pay close attention to extra words or suffixes. If there is no good match, use the original text.`
         : "";
 
       const prompt = `You are an AI assistant that extracts handwritten or printed notes about inventory transactions. The note could be in Khmer or English.
@@ -46,38 +46,57 @@ Ensure the output is ONLY a valid JSON array matching the structure.
 If you can't read an item clearly, skip it or put your best guess.
 Do not wrap the JSON in markdown codeblocks like \`\`\`json. Return raw JSON.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: base64Data
-              }
-            },
-            { text: prompt }
-          ]
-        },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                productName: { type: Type.STRING },
-                quantity: { type: Type.NUMBER },
-                unit: { type: Type.STRING },
-                description: { type: Type.STRING }
-              },
-              required: ["productName", "quantity"]
-            }
-          }
-        }
-      });
+      let response;
+      let retries = 3;
       
-      const textResponse = response.text || "[]";
+      while (retries > 0) {
+        try {
+          response = await ai.models.generateContent({
+            model: "gemini-3.6-flash",
+            contents: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: "image/jpeg",
+                    data: base64Data
+                  }
+                },
+                { text: prompt }
+              ]
+            },
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    productName: { type: Type.STRING },
+                    quantity: { type: Type.NUMBER },
+                    unit: { type: Type.STRING },
+                    description: { type: Type.STRING }
+                  },
+                  required: ["productName", "quantity"]
+                }
+              }
+            }
+          });
+          break; // Success, exit retry loop
+        } catch (e: any) {
+          retries--;
+          console.error(`Gemini API Error (retries left: ${retries}):`, e.message);
+          
+          // Check if it's a 503 Unavailable error or if we've run out of retries
+          const isUnavailable = e.status === "UNAVAILABLE" || (e.message && e.message.includes("503"));
+          if (retries === 0 || !isUnavailable) {
+            throw e;
+          }
+          // Wait 2 seconds before retrying
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      
+      const textResponse = response?.text || "[]";
       let parsed = [];
       try {
         parsed = JSON.parse(textResponse);

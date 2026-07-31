@@ -125,20 +125,18 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [isបង្កើតUserModalOpen, setIsបង្កើតUserModalOpen] = useState(false);
   const [isបង្កើតProductModalOpen, setIsបង្កើតProductModalOpen] = useState(false);
   
-  const getNowLocalDateTime = () => {
+  const getNowLocalDate = () => {
     const d = new Date();
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    const hours = String(d.getHours()).padStart(2, '0');
-    const mins = String(d.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${mins}`;
+    return `${year}-${month}-${day}`;
   };
 
   // AI Scanner State
   const [aiScannerUserId, setAiScannerUserId] = useState('');
   const [aiScannerType, setAiScannerType] = useState<TransactionType>('Stock Out');
-  const [aiScannerDate, setAiScannerDate] = useState<string>(getNowLocalDateTime());
+  const [aiScannerDate, setAiScannerDate] = useState<string>(getNowLocalDate());
   const [aiScannerImage, setAiScannerImage] = useState<string>('');
   const [aiScannerFileName, setAiScannerFileName] = useState<string>('');
   const [aiScannerLoading, setAiScannerLoading] = useState(false);
@@ -264,6 +262,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
   // Warehouse Stock states
   const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
+  const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
+  const [quickAddItems, setQuickAddItems] = useState<{productName: string, quantity: string}[]>([]);
   const [isកែប្រែWarehouseStockModalOpen, setIsកែប្រែWarehouseStockModalOpen] = useState(false);
   const [productToកែប្រែWarehouseStock, setProductToកែប្រែWarehouseStock] = useState<Product | null>(null);
   const [editWarehouseStockVal, setកែប្រែWarehouseStockVal] = useState('');
@@ -1457,7 +1457,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       
       const parsedItems = result.data.map((item: any) => {
         // match product
-        const matchedProduct = products.find(p => p.name.toLowerCase().includes((item.productName || '').toLowerCase()) || (item.productName || '').toLowerCase().includes(p.name.toLowerCase()));
+        const searchName = (item.productName || '').trim().toLowerCase();
+        let matchedProduct = products.find(p => p.name.toLowerCase() === searchName);
+        if (!matchedProduct) {
+          const sortedProducts = [...products].sort((a, b) => b.name.length - a.name.length);
+          matchedProduct = sortedProducts.find(p => p.name.toLowerCase().includes(searchName) || searchName.includes(p.name.toLowerCase()));
+        }
         return {
           id: Date.now().toString() + Math.random().toString(),
           productName: matchedProduct ? matchedProduct.name : item.productName || '',
@@ -1580,14 +1585,14 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       ` : '';
 
       return `
-        <tr style="border-bottom: 1px solid #f1f5f9;">
-          <td style="padding: 12px 16px; text-align: left;">
+        <tr style="border-bottom: 1px solid #000;">
+          <td style="padding: 4px 8px; text-align: left;">
             <div style="font-weight: 700; color: #1e293b; font-size: 13px;">${item.productName}</div>
             ${promoInfo}
           </td>
-          <td style="padding: 12px 16px; text-align: center; font-weight: 800; color: #059669; font-size: 13px;">${item.quantity}</td>
-          <td style="padding: 12px 16px; text-align: right; color: #475569; font-size: 13px;">$${item.price !== undefined ? item.price.toFixed(2) : '0.00'}</td>
-          <td style="padding: 12px 16px; text-align: right; font-weight: 800; color: #4f46e5; font-size: 13px;">$${subtotal.toFixed(2)}</td>
+          <td style="padding: 4px 8px; text-align: center; font-weight: 800; color: #059669; font-size: 13px;">${item.quantity}</td>
+          <td style="padding: 4px 8px; text-align: right; color: #475569; font-size: 13px;">$${item.price !== undefined ? item.price.toFixed(2) : '0.00'}</td>
+          <td style="padding: 4px 8px; text-align: right; font-weight: 800; color: #4f46e5; font-size: 13px;">$${subtotal.toFixed(2)}</td>
         </tr>
       `;
     }).join('');
@@ -1597,9 +1602,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         <head>
           <title>វិក្កយបត្រ - ${invoice.customerName}</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Kantumruy+Pro:wght@400;500;700;900&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Moul&family=Inter:wght@400;500;700;900&family=Kantumruy+Pro:wght@400;500;700;900&display=swap');
             body {
-              font-family: 'Kantumruy Pro', 'Inter', sans-serif;
+              font-family: 'Khmer OS Muol Light', 'Moul', 'Kantumruy Pro', 'Inter', sans-serif;
               color: #1e293b;
               margin: 0;
               padding: 40px;
@@ -1610,7 +1615,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             .invoice-card {
               max-width: 800px;
               margin: 0 auto;
-              border: 1px solid #e2e8f0;
+              border: 1px solid #000 !important;
               border-radius: 24px;
               padding: 40px;
               box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
@@ -1619,7 +1624,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               display: flex;
               justify-content: space-between;
               align-items: center;
-              border-bottom: 2px solid #f1f5f9;
+              border-bottom: 1px solid #000;
               padding-bottom: 24px;
               margin-bottom: 24px;
             }
@@ -1639,7 +1644,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               background-color: #f8fafc;
               padding: 20px;
               border-radius: 20px;
-              border: 1px solid #e2e8f0;
+              border: 1px solid #000 !important;
               margin-bottom: 30px;
             }
             .info-row {
@@ -1656,6 +1661,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               font-weight: 800;
               color: #0f172a;
             }
+            table, th, td {
+              border: 1px solid #000 !important;
+            }
             table {
               width: 100%;
               border-collapse: collapse;
@@ -1667,8 +1675,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               font-size: 11px;
               font-weight: 700;
               text-transform: uppercase;
-              padding: 12px 16px;
-              border-bottom: 2px solid #e2e8f0;
+              padding: 4px 8px;
+              border-bottom: 1px solid #000;
             }
             .total-row {
               display: flex;
@@ -1696,7 +1704,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               justify-content: space-between;
               font-size: 12px;
               color: #64748b;
-              border-top: 1px dashed #e2e8f0;
+              border-top: 1px dashed #000;
               padding-top: 30px;
               font-weight: 500;
             }
@@ -1710,7 +1718,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               padding-top: 8px;
             }
             @media print {
-              @page { margin: 15mm; }
+              @page { margin: 5mm 15mm; }
               body {
                 padding: 0;
                 background-color: #ffffff;
@@ -1879,14 +1887,14 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         }
 
         return `
-          <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; text-align: left; color: #1e293b;">${p.productName}</td>
-            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #e11d48; text-align: center;">${p.stockOut || ''}</td>
-            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #059669; text-align: center;">${p.stockSold || ''}</td>
-            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #8b5cf6; text-align: center;"></td>
-            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #f59e0b; text-align: center;">${p.stockPromo || ''}</td>
-            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; color: #4f46e5; text-align: center;">${p.stockReturn || ''}</td>
-            <td style="border: 1px solid #e2e8f0; padding: 12px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
+          <tr style="border-bottom: 1px solid #000;">
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${p.productName}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #e11d48; text-align: center;">${p.stockOut || ''}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #059669; text-align: center;">${p.stockSold || ''}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #8b5cf6; text-align: center;"></td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #f59e0b; text-align: center;">${p.stockPromo || ''}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #4f46e5; text-align: center;">${p.stockReturn || ''}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
           </tr>
         `;
       }).join('');
@@ -1898,7 +1906,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             <span>Dealer Management System</span>
           </div>
           <div class="header">
-            <h1>របាយការណ៍ស្តុកសរុប</h1>
+            <h1>របាយការណ៍ស្តុកលក់ប្រចាំថ្ងៃ</h1>
             
           </div>
 
@@ -1913,13 +1921,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           <table>
             <thead>
               <tr>
-                <th style="border: 1px solid #e2e8f0; text-align: left;">ឈ្មោះទំនិញ</th>
-                <th style="border: 1px solid #e2e8f0; text-align: center;">ស្តុកឡើង</th>
-                <th style="border: 1px solid #e2e8f0; text-align: center;">ស្តុកលក់</th>
-                <th style="border: 1px solid #e2e8f0; text-align: center;">ប្ដូរប្រវិល</th>
-                <th style="border: 1px solid #e2e8f0; text-align: center;">ស្តុកថែម</th>
-                <th style="border: 1px solid #e2e8f0; text-align: center;">ស្តុកត្រឡប់</th>
-                <th style="border: 1px solid #e2e8f0; text-align: right;">បញ្ជាក់</th>
+                <th style="border: 1px solid #000; text-align: left;">ឈ្មោះទំនិញ</th>
+                <th style="border: 1px solid #000; text-align: center;">ស្តុកឡើង</th>
+                <th style="border: 1px solid #000; text-align: center;">ស្តុកលក់</th>
+                <th style="border: 1px solid #000; text-align: center;">ប្ដូរប្រវិល</th>
+                <th style="border: 1px solid #000; text-align: center;">ស្តុកថែម</th>
+                <th style="border: 1px solid #000; text-align: center;">ស្តុកត្រឡប់</th>
+                <th style="border: 1px solid #000; text-align: right;">បញ្ជាក់</th>
               </tr>
             </thead>
             <tbody>
@@ -1962,12 +1970,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       <!DOCTYPE html>
       <html>
         <head>
-          <title>របាយការណ៍ស្តុកសរុប</title>
+          <title>របាយការណ៍ស្តុកលក់ប្រចាំថ្ងៃ</title>
           <meta charset="utf-8">
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;700&family=Inter:wght@400;500;700&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Moul&family=Inter:wght@400;500;700;900&family=Kantumruy+Pro:wght@400;500;700;900&display=swap');
             body {
-              font-family: 'Kantumruy Pro', 'Inter', sans-serif;
+              font-family: 'Khmer OS Muol Light', 'Moul', 'Kantumruy Pro', 'Inter', sans-serif;
               color: #334155;
               padding: 40px;
               line-height: 1.5;
@@ -1990,9 +1998,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             }
             .header {
               text-align: center;
-              margin-bottom: 24px;
-              border-bottom: 2px solid #f1f5f9;
-              padding-bottom: 12px;
+              margin-bottom: 8px;
             }
             .header h1 {
               font-size: 24px;
@@ -2009,11 +2015,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               display: grid;
               grid-template-columns: repeat(5, 1fr);
               gap: 16px;
-              margin-bottom: 30px;
+              margin-bottom: -1px;
               font-size: 13px;
-              border: 1px solid #e2e8f0;
-              padding: 12px 16px;
-              border-radius: 8px;
+              border: 1px solid #000 !important;
+              padding: 4px 8px;
+              border-radius: 8px 8px 0 0;
               background-color: #f8fafc;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
@@ -2035,17 +2041,20 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               font-weight: 700;
               color: #1e293b;
             }
+            table, th, td {
+              border: 1px solid #000 !important;
+            }
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-top: 20px;
+              margin-top: 0;
             }
             th {
               background-color: #f8fafc;
               color: #475569;
               font-weight: 700;
-              padding: 12px;
-              border-bottom: 2px solid #e2e8f0;
+              padding: 4px 8px;
+              border-bottom: 1px solid #000;
               font-size: 13px;
             }
             td {
@@ -2061,7 +2070,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               font-weight: 500;
             }
             @media print {
-              @page { margin: 15mm; }
+              @page { margin: 5mm 15mm; }
               body {
                 padding: 0;
               }
@@ -3464,9 +3473,25 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 {/* Multi-Stock List Selection */}
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">
-                      ជ្រើសរើសទំនិញ
-                    </label>
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[11px] md:text-xs font-bold text-slate-500">
+                        ជ្រើសរើសទំនិញ
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const existingNames = new Set(stockInItems.map(i => i.productName));
+                          const newItems = products
+                            .filter(p => !existingNames.has(p.name))
+                            .map(p => ({ productName: p.name, quantity: '' }));
+                          setQuickAddItems(newItems);
+                          setIsQuickAddModalOpen(true);
+                        }}
+                        className="text-[10px] sm:text-[11px] font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg transition active:scale-95"
+                      >
+                        + បញ្ចូលទំនិញទាំងអស់រហ័ស
+                      </button>
+                    </div>
                     <div className="relative">
                       <select
                         onChange={handleProductSelectToStockIn}
@@ -3570,6 +3595,76 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 </button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Quick Add Modal */}
+      {isQuickAddModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">បញ្ចូលទំនិញរហ័ស</h3>
+                <p className="text-xs text-slate-500 font-medium">សូមបញ្ចូលចំនួនសម្រាប់ទំនិញនីមួយៗ</p>
+              </div>
+              <button 
+                onClick={() => setIsQuickAddModalOpen(false)} 
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto p-4 custom-scroll space-y-2">
+              {quickAddItems.length === 0 ? (
+                <div className="text-center text-slate-400 font-medium py-8 text-sm">
+                  គ្មានទំនិញបន្ថែមទេ
+                </div>
+              ) : (
+                quickAddItems.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <span className="font-bold text-slate-700 text-xs sm:text-sm">{item.productName}</span>
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={e => {
+                        const copy = [...quickAddItems];
+                        copy[index].quantity = e.target.value;
+                        setQuickAddItems(copy);
+                      }}
+                      className="w-24 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-center text-sm focus:border-sky-400 outline-none font-bold text-slate-800"
+                      placeholder="ចំនួន"
+                      min="1"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center space-x-3 shrink-0 rounded-b-3xl">
+              <button
+                type="button"
+                onClick={() => setIsQuickAddModalOpen(false)}
+                className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+              >
+                បោះបង់
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const validItems = quickAddItems.filter(item => item.quantity && Number(item.quantity) > 0);
+                  setStockInItems([...stockInItems, ...validItems]);
+                  setIsQuickAddModalOpen(false);
+                }}
+                className="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm py-3 rounded-2xl transition shadow-lg shadow-sky-600/20 cursor-pointer"
+              >
+                បញ្ជាក់
+              </button>
+            </div>
           </div>
         </div>,
         document.body
@@ -3738,10 +3833,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 px-1">កាលបរិច្ឆេទ & ម៉ោង</label>
+                  <label className="text-xs font-bold text-slate-500 px-1">កាលបរិច្ឆេទ</label>
                   <input
-                    type="datetime-local"
-                    value={aiScannerDate || getNowLocalDateTime()}
+                    type="date"
+                    value={aiScannerDate || getNowLocalDate()}
                     onChange={e => setAiScannerDate(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 text-xs sm:text-sm focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition outline-none font-bold text-slate-700 cursor-pointer"
                   />
@@ -3750,16 +3845,16 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
               <div className="space-y-1.5 mb-4">
                 <label className="text-xs font-bold text-slate-500 px-1">រូបភាពវិក្កយបត្រ ឬកំណត់ត្រា</label>
-                <div className="flex items-center gap-4">
-                  <div className="flex-1 flex items-center justify-between border border-slate-200 rounded-2xl p-1 bg-slate-50">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full">
+                  <div className="flex-1 flex items-center justify-between border border-slate-200 rounded-2xl p-1 bg-slate-50 min-w-0">
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer border border-transparent whitespace-nowrap"
+                      className="bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer border border-transparent whitespace-nowrap shrink-0"
                     >
                       ជ្រើសរើសរូបភាព
                     </button>
-                    <span className="text-xs text-slate-500 font-bold px-4 truncate max-w-[180px] sm:max-w-[280px]">
+                    <span className="text-[11px] sm:text-xs text-slate-500 font-bold px-3 sm:px-4 truncate flex-1 text-right min-w-0">
                       {aiScannerFileName || "មិនទាន់ជ្រើសរើសឯកសារឡើយ"}
                     </span>
                     <input
@@ -3775,7 +3870,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     type="button"
                     onClick={handleAIScan}
                     disabled={aiScannerLoading || !aiScannerImage}
-                    className="bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-xs py-3 px-6 rounded-2xl transition shadow-md shadow-sky-500/20 whitespace-nowrap animate-in fade-in"
+                    className="bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-xs py-3.5 sm:py-3 px-6 rounded-2xl transition shadow-md shadow-sky-500/20 whitespace-normal text-center animate-in fade-in flex items-center justify-center shrink-0 w-full sm:w-auto"
                   >
                     {aiScannerLoading ? 'កំពុងស្កេន...' : 'ស្កេនទាញយកទិន្នន័យ'}
                   </button>
@@ -5571,10 +5666,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 </div>
 
                 <div className="sm:col-span-2 space-y-1">
-                  <label className="text-[11px] font-bold text-slate-500">កាលបរិច្ឆេទ & ម៉ោង</label>
+                  <label className="text-[11px] font-bold text-slate-500">កាលបរិច្ឆេទ</label>
                   <input
-                    type="datetime-local"
-                    value={editingFullInvoice.date}
+                    type="date"
+                    value={editingFullInvoice.date ? editingFullInvoice.date.split('T')[0] : ''}
                     onChange={e => setEditingFullInvoice({ ...editingFullInvoice, date: e.target.value })}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-amber-400"
                   />
@@ -5623,13 +5718,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       const computedPromo = (editingFullInvoice.type === 'Stock Sold' && prodObj)
                         ? calculatePromoQtyWithតម្លៃCheck(prodObj, qtyNum, prNum)
                         : 0;
-
                       return (
-                        <div key={idx} className="p-3 bg-slate-50/50 hover:bg-slate-50 transition space-y-2">
-                          <div className="grid grid-cols-12 gap-2 items-center">
+                        <div key={idx} className="p-2 sm:p-3 bg-slate-50/50 hover:bg-slate-50 transition space-y-1.5">
+                          <div className="flex items-end gap-1.5 sm:gap-2 w-full">
                             {/* Product selection */}
-                            <div className="col-span-11 sm:col-span-5">
-                              <label className="text-[10px] font-bold text-slate-400 block sm:hidden">ឈ្មោះទំនិញ</label>
+                            <div className="flex-1 min-w-0">
+                              <label className="text-[10px] font-bold text-slate-400 block sm:hidden mb-1">ឈ្មោះទំនិញ</label>
                               <select
                                 value={item.productName}
                                 onChange={e => {
@@ -5644,7 +5738,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                   };
                                   setEditingFullInvoice({ ...editingFullInvoice, items: updated });
                                 }}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-amber-400"
+                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-amber-400 truncate"
                               >
                                 {products.map(p => (
                                   <option key={p.id} value={p.name}>
@@ -5653,10 +5747,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                 ))}
                               </select>
                             </div>
-
                             {/* Quantity */}
-                            <div className="col-span-6 sm:col-span-2">
-                              <label className="text-[10px] font-bold text-slate-400 block sm:hidden">បរិមាណ</label>
+                            <div className="w-16 sm:w-24 shrink-0">
+                              <label className="text-[10px] font-bold text-slate-400 block sm:hidden mb-1">បរិមាណ</label>
                               <input
                                 type="number"
                                 min="1"
@@ -5666,15 +5759,14 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                   updated[idx] = { ...updated[idx], quantity: e.target.value };
                                   setEditingFullInvoice({ ...editingFullInvoice, items: updated });
                                 }}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-black text-center text-slate-800 outline-none focus:border-amber-400"
+                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-black text-center text-slate-800 outline-none focus:border-amber-400"
                                 placeholder="ចំនួន"
                               />
                             </div>
-
                             {/* Price (if Stock Sold) */}
-                            {editingFullInvoice.type === 'Stock Sold' ? (
-                              <div className="col-span-5 sm:col-span-2">
-                                <label className="text-[10px] font-bold text-slate-400 block sm:hidden">តម្លៃ ($)</label>
+                            {editingFullInvoice.type === 'Stock Sold' && (
+                              <div className="w-16 sm:w-24 shrink-0">
+                                <label className="text-[10px] font-bold text-slate-400 block sm:hidden mb-1">តម្លៃ ($)</label>
                                 <input
                                   type="number"
                                   step="0.01"
@@ -5685,19 +5777,15 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                     updated[idx] = { ...updated[idx], price: e.target.value };
                                     setEditingFullInvoice({ ...editingFullInvoice, items: updated });
                                   }}
-                                  className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-right text-slate-800 outline-none focus:border-amber-400"
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold text-right text-slate-800 outline-none focus:border-amber-400"
                                   placeholder="តម្លៃ"
                                 />
                               </div>
-                            ) : (
-                              <div className="col-span-5 sm:col-span-4" />
                             )}
-
                             {/* Subtotal & Delete button */}
-                            <div className="col-span-12 sm:col-span-3 flex items-center justify-between sm:justify-end space-x-2 pt-1 sm:pt-0">
+                            <div className="flex items-center gap-1.5 shrink-0 mb-0.5">
                               {editingFullInvoice.type === 'Stock Sold' && (
-                                <div className="text-right">
-                                  <span className="text-[10px] text-slate-400 sm:hidden">សរុបរង: </span>
+                                <div className="hidden sm:block text-right w-16">
                                   <span className="text-xs font-black text-indigo-600">
                                     ${(qtyNum * prNum).toFixed(2)}
                                   </span>
@@ -5713,7 +5801,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                   const updated = editingFullInvoice.items.filter((_, i) => i !== idx);
                                   setEditingFullInvoice({ ...editingFullInvoice, items: updated });
                                 }}
-                                className="p-1.5 hover:bg-rose-100 text-rose-500 rounded-lg transition cursor-pointer ml-auto"
+                                className="p-1.5 hover:bg-rose-100 text-rose-500 rounded-lg transition cursor-pointer"
                                 title="លុបទំនិញនេះ"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -5722,7 +5810,6 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                               </button>
                             </div>
                           </div>
-
                           {/* Promo display if computedPromo > 0 */}
                           {computedPromo > 0 && (
                             <div className="text-[10px] font-black text-emerald-600 pl-1">
