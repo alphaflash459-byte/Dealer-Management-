@@ -2239,17 +2239,22 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           fitToPage: true,
           fitToWidth: 1,
           fitToHeight: 1,
-          margins: { left: 0.2, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 }
+          margins: { left: 0.39, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 }
         }
       });
       
       // Fix for Excel ignoring fitToPage when scale is set
       delete ws.pageSetup.scale;
+      ws.pageSetup.fitToPage = true;
+      ws.pageSetup.fitToWidth = 1;
+      ws.pageSetup.fitToHeight = 1;
+      
+      ws.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
       
       hasData = true;
 
       // Add Data
-      ws.addRow([`ស្តុកប្រចាំថ្ងៃ ( ${user.username || ''} )`, "", "", "", "", "", "", "", ""]);
+      ws.addRow([`របាយការណ៍លក់ប្រចាំថ្ងៃ ( ${user.username || ''} )`, "", "", "", "", "", "", "", ""]);
       ws.addRow([
         `ឈ្មោះអ្នកលក់៖ ${user.username || ""}`,
         "",
@@ -2307,15 +2312,15 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
       // Column Widths
       ws.columns = [
-        { width: 6 },  // ល.រ
-        { width: 34 }, // ឈ្មោះទំនិញ
-        { width: 14 }, // កូដសម្គាល់
-        { width: 13 }, // ចំនួន
-        { width: 13 }, // ចំនួនលក់
-        { width: 13 }, // ដូរប្រវិល
-        { width: 13 }, // ចំនួនថែម
-        { width: 13 }, // ចំនួនសល់
-        { width: 13 }  // ផ្សេងៗ
+        { width: 10 },  // ល.រ
+        { width: 41 }, // ឈ្មោះទំនិញ
+        { width: 17 }, // កូដសម្គាល់
+        { width: 16 }, // ចំនួន
+        { width: 16 }, // ចំនួនលក់
+        { width: 16 }, // ដូរប្រវិល
+        { width: 16 }, // ចំនួនថែម
+        { width: 16 }, // ចំនួនសល់
+        { width: 16 }  // ផ្សេងៗ
       ];
 
       // Styling
@@ -2352,8 +2357,48 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           }
 
           cell.border = borderStyle;
-          cell.font = fontStyle;
           cell.alignment = alignStyle;
+          
+          if (cell.value != null && typeof cell.value !== 'object') {
+            const str = cell.value.toString();
+            const hasKhmer = /[\u1780-\u17FF\u19E0-\u19FF]/.test(str);
+            const hasNonKhmer = /[^\u1780-\u17FF\u19E0-\u19FF\u200B\s]/.test(str);
+            
+            const isNumber = /^[\[\]\(\)\d\.\,\s\u17E0-\u17E9\+]+$/.test(str.trim());
+            
+            let khSize = fontStyle.size === 14 ? 14 : 10;
+            let enSize = fontStyle.size === 14 ? 14 : 12;
+            
+            if (rowNumber > 3 && isNumber && str.trim() !== '') {
+               khSize = 14;
+               enSize = 14;
+               if (colNumber === 1) {
+                 khSize = 10;
+                 enSize = 10;
+               }
+            }
+
+            if (hasKhmer && hasNonKhmer) {
+              const parts = str.split(/([\u1780-\u17FF\u19E0-\u19FF\u200B]+)/g);
+              const segments = [];
+              for (const part of parts) {
+                if (!part) continue;
+                if (/^[\u1780-\u17FF\u19E0-\u19FF\u200B]+$/.test(part)) {
+                  segments.push({ font: { ...fontStyle, name: 'Khmer OS Muol Light', size: khSize }, text: part });
+                } else {
+                  segments.push({ font: { ...fontStyle, name: 'Times New Roman', size: enSize }, text: part });
+                }
+              }
+              cell.value = { richText: segments };
+            } else if (hasKhmer) {
+              cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: khSize };
+            } else {
+              cell.font = { ...fontStyle, name: 'Times New Roman', size: enSize };
+            }
+          } else {
+            const enSize = fontStyle.size === 14 ? 14 : 12;
+            cell.font = { ...fontStyle, name: 'Times New Roman', size: enSize };
+          }
         });
       });
       

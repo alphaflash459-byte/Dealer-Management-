@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1"><si><r><rPr><b/><color rgb="FF002060"/><sz val="11"/><rFont val="Times New Roman"/></rPr><t xml:space="preserve">Hello </t></r><r><rPr><b/><color rgb="FF002060"/><sz val="11"/><rFont val="Khmer OS Muol Light"/></rPr><t>ខ្មែរ</t></r><r><rPr><b/><color rgb="FF002060"/><sz val="11"/><rFont val="Times New Roman"/></rPr><t xml:space="preserve"> 123</t></r></si></sst>
