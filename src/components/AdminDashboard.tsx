@@ -2274,23 +2274,22 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         "ចំនួនលក់",
         "ដូរប្រវិល",
         "ចំនួនថែម",
-        "ចំនួនសល់",
+        "ស្តុកត្រឡប់",
         "ផ្សេងៗ"
       ]);
 
       let rowIndex = 1;
       exportProductsList.forEach((item) => {
         const pData = groupedMap[item.code];
-        const remaining = pData.stockOut - pData.stockSold - pData.stockPromo - pData.stockReturn;
         ws.addRow([
           toKhmerNumeral(rowIndex++),
           item.khmerName,
           item.code,
           pData.stockOut || '',
           pData.stockSold || '',
-          pData.stockReturn || '',
+          '',
           pData.stockPromo || '',
-          remaining || '',
+          pData.stockReturn || '',
           ''
         ]);
       });
