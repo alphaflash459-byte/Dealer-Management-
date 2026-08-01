@@ -2161,13 +2161,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
       { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
       { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WURKZ ICE" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
       { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
       { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "W ORD" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
       { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
       { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
-      { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "D ORD" },
+      { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
       { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
       { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
       { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
@@ -2203,10 +2203,15 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       });
 
       userTxs.forEach(t => {
-        if (!groupedMap[t.productName]) {
-          groupedMap[t.productName] = { stockOut: 0, stockSold: 0, stockPromo: 0, stockReturn: 0 };
+        let pName = t.productName;
+        if (pName === 'WURKZ ICE') pName = 'WICE';
+        if (pName === 'W ORD') pName = 'WURKZ ORD';
+        if (pName === 'D ORD') pName = 'DAZZ ORD';
+
+        if (!groupedMap[pName]) {
+          groupedMap[pName] = { stockOut: 0, stockSold: 0, stockPromo: 0, stockReturn: 0 };
         }
-        const group = groupedMap[t.productName];
+        const group = groupedMap[pName];
         if (t.type === 'Stock Out') group.stockOut += t.quantity;
         else if (t.type === 'Stock Sold') { group.stockSold += t.quantity; group.stockPromo += (t.promoQty || 0); }
         else if (t.type === 'Stock Return') group.stockReturn += t.quantity;
