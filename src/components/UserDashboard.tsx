@@ -1597,11 +1597,16 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   const handleExportPDF = () => {
     const activeProducts = products.map(product => {
       const loaded = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Out').reduce((sum, t) => sum + t.quantity, 0);
-      const soldOnly = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Sold').reduce((sum, t) => sum + t.quantity, 0);
-      const promosGiven = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Sold').reduce((sum, t) => sum + (t.promoQty || 0), 0);
-      const soldTotal = soldOnly + promosGiven;
+      const stockSoldTxs = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Sold');
+      const soldTotal = stockSoldTxs.reduce((sum, t) => sum + t.quantity, 0);
+      const promosGiven = stockSoldTxs.reduce((sum, t) => sum + (t.promoQty || 0), 0);
+      const exchangedGiven = stockSoldTxs.reduce((sum, t) => sum + ((t as any).exchangedQty || 0), 0);
+      const soldOnly = stockSoldTxs.reduce((sum, t) => {
+        if ((t as any).soldQty !== undefined) return sum + (t as any).soldQty;
+        return sum + Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
+      }, 0);
       const returned = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Return').reduce((sum, t) => sum + t.quantity, 0);
-      return { product, loaded, soldOnly, promosGiven, soldTotal, returned };
+      return { product, loaded, soldOnly, exchangedGiven, promosGiven, soldTotal, returned };
     }).filter(item => item.loaded > 0 || item.soldTotal > 0 || item.returned > 0);
 
     if (activeProducts.length === 0) {
@@ -1638,8 +1643,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
     const hasAnySalesActivity = activeProducts.some(p => p.soldTotal > 0 || p.returned > 0);
 
-    const rowsHtml = activeProducts.map(({ product, loaded, soldOnly, promosGiven, soldTotal, returned }) => {
-      const balance = loaded - soldTotal - returned;
+    const rowsHtml = activeProducts.map(({ product, loaded, soldOnly, exchangedGiven, promosGiven, soldTotal, returned }) => {
+      const balance = loaded - (soldOnly + exchangedGiven + promosGiven) - returned;
       
       let statusText = `ត្រឹមត្រូវ`;
       let statusColor = "color: #059669; background-color: #ecfdf5; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;"; 
@@ -1660,7 +1665,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
           <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${product.name}</td>
           <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #e11d48; text-align: center;">${loaded || ''}</td>
           <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #059669; text-align: center;">${soldOnly || ''}</td>
-          <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #8b5cf6; text-align: center;"></td>
+          <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #8b5cf6; text-align: center;">${exchangedGiven || ''}</td>
           <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #f59e0b; text-align: center;">${promosGiven || ''}</td>
           <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #4f46e5; text-align: center;">${returned || ''}</td>
           <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
@@ -2055,6 +2060,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                         <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
                         <th className="px-1.5 md:px-3 py-2.5 font-bold text-rose-600 whitespace-nowrap">ឡើងឡាន</th>
                         <th className="px-1.5 md:px-3 py-2.5 font-bold text-emerald-600 whitespace-nowrap">លក់ចេញ</th>
+                        <th className="px-1.5 md:px-3 py-2.5 font-bold text-violet-500 whitespace-nowrap">ប្ដូរប្រវិល</th>
                         <th className="px-1.5 md:px-3 py-2.5 font-bold text-teal-600 whitespace-nowrap">ថែម</th>
                         <th className="px-1.5 md:px-3 py-2.5 font-bold text-amber-600 whitespace-nowrap">ត្រឡប់</th>
                         <th className="px-1.5 md:px-3 py-2.5 text-right font-bold text-indigo-600 whitespace-nowrap">បញ្ជាក់</th>
@@ -2064,29 +2070,31 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                       {(() => {
                         const activeProducts = products.map(product => {
                           const loaded = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Out').reduce((sum, t) => sum + t.quantity, 0);
-                          const soldOnly = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Sold').reduce((sum, t) => sum + t.quantity, 0);
-                          const promosGiven = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Sold').reduce((sum, t) => sum + (t.promoQty || 0), 0);
-                          const soldTotal = soldOnly + promosGiven;
+                          const stockSoldTxs = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Sold');
+                          const soldTotal = stockSoldTxs.reduce((sum, t) => sum + t.quantity, 0);
+                          const promosGiven = stockSoldTxs.reduce((sum, t) => sum + (t.promoQty || 0), 0);
+                          const exchangedGiven = stockSoldTxs.reduce((sum, t) => sum + ((t as any).exchangedQty || 0), 0);
+                          const soldOnly = stockSoldTxs.reduce((sum, t) => {
+                            if ((t as any).soldQty !== undefined) return sum + (t as any).soldQty;
+                            return sum + Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
+                          }, 0);
                           const returned = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Return').reduce((sum, t) => sum + t.quantity, 0);
-                          return { product, loaded, soldOnly, promosGiven, soldTotal, returned };
+                          return { product, loaded, soldOnly, exchangedGiven, promosGiven, soldTotal, returned };
                         }).filter(item => item.loaded > 0 || item.soldTotal > 0 || item.returned > 0);
-
                         if (activeProducts.length === 0) {
                           return (
                             <tr>
-                              <td colSpan={6} className="text-center py-16 text-slate-400 text-xs md:text-sm font-bold">
+                              <td colSpan={7} className="text-center py-16 text-slate-400 text-xs md:text-sm font-bold">
                                 គ្មានទិន្នន័យទំនិញសម្រាប់បង្ហាញឡើយ
                               </td>
                             </tr>
                           );
                         }
-
                         return (() => {
                           const hasAnySalesActivity = activeProducts.some(p => p.soldTotal > 0 || p.returned > 0);
                           
-                          return activeProducts.map(({ product, loaded, soldOnly, promosGiven, soldTotal, returned }) => {
-                            const balance = loaded - soldTotal - returned;
-
+                          return activeProducts.map(({ product, loaded, soldOnly, exchangedGiven, promosGiven, soldTotal, returned }) => {
+                            const balance = loaded - (soldOnly + exchangedGiven + promosGiven) - returned;
                             let badgeColorClass = "bg-emerald-50 text-emerald-700 border border-emerald-100";
                             let statusText = `ត្រូវ ${balance}`;
                             
@@ -2100,13 +2108,15 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                             badgeColorClass = "bg-rose-50 text-rose-700 border border-rose-100";
                             statusText = `បាត់ ${balance}`;
                           }
-
                           return (
                             <tr key={product.id} className="hover:bg-slate-50/70 transition-colors">
                               <td className="px-1.5 md:px-3 py-2 font-black text-slate-800 text-left">{product.name}</td>
                               <td className="px-1.5 md:px-3 py-2 text-center font-bold text-rose-600 text-xs sm:text-sm">{loaded}</td>
                               <td className="px-1.5 md:px-3 py-2 text-center font-bold text-emerald-600 text-xs sm:text-sm">
                                 {soldOnly}
+                              </td>
+                              <td className="px-1.5 md:px-3 py-2 text-center font-bold text-violet-500 text-xs sm:text-sm">
+                                {exchangedGiven}
                               </td>
                               <td className="px-1.5 md:px-3 py-2 text-center font-bold text-teal-600 text-xs sm:text-sm">
                                 {promosGiven}

@@ -39,6 +39,8 @@ export interface Transaction {
   type: TransactionType;
   productName: string;
   quantity: number;
+  soldQty?: number;
+  exchangedQty?: number;
   promoQty?: number;
   price?: number;
   date: string;

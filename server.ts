@@ -81,7 +81,10 @@ CRITICAL RULES:
 
 Extract the data into a structured JSON array. Each item must have:
 - \`productName\` (string, the name of the product)
-- \`quantity\` (number, the final aggregated quantity)
+- \`quantity\` (number, the primary quantity. For Stock Sold, DO NOT calculate this, leave it 0 or omit it)
+- \`soldQuantity\` (number, required for Stock Sold. Extract from ចំនួនលក់)
+- \`exchangedQuantity\` (number, required for Stock Sold. Extract from ដូរក្រវិល)
+- \`promoQuantity\` (number, required for Stock Sold. Extract from ចំនួនថែម)
 - \`unit\` (string, optional, e.g., \`case\`, \`box\`)
 - \`description\` (string, optional, any extra notes for the item)${availableProductsStr}
 

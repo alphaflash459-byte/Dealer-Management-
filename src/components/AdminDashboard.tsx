@@ -1580,13 +1580,28 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           const sortedProducts = [...products].sort((a, b) => b.name.length - a.name.length);
           matchedProduct = sortedProducts.find(p => p.name.toLowerCase().includes(searchName) || searchName.includes(p.name.toLowerCase()));
         }
+        const soldQ = Number(item.soldQuantity) || 0;
+        const exQ = Number(item.exchangedQuantity) || 0;
+        const proQ = Number(item.promoQuantity) || 0;
+        let qty = Number(item.quantity) || 0;
+        
+        if (aiScannerType === 'Stock Sold') {
+          // Force recalculation for Stock Sold so it exactly matches inputted numbers
+          if (soldQ > 0 || exQ > 0) {
+            qty = soldQ + exQ;
+          } else if (Number(item.quantity) > 0) {
+            qty = Number(item.quantity) - proQ;
+            if (qty < 0) qty = 0;
+          }
+        }
+        
         return {
           id: Date.now().toString() + Math.random().toString(),
           productName: matchedProduct ? matchedProduct.name : item.productName || '',
-          quantity: item.quantity || 0,
-          soldQty: item.soldQuantity,
-          exchangedQty: item.exchangedQuantity,
-          promoQty: item.promoQuantity,
+          quantity: qty,
+          soldQty: soldQ,
+          exchangedQty: exQ,
+          promoQty: proQ,
           unit: item.unit || '',
           description: item.description || '',
           matchedProductId: matchedProduct?.id,
@@ -1655,12 +1670,14 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       for (const item of aiScannerResults) {
         if (!item.productName || item.quantity <= 0) continue;
         
-        const newTransaction: Transaction = {
+        const newTransaction: any = {
           id: Date.now().toString() + Math.random().toString(),
           userId: aiScannerUserId,
           type: aiScannerType,
           productName: item.productName,
           quantity: item.quantity,
+          soldQty: item.soldQty || 0,
+          exchangedQty: item.exchangedQty || 0,
           promoQty: item.promoQty || 0,
           date: isoDate,
           note: item.description ? "AI Scan: " + item.description : "AI Scan"
@@ -1986,38 +2003,44 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           productName: string;
           stockOut: number;
           stockSold: number;
+          stockExchanged: number;
           stockPromo: number;
           stockReturn: number;
+          totalSoldQty: number;
         }
       } = {};
-
       products.forEach(p => {
-        groupedMap[p.name] = { productName: p.name, stockOut: 0, stockSold: 0, stockPromo: 0, stockReturn: 0 };
+        groupedMap[p.name] = { productName: p.name, stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0, totalSoldQty: 0 };
       });
-
       userTxs.forEach(t => {
         if (!groupedMap[t.productName]) {
-          groupedMap[t.productName] = { productName: t.productName, stockOut: 0, stockSold: 0, stockPromo: 0, stockReturn: 0 };
+          groupedMap[t.productName] = { productName: t.productName, stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0, totalSoldQty: 0 };
         }
         const group = groupedMap[t.productName];
         if (t.type === 'Stock Out') group.stockOut += t.quantity;
-        else if (t.type === 'Stock Sold') { group.stockSold += t.quantity; group.stockPromo += (t.promoQty || 0); }
+        else if (t.type === 'Stock Sold') { 
+          group.totalSoldQty += t.quantity;
+          if ((t as any).soldQty !== undefined) {
+            group.stockSold += (t as any).soldQty;
+          } else {
+            group.stockSold += Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
+          }
+          group.stockExchanged += ((t as any).exchangedQty || 0);
+          group.stockPromo += (t.promoQty || 0); 
+        }
         else if (t.type === 'Stock Return') group.stockReturn += t.quantity;
       });
-
       const userGrouped = Object.values(groupedMap)
-        .filter(p => p.stockOut > 0 || p.stockSold > 0 || p.stockPromo > 0 || p.stockReturn > 0)
+        .filter(p => p.stockOut > 0 || p.totalSoldQty > 0 || p.stockPromo > 0 || p.stockReturn > 0)
         .sort((a, b) => a.productName.localeCompare(b.productName));
-
       if (userGrouped.length === 0) return ''; // No data for this user
 
-      const hasAnySalesActivity = userGrouped.some(p => (p.stockSold + p.stockPromo + p.stockReturn) > 0);
-
+      const hasAnySalesActivity = userGrouped.some(p => (p.totalSoldQty + p.stockReturn) > 0);
       const rowsHtml = userGrouped.map(p => {
-        const diff = p.stockOut - (p.stockSold + p.stockPromo + p.stockReturn);
+        const diff = p.stockOut - (p.stockSold + p.stockExchanged + p.stockPromo + p.stockReturn);
         let statusText = `ត្រឹមត្រូវ`;
-        let statusColor = "color: #059669; background-color: #ecfdf5; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;"; 
-        
+        let statusColor = "color: #059669; background-color: #ecfdf5; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;";
+         
         if (!hasAnySalesActivity && diff > 0) {
           statusText = `-`;
           statusColor = "color: #94a3b8; background-color: transparent; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;";
@@ -2034,7 +2057,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${p.productName}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #e11d48; text-align: center;">${p.stockOut || ''}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #059669; text-align: center;">${p.stockSold || ''}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #8b5cf6; text-align: center;"></td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #8b5cf6; text-align: center;">${p.stockExchanged || ''}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #f59e0b; text-align: center;">${p.stockPromo || ''}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #4f46e5; text-align: center;">${p.stockReturn || ''}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
@@ -2427,7 +2450,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           item.code,
           pData.stockOut || '',
           pData.stockSold || '',
-          '',
+          pData.stockExchanged || '',
           pData.stockPromo || '',
           pData.stockReturn || '',
           ''
@@ -2586,8 +2609,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         productName: string;
         stockOut: number;
         stockSold: number;
+        stockExchanged: number;
         stockPromo: number;
         stockReturn: number;
+        totalSoldQty: number; // For total calculation if needed
       }
     } = {};
 
@@ -2597,8 +2622,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         productName: p.name,
         stockOut: 0,
         stockSold: 0,
+        stockExchanged: 0,
         stockPromo: 0,
-        stockReturn: 0
+        stockReturn: 0,
+        totalSoldQty: 0
       };
     });
 
@@ -2609,8 +2636,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           productName: t.productName,
           stockOut: 0,
           stockSold: 0,
+          stockExchanged: 0,
           stockPromo: 0,
-          stockReturn: 0
+          stockReturn: 0,
+          totalSoldQty: 0
         };
       }
       
@@ -2618,7 +2647,14 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       if (t.type === 'Stock Out') {
         group.stockOut += t.quantity;
       } else if (t.type === 'Stock Sold') {
-        group.stockSold += t.quantity;
+        group.totalSoldQty += t.quantity;
+        if (t.soldQty !== undefined) {
+          group.stockSold += t.soldQty;
+        } else {
+          // Fallback if soldQty is not recorded, we assume total quantity minus promoQty
+          group.stockSold += Math.max(0, t.quantity - (t.promoQty || 0) - (t.exchangedQty || 0));
+        }
+        group.stockExchanged += (t.exchangedQty || 0);
         group.stockPromo += (t.promoQty || 0);
       } else if (t.type === 'Stock Return') {
         group.stockReturn += t.quantity;
@@ -2627,7 +2663,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
     // Convert to array and filter out products with zero activity in the filtered range
     return Object.values(groupedMap)
-      .filter(p => p.stockOut > 0 || p.stockSold > 0 || p.stockPromo > 0 || p.stockReturn > 0)
+      .filter(p => p.stockOut > 0 || p.totalSoldQty > 0 || p.stockPromo > 0 || p.stockReturn > 0)
       .sort((a, b) => a.productName.localeCompare(b.productName));
   })();
 
@@ -2926,10 +2962,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               </thead>
               <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
                 {(() => {
-                  const hasAnySalesActivity = txGroupedByProduct.some(p => (p.stockSold + p.stockPromo + p.stockReturn) > 0);
+                  const hasAnySalesActivity = txGroupedByProduct.some(p => (p.totalSoldQty + p.stockReturn) > 0);
                   
                   return txGroupedByProduct.map(p => {
-                    const diff = p.stockOut - (p.stockSold + p.stockPromo + p.stockReturn);
+                    const diff = p.stockOut - (p.stockSold + p.stockExchanged + p.stockPromo + p.stockReturn);
                     let badge = null;
                     
                     if (!hasAnySalesActivity && diff > 0) {
@@ -2957,7 +2993,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                         {p.stockSold || '-'}
                       </td>
                       <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-violet-500">
-                        -
+                        {p.stockExchanged || '-'}
                       </td>
                       <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-amber-500">
                         {p.stockPromo || '-'}
@@ -4158,7 +4194,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                 onChange={e => {
                                   const val = parseInt(e.target.value) || 0;
                                   const newItems = [...manualAddItems];
-                                  newItems[actualIdx] = { ...item, soldQty: val, quantity: val + item.exchangedQty + item.promoQty };
+                                  newItems[actualIdx] = { ...item, soldQty: val, quantity: val + item.exchangedQty };
                                   setManualAddItems(newItems);
                                 }}
                                 className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
@@ -4172,7 +4208,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                 onChange={e => {
                                   const val = parseInt(e.target.value) || 0;
                                   const newItems = [...manualAddItems];
-                                  newItems[actualIdx] = { ...item, exchangedQty: val, quantity: item.soldQty + val + item.promoQty };
+                                  newItems[actualIdx] = { ...item, exchangedQty: val, quantity: item.soldQty + val };
                                   setManualAddItems(newItems);
                                 }}
                                 className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
@@ -4186,7 +4222,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                 onChange={e => {
                                   const val = parseInt(e.target.value) || 0;
                                   const newItems = [...manualAddItems];
-                                  newItems[actualIdx] = { ...item, promoQty: val, quantity: item.soldQty + item.exchangedQty + val };
+                                  newItems[actualIdx] = { ...item, promoQty: val, quantity: item.soldQty + item.exchangedQty };
                                   setManualAddItems(newItems);
                                 }}
                                 className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-amber-600 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
@@ -4592,7 +4628,17 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs">
                         <tr>
                           <th className="p-3">ឈ្មោះទំនិញ / ផលិតផល</th>
-                          <th className="p-3 w-24">បរិមាណ</th>
+                          {aiScannerType === 'Stock Sold' ? (
+                            <>
+                              <th className="p-3 w-20 text-center">លក់</th>
+                              <th className="p-3 w-20 text-center">ក្រវិល</th>
+                              <th className="p-3 w-20 text-center">ថែម</th>
+                              <th className="p-3 w-20 text-center font-bold text-sky-600">សរុប</th>
+                            </>
+                          ) : (
+                            <th className="p-3 w-24 text-center">បរិមាណ</th>
+                          )}
+                          <th className="p-3 w-10"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -4616,7 +4662,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                   }
                                   setAiScannerResults(newResults);
                                 }}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:border-sky-400 outline-none font-bold text-slate-700 cursor-pointer"
+                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs focus:border-sky-400 outline-none font-bold text-slate-700 cursor-pointer"
                               >
                                 {item.actualProduct ? null : <option value={item.productName}>{item.productName} (មិនមានក្នុងស្តុក)</option>}
                                 {products.map(p => (
@@ -4624,18 +4670,73 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                 ))}
                               </select>
                             </td>
-                            <td className="p-2">
-                              <input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) => {
-                                  const newResults = [...aiScannerResults];
-                                  newResults[idx].quantity = Number(e.target.value) || 0;
-                                  setAiScannerResults(newResults);
-                                }}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:border-sky-400 outline-none font-bold text-slate-700 text-center"
-                              />
-                            </td>
+                            {aiScannerType === 'Stock Sold' ? (
+                              <>
+                                <td className="p-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.soldQty || ''}
+                                    onChange={e => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      const newResults = [...aiScannerResults];
+                                      newResults[idx].soldQty = val;
+                                      newResults[idx].quantity = val + (newResults[idx].exchangedQty || 0);
+                                      setAiScannerResults(newResults);
+                                    }}
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.exchangedQty || ''}
+                                    onChange={e => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      const newResults = [...aiScannerResults];
+                                      newResults[idx].exchangedQty = val;
+                                      newResults[idx].quantity = (newResults[idx].soldQty || 0) + val;
+                                      setAiScannerResults(newResults);
+                                    }}
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.promoQty || ''}
+                                    onChange={e => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      const newResults = [...aiScannerResults];
+                                      newResults[idx].promoQty = val;
+                                      newResults[idx].quantity = (newResults[idx].soldQty || 0) + (newResults[idx].exchangedQty || 0);
+                                      setAiScannerResults(newResults);
+                                    }}
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <div className="w-full bg-sky-50 border border-sky-100 rounded-xl px-2 py-1.5 text-xs font-black text-sky-700 text-center">
+                                    {item.quantity}
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <td className="p-2">
+                                <input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const newResults = [...aiScannerResults];
+                                    newResults[idx].quantity = Number(e.target.value) || 0;
+                                    setAiScannerResults(newResults);
+                                  }}
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs focus:border-sky-400 outline-none font-bold text-slate-700 text-center"
+                                />
+                              </td>
+                            )}
                             <td className="p-2 w-10 text-center">
                               <button
                                 type="button"
