@@ -1,0 +1,55 @@
+
+      {/* Quick Add Modal */}
+      {isQuickAddModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">បញ្ចូលទំនិញរហ័ស</h3>
+                <p className="text-xs text-slate-500 font-medium">សូមបញ្ចូលចំនួនសម្រាប់ទំនិញនីមួយៗ</p>
+              </div>
+              <button 
+                onClick={() => setIsQuickAddModalOpen(false)} 
+                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto p-4 custom-scroll space-y-2">
+              {quickAddItems.length === 0 ? (
+                <div className="text-center text-slate-400 font-medium py-8 text-sm">
+                  គ្មានទំនិញបន្ថែមទេ
+                </div>
+              ) : (
+                quickAddItems.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <span className="font-bold text-slate-700 text-xs sm:text-sm">{item.productName}</span>
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={e => {
+                        const copy = [...quickAddItems];
+                        copy[index].quantity = e.target.value;
+                        setQuickAddItems(copy);
+                      }}
+                      className="w-24 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-center text-sm focus:border-sky-400 outline-none font-bold text-slate-800"
+                      placeholder="ចំនួន"
+                      min="1"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center space-x-3 shrink-0 rounded-b-3xl">
+              <button
+                type="button"
+                onClick={() => setIsQuickAddModalOpen(false)}
+                className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+              >
+                បោះបង់
+              </button>
+              <button

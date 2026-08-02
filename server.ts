@@ -35,18 +35,59 @@ async function startServer() {
         ? `\nHere is the exact list of available product names in the system:\n[${productNames.join(', ')}]\nCRITICAL: When extracting the product name, please map it EXACTLY to a name from this list. If the note says 'CBL ORD', you MUST map it to 'CBL ORD' (if it exists in the list) and NOT just 'CBL'. Pay close attention to extra words or suffixes. If there is no good match, use the original text.`
         : "";
 
-      const prompt = `You are an AI assistant that extracts handwritten or printed notes about inventory transactions. The note could be in Khmer or English.
-Extract the data into a structured JSON array.
-Each item must have:
-- 'productName' (string, extract exactly as written, translating to English is optional if it's clear, otherwise keep original text)
-- 'quantity' (number)
-- 'unit' (string, optional, like 'case', 'box', 'item')
-- 'description' (string, optional, any extra notes for the item)${availableProductsStr}
-Ensure the output is ONLY a valid JSON array matching the structure.
-If you can't read an item clearly, skip it or put your best guess.
-Do not wrap the JSON in markdown codeblocks like \`\`\`json. Return raw JSON.`;
+      let typeSpecificInstructions = "";
+      const normalizedTargetType = (targetType || '').toLowerCase();
+      if (normalizedTargetType.includes('sold') || normalizedTargetType.includes('sell') || targetType === 'Stock Sold' || targetType === 'ស្តុកលក់ចេញ') {
+        typeSpecificInstructions = `
+CRITICAL RULE FOR STOCK SOLD (ស្តុកលក់ / ស្តុកលក់ចេញ):
+You must extract the OUTGOING stock. The table has several numeric columns. YOU MUST EXAMINE THE COLUMN HEADERS CAREFULLY.
+- EXTRACT from "ចំនួនលក់" (Sold) -> put in 'soldQuantity'
+- EXTRACT from "ដូរក្រវិល" / "ចំនួនដបប្រវិល" (Exchanged/Ring pull) -> put in 'exchangedQuantity'
+- EXTRACT from "ចំនួនថែម" / "ជួនថែម" / "ថែម" (Promo/Free) -> put in 'promoQuantity'
 
-      const modelsToTry = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+VISUAL GUIDE for the table layout (Left to Right):
+1. First numeric column is often "ក្នុងឡាន" or "ស្តុកឡើង" (Loaded Stock). -> DO NOT EXTRACT (Ignore this!)
+2. Second numeric column is often "ចំនួនដបប្រវិល" / "ដូរក្រវិល". -> Put in 'exchangedQuantity'
+3. Third numeric column is often "ចំនួនលក់" (Sold). -> Put in 'soldQuantity'
+4. Other columns might be "ថែម" (Promo) -> Put in 'promoQuantity'
+5. Towards the right is "ចំនួនសល់" (Remaining Stock). -> DO NOT EXTRACT (Ignore this!)
+
+Example: If a row has 127 in column 1, 4 in column 2, 15 in column 3, and 108 in column 5.
+Then 'exchangedQuantity' = 4, 'soldQuantity' = 15, and 'promoQuantity' = 0.
+IGNORE 127 and 108 completely!
+
+In the 'description', write EXACTLY: "លក់: [val], ដូរក្រវិល: [val], ថែម: [val]" using only non-zero values.
+`;
+      } else if (normalizedTargetType.includes('return') || targetType === 'Stock Return' || targetType === 'ស្តុកត្រឡប់') {
+        typeSpecificInstructions = `
+INSTRUCTIONS FOR STOCK RETURN (ស្តុកត្រឡប់):
+Extract only the returned stock quantity (ស្តុកត្រឡប់ / ត្រឡប់).
+`;
+      } else if (normalizedTargetType.includes('out') || targetType === 'Stock Out' || targetType === 'ស្តុកឡើងឡាន') {
+        typeSpecificInstructions = `
+INSTRUCTIONS FOR STOCK OUT (ស្តុកឡើង / ស្តុកឡើងឡាន):
+Extract only the loaded stock quantity (ស្តុកឡើង / ចំនួនឡើង).
+`;
+      }
+
+      const prompt = `You are an expert data entry AI assistant. Extract inventory transactions from the provided image (handwritten or printed, Khmer or English).
+Target Transaction Type: ${targetType || 'General'}
+${typeSpecificInstructions}
+
+CRITICAL RULES:
+1. Ignore noise, irrelevant text, or crossed-out items. Only extract valid product lines.
+2. AGGREGATE DUPLICATES: If the same product appears multiple times, SUM the quantities together into a single item. NEVER output duplicate \`productName\`s.
+3. EXACT MATCH: Map the product name to the provided list if possible. Pay close attention to extra words or suffixes.
+
+Extract the data into a structured JSON array. Each item must have:
+- \`productName\` (string, the name of the product)
+- \`quantity\` (number, the final aggregated quantity)
+- \`unit\` (string, optional, e.g., \`case\`, \`box\`)
+- \`description\` (string, optional, any extra notes for the item)${availableProductsStr}
+
+Ensure the output is ONLY a valid JSON array matching the structure. If you can't read an item clearly, skip it or put your best guess. Do not wrap the JSON in markdown codeblocks like \`\`\`json. Return raw JSON.`;
+
+      const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash", "gemini-2.0-flash"];
       let response;
       let lastError: any = null;
 
@@ -76,10 +117,13 @@ Do not wrap the JSON in markdown codeblocks like \`\`\`json. Return raw JSON.`;
                     properties: {
                       productName: { type: Type.STRING },
                       quantity: { type: Type.NUMBER },
+                      soldQuantity: { type: Type.NUMBER },
+                      exchangedQuantity: { type: Type.NUMBER },
+                      promoQuantity: { type: Type.NUMBER },
                       unit: { type: Type.STRING },
                       description: { type: Type.STRING }
                     },
-                    required: ["productName", "quantity"]
+                    required: ["productName"]
                   }
                 }
               }

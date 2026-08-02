@@ -143,7 +143,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [aiScannerImage, setAiScannerImage] = useState<string>('');
   const [aiScannerFileName, setAiScannerFileName] = useState<string>('');
   const [aiScannerLoading, setAiScannerLoading] = useState(false);
-  const [aiScannerResults, setAiScannerResults] = useState<{ id: string, productName: string, quantity: number, unit?: string, description?: string, matchedProductId?: string, actualProduct?: Product }[]>([]);
+  const [aiScannerResults, setAiScannerResults] = useState<{ id: string, productName: string, quantity: number, soldQty?: number, exchangedQty?: number, promoQty?: number, unit?: string, description?: string, matchedProductId?: string, actualProduct?: Product }[]>([]);
+  const [manualAddMode, setManualAddMode] = useState<'none' | 'single' | 'all'>('none');
+  const [manualAddItems, setManualAddItems] = useState<{ id: string, productName: string, quantity: number, soldQty: number, exchangedQty: number, promoQty: number, matchedProductId?: string, actualProduct?: Product }[]>([]);
+  const [manualAddSearchText, setManualAddSearchText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newឈ្មោះអ្នកប្រើប្រាស់, setNewឈ្មោះអ្នកប្រើប្រាស់] = useState('');
@@ -281,6 +284,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [stockInItems, setStockInItems] = useState<StockItemInput[]>([]);
   const [stockInScannerLoading, setStockInScannerLoading] = useState(false);
   const stockInFileInputRef = useRef<HTMLInputElement>(null);
+  const [stockInImage, setStockInImage] = useState<string>('');
+  const [stockInFileName, setStockInFileName] = useState<string>('');
   const [actualStockDrafts, setActualStockDrafts] = useState<{ [productId: string]: string }>({});
   const [warehouseSearchQuery, setWarehouseSearchQuery] = useState('');
   const [selectedAdminId, setSelectedAdminId] = useState<string>('all');
@@ -461,15 +466,14 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   };
 
 
-  const handleStockInAIScan = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStockInImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+    setStockInFileName(file.name);
     const reader = new FileReader();
     reader.onload = (event) => {
-      const rawBase64 = event.target?.result as string;
       const img = new Image();
-      img.onload = async () => {
+      img.onload = () => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
@@ -490,59 +494,82 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        let compressedBase64 = rawBase64;
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          compressedBase64 = canvas.toDataURL('image/jpeg', 0.4);
-        }
-
-        setStockInScannerLoading(true);
-        try {
-          const response = await fetch('/api/extract-note', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              image: compressedBase64, 
-              targetType: 'Stock In',
-              productNames: products.map(p => p.name)
-            })
-          });
-          
-          let result;
-          try {
-            result = await response.json();
-          } catch (e) {
-            throw new Error('ម៉ាស៊ីនបម្រើបានបញ្ជូនការឆ្លើយតបមិនត្រឹមត្រូវ។');
-          }
-          
-          if (!result.success) {
-            throw new Error(result.error || "ការទាញយកទិន្នន័យបានបរាជ័យ");
-          }
-          
-          const parsedItems = result.data.map((item: any) => {
-            const searchName = (item.productName || '').trim().toLowerCase();
-            let matchedProduct = products.find(p => p.name.toLowerCase() === searchName);
-            if (!matchedProduct) {
-              const sortedProducts = [...products].sort((a, b) => b.name.length - a.name.length);
-              matchedProduct = sortedProducts.find(p => p.name.toLowerCase().includes(searchName) || searchName.includes(p.name.toLowerCase()));
-            }
-            return {
-              productName: matchedProduct ? matchedProduct.name : item.productName || '',
-              quantity: item.quantity ? item.quantity.toString() : ''
-            };
-          }).filter((item: any) => item.productName);
-          
-          setStockInItems(prev => [...prev, ...parsedItems]);
-        } catch (error: any) {
-          alert("មានបញ្ហាក្នុងការស្កេន: " + error.message);
-        } finally {
-          setStockInScannerLoading(false);
-          if (stockInFileInputRef.current) stockInFileInputRef.current.value = '';
+          setStockInImage(canvas.toDataURL('image/jpeg', 0.4));
         }
       };
-      img.src = rawBase64;
+      img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleStockInScan = async () => {
+    if (!stockInImage) return;
+    setStockInScannerLoading(true);
+    try {
+      const response = await fetch('/api/extract-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          image: stockInImage, 
+          targetType: 'Stock In',
+          productNames: products.map(p => p.name)
+        })
+      });
+      
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        throw new Error('ម៉ាស៊ីនបម្រើបានបញ្ជូនការឆ្លើយតបមិនត្រឹមត្រូវ។');
+      }
+      
+      if (!result.success) {
+        throw new Error(result.error || "ការទាញយកទិន្នន័យបានបរាជ័យ");
+      }
+      
+      const parsedItems = result.data.map((item: any) => {
+        const searchName = (item.productName || '').trim().toLowerCase();
+        let matchedProduct = products.find(p => p.name.toLowerCase() === searchName);
+        if (!matchedProduct) {
+          const sortedProducts = [...products].sort((a, b) => b.name.length - a.name.length);
+          matchedProduct = sortedProducts.find(p => p.name.toLowerCase().includes(searchName) || searchName.includes(p.name.toLowerCase()));
+        }
+        return {
+          productName: matchedProduct ? matchedProduct.name : item.productName || '',
+          quantity: item.quantity ? item.quantity.toString() : ''
+        };
+      }).filter((item: any) => item.productName);
+      
+      const aggregatedItems = parsedItems.reduce((acc: any[], current: any) => {
+        const existing = acc.find(item => item.productName === current.productName);
+        if (existing) {
+          existing.quantity = ((Number(existing.quantity) || 0) + (Number(current.quantity) || 0)).toString();
+        } else {
+          acc.push(current);
+        }
+        return acc;
+      }, []);
+      
+      setStockInItems(prev => {
+        const newArray = [...prev];
+        aggregatedItems.forEach(aggItem => {
+          const existingInPrev = newArray.find(p => p.productName === aggItem.productName);
+          if (existingInPrev) {
+            existingInPrev.quantity = ((Number(existingInPrev.quantity) || 0) + (Number(aggItem.quantity) || 0)).toString();
+          } else {
+            newArray.push(aggItem);
+          }
+        });
+        return newArray;
+      });
+    } catch (error: any) {
+      alert("មានបញ្ហាក្នុងការស្កេន: " + error.message);
+    } finally {
+      setStockInScannerLoading(false);
+      if (stockInFileInputRef.current) stockInFileInputRef.current.value = '';
+    }
   };
 
   const handleរក្សាទុកStockIn = async (e: React.FormEvent) => {
@@ -1557,6 +1584,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           id: Date.now().toString() + Math.random().toString(),
           productName: matchedProduct ? matchedProduct.name : item.productName || '',
           quantity: item.quantity || 0,
+          soldQty: item.soldQuantity,
+          exchangedQty: item.exchangedQuantity,
+          promoQty: item.promoQuantity,
           unit: item.unit || '',
           description: item.description || '',
           matchedProductId: matchedProduct?.id,
@@ -1564,7 +1594,29 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         };
       });
       
-      setAiScannerResults(parsedItems);
+      const aggregatedItems = parsedItems.reduce((acc: any[], current: any) => {
+        const existing = acc.find(item => item.productName === current.productName);
+        if (existing) {
+          existing.quantity = (Number(existing.quantity) || 0) + (Number(current.quantity) || 0);
+          if (current.soldQty !== undefined || existing.soldQty !== undefined) {
+             existing.soldQty = (Number(existing.soldQty) || 0) + (Number(current.soldQty) || 0);
+          }
+          if (current.exchangedQty !== undefined || existing.exchangedQty !== undefined) {
+             existing.exchangedQty = (Number(existing.exchangedQty) || 0) + (Number(current.exchangedQty) || 0);
+          }
+          if (current.promoQty !== undefined || existing.promoQty !== undefined) {
+             existing.promoQty = (Number(existing.promoQty) || 0) + (Number(current.promoQty) || 0);
+          }
+          if (current.description) {
+            existing.description = existing.description ? existing.description + ", " + current.description : current.description;
+          }
+        } else {
+          acc.push(current);
+        }
+        return acc;
+      }, []);
+      
+      setAiScannerResults(aggregatedItems);
     } catch (error: any) {
       alert("មានបញ្ហាក្នុងការស្កេន: " + error.message);
     } finally {
@@ -1609,6 +1661,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           type: aiScannerType,
           productName: item.productName,
           quantity: item.quantity,
+          promoQty: item.promoQty || 0,
           date: isoDate,
           note: item.description ? "AI Scan: " + item.description : "AI Scan"
         };
@@ -3848,27 +3901,20 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
       {/* Stock In Modal */}
       {isStockInModalOpen && createPortal(
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-0">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setIsStockInModalOpen(false); setStockInItems([]); }}></div>
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center shrink-0">
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">បញ្ចូលស្តុកចូល </h3>
-                <p className="text-xs text-slate-500 font-medium">សូមជ្រើសរើសទំនិញ និងបញ្ចូលចំនួនស្តុកបន្ថែម</p>
+                <h3 className="text-lg font-black text-slate-800">បញ្ចូលស្តុកចូល</h3>
+                <p className="text-xs text-slate-500 font-medium mt-1">សូមជ្រើសរើសទំនិញ និងបញ្ចូលចំនួនស្តុកបន្ថែម</p>
               </div>
-              <button 
-                onClick={() => {
-                  setIsStockInModalOpen(false);
-                  setStockInItems([]);
-                }} 
-                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={() => { setIsStockInModalOpen(false); setStockInItems([]); }} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
-            <form onSubmit={handleរក្សាទុកStockIn} className="flex flex-col min-h-0">
+            <form onSubmit={handleរក្សាទុកStockIn} className="flex flex-col min-h-0 flex-1">
               <div className="overflow-y-auto p-6 pt-4 custom-scroll space-y-4">
                 {/* Meta Inputs (Date & Deliverer) */}
                 <div className="grid grid-cols-2 gap-4">
@@ -3894,153 +3940,143 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   </div>
                 </div>
 
-                {/* Multi-Stock List Selection */}
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center px-1">
-                      <label className="text-[11px] md:text-xs font-bold text-slate-500">
-                        ជ្រើសរើសទំនិញ
-                      </label>
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => stockInFileInputRef.current?.click()}
-                          disabled={stockInScannerLoading}
-                          className="flex items-center space-x-1 text-[10px] sm:text-[11px] font-bold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-2.5 py-1 rounded-lg transition active:scale-95 disabled:opacity-50"
-                        >
-                          {stockInScannerLoading ? (
-                            <span>កំពុងស្កេន...</span>
-                          ) : (
-                            <>
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M3 4a2 2 0 012-2h4a1 1 0 010 2H5v12h10V4h-1a1 1 0 110-2h1a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V4zm3 4a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                              </svg>
-                              <span>អេអាយស្កេន ឆ្លាតវៃ</span>
-                            </>
-                          )}
-                        </button>
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          capture="environment" 
-                          ref={stockInFileInputRef} 
-                          onChange={handleStockInAIScan} 
-                          className="hidden" 
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const existingNames = new Set(stockInItems.map(i => i.productName));
-                            const newItems = products
-                              .filter(p => !existingNames.has(p.name))
-                              .map(p => ({ productName: p.name, quantity: '' }));
-                            setQuickAddItems(newItems);
-                            setIsQuickAddModalOpen(true);
-                          }}
-                          className="text-[10px] sm:text-[11px] font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg transition active:scale-95"
-                        >
-                          + បញ្ចូលទំនិញទាំងអស់រហ័ស
-                        </button>
-                      </div>
-                    </div>
-                    <div className="relative">
-                      <select
-                        onChange={handleProductSelectToStockIn}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-sky-400 outline-none font-bold text-slate-800 appearance-none cursor-pointer"
-                        value=""
+                {/* Upload Section */}
+                <div className="space-y-1.5 mb-4">
+                  <label className="text-xs font-bold text-slate-500 px-1">រូបភាពវិក្កយបត្រ ឬកំណត់ត្រា</label>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full">
+                    <div className="flex-1 flex items-center justify-between border border-slate-200 rounded-2xl p-1 bg-slate-50 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => stockInFileInputRef.current?.click()}
+                        className="bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer border border-transparent whitespace-nowrap shrink-0"
                       >
-                        <option value="" disabled>-- ជ្រើសរើសទំនិញដើម្បីបញ្ចូលស្តុក --</option>
-                        {products.map(p => (
-                          <option key={p.id} value={p.name}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                        </svg>
-                      </div>
+                        ជ្រើសរើសរូបភាព
+                      </button>
+                      <span className="text-[11px] sm:text-xs text-slate-500 font-bold px-3 sm:px-4 truncate flex-1 text-right min-w-0">
+                        {stockInFileName || "មិនទាន់ជ្រើសរើសឯកសារឡើយ"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        ref={stockInFileInputRef}
+                        onChange={handleStockInImageUpload}
+                        className="hidden"
+                      />
                     </div>
+                    <button
+                      type="button"
+                      onClick={handleStockInScan}
+                      disabled={stockInScannerLoading || !stockInImage}
+                      className="bg-sky-400 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs py-3.5 sm:py-3 px-6 rounded-2xl transition shadow-md shadow-sky-400/20 whitespace-normal text-center animate-in fade-in flex items-center justify-center shrink-0 w-full sm:w-auto"
+                    >
+                      {stockInScannerLoading ? 'កំពុងស្កេន...' : 'ស្កេនទាញយកទិន្នន័យ'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const existingNames = new Set(stockInItems.map(i => i.productName));
+                        const newItems = products
+                          .filter(p => !existingNames.has(p.name))
+                          .map(p => ({ productName: p.name, quantity: '' }));
+                        setQuickAddItems(newItems);
+                        setIsQuickAddModalOpen(true);
+                      }}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs py-3.5 sm:py-3 px-6 rounded-2xl transition shadow-md shadow-emerald-500/20 whitespace-normal text-center animate-in fade-in flex items-center justify-center shrink-0 w-full sm:w-auto"
+                    >
+                      + បញ្ចូលរហ័សទាំងអស់
+                    </button>
                   </div>
+                </div>
 
-                  {/* List Rows */}
-                  <div className="space-y-1.5">
-                    {stockInItems.length === 0 ? (
-                      <div className="border border-dashed border-slate-200 rounded-2xl py-8 px-4 text-center text-xs text-slate-400 font-bold bg-slate-50/30">
-                        📦 សូមជ្រើសរើសទំនិញខាងលើ ដើម្បីបន្ថែមចូលក្នុងបញ្ជីបញ្ចូលស្តុក
-                      </div>
-                    ) : (
-                      <div className="border border-slate-100 rounded-2xl bg-slate-50/30 p-2 sm:p-3 space-y-1">
-                        {/* Column Headers */}
-                        <div className="grid grid-cols-12 gap-2 px-2 pb-2 border-b border-slate-200 text-[10px] font-bold text-slate-400">
-                          <div className="col-span-8">ទំនិញ</div>
-                          <div className="col-span-3 text-center">បរិមាណ</div>
-                          <div className="col-span-1"></div>
-                        </div>
+                {stockInImage && (
+                  <div className="mb-4 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 relative h-48 md:h-64 flex items-center justify-center">
+                     <img src={stockInImage} alt="Scanned Note" className="max-h-full object-contain" />
+                  </div>
+                )}
 
-                        {/* Rows */}
-                        <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto pr-1 custom-scroll">
-                          {stockInItems.map((item, index) => (
-                            <div key={index} className="grid grid-cols-12 gap-2 py-2 items-center px-2 hover:bg-slate-50 rounded-lg transition animate-in fade-in duration-150">
-                              {/* Product Name */}
-                              <div className="col-span-8 flex flex-col min-w-0">
-                                <span className="font-bold text-slate-800 text-xs truncate" title={item.productName}>
-                                  {item.productName}
-                                </span>
-                              </div>
-
-                              {/* បរិមាណ Input */}
-                              <div className="col-span-3">
+                <div className="space-y-3 flex-1 flex flex-col min-h-0">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-slate-500 px-1">ទិន្នន័យ (ស្កេន ឬបញ្ចូលដោយដៃ)</label>
+                  </div>
+                  
+                  {stockInItems.length > 0 ? (
+                    <div className="border border-slate-200 rounded-2xl overflow-y-auto custom-scroll flex-1 max-h-[40vh]">
+                      <table className="w-full text-left text-sm min-w-[500px]">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs sticky top-0 z-10">
+                          <tr>
+                            <th className="p-3">ឈ្មោះទំនិញ / ផលិតផល</th>
+                            <th className="p-3 w-24 text-center">បរិមាណ</th>
+                            <th className="p-3 w-12 text-center"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {stockInItems.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 transition">
+                              <td className="p-2">
+                                <select
+                                  value={item.productName}
+                                  onChange={(e) => updateStockInRow(idx, 'productName', e.target.value)}
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:border-sky-400 outline-none transition cursor-pointer truncate"
+                                >
+                                  {products.map(p => (
+                                    <option key={p.id} value={p.name}>{p.name}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="p-2">
                                 <input
                                   type="number"
-                                  value={item.quantity}
-                                  onChange={e => updateStockInRow(index, 'quantity', e.target.value)}
-                                  className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-center text-xs focus:border-sky-400 outline-none font-bold text-slate-800"
-                                  required
                                   min="1"
+                                  value={item.quantity}
+                                  onChange={e => updateStockInRow(idx, 'quantity', e.target.value)}
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-2 py-2 text-center text-xs focus:border-sky-400 outline-none font-bold text-slate-800 transition"
+                                  required
                                   placeholder="ចំនួន"
                                 />
-                              </div>
-
-                              {/* លុប button */}
-                              <div className="col-span-1 text-right">
+                              </td>
+                              <td className="p-2 text-center">
                                 <button
                                   type="button"
-                                  onClick={() => removeStockInRow(index)}
-                                  className="p-1 hover:bg-rose-50 text-rose-500 rounded-lg transition cursor-pointer flex justify-end w-full"
-                                  title="លុបចោល"
+                                  onClick={() => removeStockInRow(idx)}
+                                  className="p-2 hover:bg-rose-50 text-rose-400 hover:text-rose-500 rounded-lg transition"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                   </svg>
                                 </button>
-                              </div>
-                            </div>
+                              </td>
+                            </tr>
                           ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="border border-dashed border-slate-200 rounded-2xl py-12 px-4 text-center text-slate-400 bg-slate-50/50 flex flex-col items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="font-bold text-sm">មិនទាន់មានទិន្នន័យ។ សូមស្កេន ឬបន្ថែមដោយដៃ។</p>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Footer Actions */}
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center space-x-3 shrink-0 rounded-b-3xl">
+{/* Footer Actions */}
+              <div className="p-4 sm:p-5 border-t border-slate-50 bg-slate-50/50 flex space-x-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setIsStockInModalOpen(false);
                     setStockInItems([]);
                   }}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition cursor-pointer animate-in duration-100"
+                  className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition shadow-sm"
                 >
                   បោះបង់
                 </button>
                 <button
                   type="submit"
                   disabled={loading || stockInItems.length === 0}
-                  className="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm py-3 rounded-2xl shadow-lg shadow-sky-600/30 transition disabled:opacity-70 cursor-pointer"
+                  className="flex-[2] bg-sky-500 hover:bg-sky-600 disabled:opacity-70 text-white font-bold text-sm py-3 rounded-2xl shadow-md shadow-sky-500/20 active:scale-[0.98] transition"
                 >
                   {loading ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក'}
                 </button>
@@ -4050,57 +4086,248 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         </div>,
         document.body
       )}
-
-      {/* Quick Add Modal */}
-      {isQuickAddModalOpen && createPortal(
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
-              <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">បញ្ចូលទំនិញរហ័ស</h3>
-                <p className="text-xs text-slate-500 font-medium">សូមបញ្ចូលចំនួនសម្រាប់ទំនិញនីមួយៗ</p>
-              </div>
-              <button 
-                onClick={() => setIsQuickAddModalOpen(false)} 
-                className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+      {manualAddMode !== 'none' && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 sm:px-0">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setManualAddMode('none')}></div>
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center shrink-0">
+              <h3 className="text-lg font-black text-slate-800">
+                {manualAddMode === 'all' ? 'បញ្ចូលរហ័សទាំងអស់' : 'បន្ថែមទំនិញ'}
+              </h3>
+              <button onClick={() => setManualAddMode('none')} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             
-            <div className="overflow-y-auto p-4 custom-scroll space-y-2">
-              {quickAddItems.length === 0 ? (
-                <div className="text-center text-slate-400 font-medium py-8 text-sm">
-                  គ្មានទំនិញបន្ថែមទេ
-                </div>
-              ) : (
-                quickAddItems.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span className="font-bold text-slate-700 text-xs sm:text-sm">{item.productName}</span>
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={e => {
-                        const copy = [...quickAddItems];
-                        copy[index].quantity = e.target.value;
-                        setQuickAddItems(copy);
-                      }}
-                      className="w-24 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-center text-sm focus:border-sky-400 outline-none font-bold text-slate-800"
-                      placeholder="ចំនួន"
-                      min="1"
-                    />
-                  </div>
-                ))
-              )}
+            <div className="p-4 sm:p-6 flex flex-col min-h-0 overflow-hidden flex-1">
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="ស្វែងរកទំនិញ..."
+                  value={manualAddSearchText}
+                  onChange={e => setManualAddSearchText(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 transition placeholder:text-slate-400 placeholder:font-normal"
+                />
+              </div>
+              <div className="flex-1 overflow-auto custom-scroll border border-slate-200 rounded-2xl">
+                <table className="w-full text-left text-sm min-w-[500px]">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs sticky top-0 z-10">
+                    <tr>
+                      <th className="p-3 w-48">ឈ្មោះទំនិញ</th>
+                      {aiScannerType === 'Stock Sold' ? (
+                        <>
+                          <th className="p-3 w-20 text-center">លក់</th>
+                          <th className="p-3 w-20 text-center">ក្រវិល</th>
+                          <th className="p-3 w-20 text-center">ថែម</th>
+                          <th className="p-3 w-20 text-center font-bold text-sky-600">សរុប</th>
+                        </>
+                      ) : (
+                        <th className="p-3 w-24 text-center">បរិមាណ</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {manualAddItems.filter(item => item.productName.toLowerCase().includes(manualAddSearchText.toLowerCase())).map((item) => {
+                      const actualIdx = manualAddItems.findIndex(mi => mi.id === item.id);
+                      return (
+                      <tr key={item.id} className="hover:bg-slate-50 transition">
+                        <td className="p-2">
+                          <select
+                            value={item.productName}
+                            onChange={e => {
+                              const pName = e.target.value;
+                              const actual = products.find(p => p.name === pName);
+                              const newItems = [...manualAddItems];
+                              newItems[actualIdx] = { ...item, productName: pName, matchedProductId: actual?.id, actualProduct: actual };
+                              setManualAddItems(newItems);
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition truncate"
+                          >
+                            {products.map(p => (
+                              <option key={p.id} value={p.name}>{p.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        {aiScannerType === 'Stock Sold' ? (
+                          <>
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.soldQty || ''}
+                                onChange={e => {
+                                  const val = parseInt(e.target.value) || 0;
+                                  const newItems = [...manualAddItems];
+                                  newItems[actualIdx] = { ...item, soldQty: val, quantity: val + item.exchangedQty + item.promoQty };
+                                  setManualAddItems(newItems);
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.exchangedQty || ''}
+                                onChange={e => {
+                                  const val = parseInt(e.target.value) || 0;
+                                  const newItems = [...manualAddItems];
+                                  newItems[actualIdx] = { ...item, exchangedQty: val, quantity: item.soldQty + val + item.promoQty };
+                                  setManualAddItems(newItems);
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.promoQty || ''}
+                                onChange={e => {
+                                  const val = parseInt(e.target.value) || 0;
+                                  const newItems = [...manualAddItems];
+                                  newItems[actualIdx] = { ...item, promoQty: val, quantity: item.soldQty + item.exchangedQty + val };
+                                  setManualAddItems(newItems);
+                                }}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-amber-600 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <div className="w-full bg-slate-100 rounded-xl px-2 py-1.5 text-xs font-black text-sky-600 text-center border border-slate-100">
+                                {item.quantity}
+                              </div>
+                            </td>
+                          </>
+                        ) : (
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.quantity || ''}
+                              onChange={e => {
+                                const val = parseInt(e.target.value) || 0;
+                                const newItems = [...manualAddItems];
+                                newItems[actualIdx] = { ...item, quantity: val };
+                                setManualAddItems(newItems);
+                              }}
+                              className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
+                            />
+                          </td>
+                        )}
+                      </tr>
+                    )})}
+                  </tbody>
+                </table>
+              </div>
             </div>
+            <div className="p-4 sm:p-5 border-t border-slate-50 bg-slate-50/50 flex space-x-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setManualAddMode('none')}
+                className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition shadow-sm"
+              >
+                បោះបង់
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (manualAddMode === 'all') {
+                    // Replace or append? For "all", usually replace is better, but append works too.
+                    const newResults = [...aiScannerResults];
+                    manualAddItems.forEach(item => {
+                      if (item.quantity > 0) {
+                        const existingIdx = newResults.findIndex(r => r.matchedProductId === item.matchedProductId);
+                        if (existingIdx >= 0) {
+                          newResults[existingIdx].quantity += item.quantity;
+                          newResults[existingIdx].soldQty = (newResults[existingIdx].soldQty || 0) + item.soldQty;
+                          newResults[existingIdx].exchangedQty = (newResults[existingIdx].exchangedQty || 0) + item.exchangedQty;
+                          newResults[existingIdx].promoQty = (newResults[existingIdx].promoQty || 0) + item.promoQty;
+                        } else {
+                          newResults.push(item);
+                        }
+                      }
+                    });
+                    setAiScannerResults(newResults);
+                  } else {
+                    setAiScannerResults([...aiScannerResults, ...manualAddItems]);
+                  }
+                  setManualAddMode('none');
+                }}
+                className="flex-[2] bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm py-3 rounded-2xl shadow-md shadow-emerald-500/20 active:scale-[0.98] transition"
+              >
+                បញ្ជាក់ឲ្យចូល
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
-            <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center space-x-3 shrink-0 rounded-b-3xl">
+
+      {/* Quick Add Modal */}
+      {isQuickAddModalOpen && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 sm:px-0">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsQuickAddModalOpen(false)}></div>
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center shrink-0">
+              <h3 className="text-lg font-black text-slate-800">បញ្ចូលរហ័សទាំងអស់</h3>
+              <button onClick={() => setIsQuickAddModalOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            
+            <div className="p-4 sm:p-6 flex flex-col min-h-0 overflow-hidden flex-1">
+              <div className="flex-1 overflow-auto custom-scroll border border-slate-200 rounded-2xl">
+                <table className="w-full text-left text-sm min-w-[500px]">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs sticky top-0 z-10">
+                    <tr>
+                      <th className="p-3 w-48">ឈ្មោះទំនិញ</th>
+                      <th className="p-3 w-24 text-center">បរិមាណ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {quickAddItems.map((item, index) => (
+                      <tr key={index} className="hover:bg-slate-50 transition">
+                        <td className="p-2">
+                          <select
+                            value={item.productName}
+                            onChange={e => {
+                              const copy = [...quickAddItems];
+                              copy[index].productName = e.target.value;
+                              setQuickAddItems(copy);
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition truncate"
+                          >
+                            {products.map(p => (
+                              <option key={p.id} value={p.name}>{p.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.quantity || ''}
+                            onChange={e => {
+                              const copy = [...quickAddItems];
+                              copy[index].quantity = e.target.value;
+                              setQuickAddItems(copy);
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition text-center"
+                            placeholder="ចំនួន"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="p-4 sm:p-5 border-t border-slate-50 bg-slate-50/50 flex space-x-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsQuickAddModalOpen(false)}
-                className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm py-3 rounded-2xl transition cursor-pointer"
+                className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 font-bold text-sm py-3 rounded-2xl transition shadow-sm"
               >
                 បោះបង់
               </button>
@@ -4111,9 +4338,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   setStockInItems([...stockInItems, ...validItems]);
                   setIsQuickAddModalOpen(false);
                 }}
-                className="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm py-3 rounded-2xl transition shadow-lg shadow-sky-600/20 cursor-pointer"
+                className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm py-3 rounded-2xl transition shadow-md shadow-sky-500/20"
               >
-                បញ្ជាក់
+                រក្សាទុក
               </button>
             </div>
           </div>
@@ -4321,9 +4548,29 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     type="button"
                     onClick={handleAIScan}
                     disabled={aiScannerLoading || !aiScannerImage}
-                    className="bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-xs py-3.5 sm:py-3 px-6 rounded-2xl transition shadow-md shadow-sky-500/20 whitespace-normal text-center animate-in fade-in flex items-center justify-center shrink-0 w-full sm:w-auto"
+                    className="bg-sky-400 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs py-3.5 sm:py-3 px-6 rounded-2xl transition shadow-md shadow-sky-400/20 whitespace-normal text-center animate-in fade-in flex items-center justify-center shrink-0 w-full sm:w-auto"
                   >
                     {aiScannerLoading ? 'កំពុងស្កេន...' : 'ស្កេនទាញយកទិន្នន័យ'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const items = products.map(p => ({
+                        id: Date.now().toString() + Math.random().toString(),
+                        productName: p.name,
+                        quantity: 0,
+                        soldQty: 0,
+                        exchangedQty: 0,
+                        promoQty: 0,
+                        matchedProductId: p.id,
+                        actualProduct: p
+                      }));
+                      setManualAddItems(items);
+                      setManualAddMode('all');
+                    }}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs py-3.5 sm:py-3 px-6 rounded-2xl transition shadow-md shadow-emerald-500/20 whitespace-normal text-center animate-in fade-in flex items-center justify-center shrink-0 w-full sm:w-auto"
+                  >
+                    + បញ្ចូលរហ័សទាំងអស់
                   </button>
                 </div>
               </div>
@@ -4334,11 +4581,14 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 </div>
               )}
 
-              {aiScannerResults.length > 0 && (
-                <div className="space-y-3">
-                  <label className="text-xs font-bold text-slate-500 px-1">លទ្ធផលដែលទាញយកបាន</label>
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-sm">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-slate-500 px-1">ទិន្នន័យ (ស្កេន ឬបញ្ចូលដោយដៃ)</label>
+                  
+                </div>
+                {aiScannerResults.length > 0 ? (
+                  <div className="border border-slate-200 rounded-2xl overflow-x-auto">
+                    <table className="w-full text-left text-sm min-w-[500px]">
                       <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs">
                         <tr>
                           <th className="p-3">ឈ្មោះទំនិញ / ផលិតផល</th>
@@ -4386,13 +4636,31 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:border-sky-400 outline-none font-bold text-slate-700 text-center"
                               />
                             </td>
+                            <td className="p-2 w-10 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAiScannerResults(aiScannerResults.filter((_, i) => i !== idx));
+                                }}
+                                className="text-rose-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition"
+                                title="លុប"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-center py-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+                    <p className="text-slate-400 text-sm">មិនទាន់មានទិន្នន័យ។ សូមស្កេន ឬបន្ថែមដោយដៃ។</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="p-5 border-t border-slate-50 bg-slate-50/50 flex space-x-3 shrink-0">
@@ -6786,11 +7054,23 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     </label>
                     <div className="space-y-2">
                       {editStockInItems.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-                          <div className="flex-1">
-                            <div className="text-xs font-bold text-slate-700 mb-1">{item.productName}</div>
+                        <div key={idx} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition duration-200">
+                          <div className="flex-1 min-w-0">
+                            <select
+                              value={item.productName}
+                              onChange={(e) => {
+                                const newItems = [...editStockInItems];
+                                newItems[idx].productName = e.target.value;
+                                setកែប្រែStockInItems(newItems);
+                              }}
+                              className="w-full bg-transparent border-none px-2 py-1 text-sm font-bold text-slate-700 focus:ring-0 outline-none cursor-pointer truncate"
+                            >
+                              {products.map(p => (
+                                <option key={p.id} value={p.name}>{p.name}</option>
+                              ))}
+                            </select>
                           </div>
-                          <div className="w-28 relative">
+                          <div className="w-28 relative shrink-0">
                             <input
                               type="number"
                               min="1"
@@ -6800,11 +7080,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                                 newItems[idx].quantity = e.target.value;
                                 setកែប្រែStockInItems(newItems);
                               }}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:border-sky-400 outline-none font-bold text-slate-800 pr-8"
-                              placeholder="ចំនួន"
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-sky-400 outline-none font-black text-slate-800 pr-10 text-center"
+                              placeholder="0"
                               required
                             />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold pointer-events-none">
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-bold pointer-events-none">
                               ឯកតា
                             </div>
                           </div>
