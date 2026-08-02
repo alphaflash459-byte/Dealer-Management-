@@ -466,51 +466,81 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64Image = event.target?.result as string;
-      setStockInScannerLoading(true);
-      try {
-        const response = await fetch('/api/extract-note', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            image: base64Image, 
-            targetType: 'Stock In',
-            productNames: products.map(p => p.name)
-          })
-        });
-        
-        let result;
-        try {
-          result = await response.json();
-        } catch (e) {
-          throw new Error('ម៉ាស៊ីនបម្រើបានបញ្ជូនការឆ្លើយតបមិនត្រឹមត្រូវ។');
-        }
-        
-        if (!result.success) {
-          throw new Error(result.error || "ការទាញយកទិន្នន័យបានបរាជ័យ");
-        }
-        
-        const parsedItems = result.data.map((item: any) => {
-          const searchName = (item.productName || '').trim().toLowerCase();
-          let matchedProduct = products.find(p => p.name.toLowerCase() === searchName);
-          if (!matchedProduct) {
-            const sortedProducts = [...products].sort((a, b) => b.name.length - a.name.length);
-            matchedProduct = sortedProducts.find(p => p.name.toLowerCase().includes(searchName) || searchName.includes(p.name.toLowerCase()));
+    reader.onload = (event) => {
+      const rawBase64 = event.target?.result as string;
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const MAX_DIMENSION = 800;
+
+        if (width > height) {
+          if (width > MAX_DIMENSION) {
+            height *= MAX_DIMENSION / width;
+            width = MAX_DIMENSION;
           }
-          return {
-            productName: matchedProduct ? matchedProduct.name : item.productName || '',
-            quantity: item.quantity ? item.quantity.toString() : ''
-          };
-        }).filter((item: any) => item.productName);
-        
-        setStockInItems(prev => [...prev, ...parsedItems]);
-      } catch (error: any) {
-        alert("មានបញ្ហាក្នុងការស្កេន: " + error.message);
-      } finally {
-        setStockInScannerLoading(false);
-        if (stockInFileInputRef.current) stockInFileInputRef.current.value = '';
-      }
+        } else {
+          if (height > MAX_DIMENSION) {
+            width *= MAX_DIMENSION / height;
+            height = MAX_DIMENSION;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        let compressedBase64 = rawBase64;
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          compressedBase64 = canvas.toDataURL('image/jpeg', 0.4);
+        }
+
+        setStockInScannerLoading(true);
+        try {
+          const response = await fetch('/api/extract-note', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              image: compressedBase64, 
+              targetType: 'Stock In',
+              productNames: products.map(p => p.name)
+            })
+          });
+          
+          let result;
+          try {
+            result = await response.json();
+          } catch (e) {
+            throw new Error('ម៉ាស៊ីនបម្រើបានបញ្ជូនការឆ្លើយតបមិនត្រឹមត្រូវ។');
+          }
+          
+          if (!result.success) {
+            throw new Error(result.error || "ការទាញយកទិន្នន័យបានបរាជ័យ");
+          }
+          
+          const parsedItems = result.data.map((item: any) => {
+            const searchName = (item.productName || '').trim().toLowerCase();
+            let matchedProduct = products.find(p => p.name.toLowerCase() === searchName);
+            if (!matchedProduct) {
+              const sortedProducts = [...products].sort((a, b) => b.name.length - a.name.length);
+              matchedProduct = sortedProducts.find(p => p.name.toLowerCase().includes(searchName) || searchName.includes(p.name.toLowerCase()));
+            }
+            return {
+              productName: matchedProduct ? matchedProduct.name : item.productName || '',
+              quantity: item.quantity ? item.quantity.toString() : ''
+            };
+          }).filter((item: any) => item.productName);
+          
+          setStockInItems(prev => [...prev, ...parsedItems]);
+        } catch (error: any) {
+          alert("មានបញ្ហាក្នុងការស្កេន: " + error.message);
+        } finally {
+          setStockInScannerLoading(false);
+          if (stockInFileInputRef.current) stockInFileInputRef.current.value = '';
+        }
+      };
+      img.src = rawBase64;
     };
     reader.readAsDataURL(file);
   };

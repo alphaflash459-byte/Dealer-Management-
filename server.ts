@@ -46,54 +46,83 @@ Ensure the output is ONLY a valid JSON array matching the structure.
 If you can't read an item clearly, skip it or put your best guess.
 Do not wrap the JSON in markdown codeblocks like \`\`\`json. Return raw JSON.`;
 
+      const modelsToTry = ["gemini-3.6-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
       let response;
-      let retries = 3;
-      
-      while (retries > 0) {
-        try {
-          response = await ai.models.generateContent({
-            model: "gemini-3.6-flash",
-            contents: {
-              parts: [
-                {
-                  inlineData: {
-                    mimeType: "image/jpeg",
-                    data: base64Data
-                  }
-                },
-                { text: prompt }
-              ]
-            },
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    productName: { type: Type.STRING },
-                    quantity: { type: Type.NUMBER },
-                    unit: { type: Type.STRING },
-                    description: { type: Type.STRING }
+      let lastError: any = null;
+
+      for (const modelName of modelsToTry) {
+        let retries = 2;
+        while (retries >= 0) {
+          try {
+            response = await ai.models.generateContent({
+              model: modelName,
+              contents: {
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: "image/jpeg",
+                      data: base64Data
+                    }
                   },
-                  required: ["productName", "quantity"]
+                  { text: prompt }
+                ]
+              },
+              config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      productName: { type: Type.STRING },
+                      quantity: { type: Type.NUMBER },
+                      unit: { type: Type.STRING },
+                      description: { type: Type.STRING }
+                    },
+                    required: ["productName", "quantity"]
+                  }
                 }
               }
+            });
+            lastError = null;
+            break; // Success
+          } catch (e: any) {
+            lastError = e;
+            const errStr = (e.message || "") + " " + JSON.stringify(e);
+            console.error(`Gemini API Error on ${modelName} (retries left: ${retries}):`, e.message || e);
+            
+            const isRateLimit = e.status === 429 || e.status === "RESOURCE_EXHAUSTED" || errStr.includes("429") || errStr.includes("Quota") || errStr.includes("RESOURCE_EXHAUSTED");
+            const isUnavailable = e.status === "UNAVAILABLE" || errStr.includes("503");
+
+            if (isRateLimit) {
+              console.log(`Rate limit / Quota reached for ${modelName}, switching to next model...`);
+              break; // Try next model immediately
             }
-          });
-          break; // Success, exit retry loop
-        } catch (e: any) {
-          retries--;
-          console.error(`Gemini API Error (retries left: ${retries}):`, e.message);
-          
-          // Check if it's a 503 Unavailable error or if we've run out of retries
-          const isUnavailable = e.status === "UNAVAILABLE" || (e.message && e.message.includes("503"));
-          if (retries === 0 || !isUnavailable) {
-            throw e;
+
+            if (retries === 0 || !isUnavailable) {
+              break; // Try next model
+            }
+            retries--;
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
-          // Wait 2 seconds before retrying
-          await new Promise(resolve => setTimeout(resolve, 2000));
         }
+        if (response) {
+          break; // Successfully got response
+        }
+      }
+
+      if (!response && lastError) {
+        const errStr = (lastError.message || "") + " " + JSON.stringify(lastError);
+        if (errStr.includes("429") || errStr.includes("Quota") || errStr.includes("RESOURCE_EXHAUSTED")) {
+          return res.status(429).json({ 
+            success: false,
+            error: "ប្រព័ន្ធ AI កំពុងមមាញឹក ឬអស់កូតាក្នុងការស្កេន (429 Quota Exceeded)។ សូមរង់ចាំប្រហែល 30 វិនាទី រួចព្យាយាមម្តងទៀត។" 
+          });
+        }
+        return res.status(500).json({
+          success: false,
+          error: lastError.message || "Failed to process image"
+        });
       }
       
       const textResponse = response?.text || "[]";
