@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { User, Transaction, Product, StockOrder } from './types';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
@@ -115,9 +116,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row w-full h-[100dvh] font-sans bg-[#f1f5f9]">
+    <div className="flex flex-col md:flex-row w-full h-[100dvh] overflow-x-hidden font-sans bg-slate-50">
       {/* NAVIGATION (Sidebar on Tablet/PC, Bottom Bar on Mobile) */}
-      <nav className="md:relative w-full md:w-64 bg-white/95 md:bg-white backdrop-blur-md md:backdrop-blur-none border-t md:border-t-0 md:border-r border-slate-200/50 z-40 shrink-0 order-2 md:order-1 transition-all shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] md:shadow-none pb-safe">
+      <nav className="md:relative w-full md:w-64 bg-white/80 md:bg-white backdrop-blur-xl md:backdrop-blur-none border-t md:border-t-0 md:border-r border-slate-200/50 z-50 shrink-0 order-2 md:order-1 transition-all shadow-[0_-10px_30px_-10px_rgba(0,0,0,0.1)] md:shadow-none pb-safe rounded-t-3xl md:rounded-none">
         <div className="hidden md:flex items-center space-x-3 p-6 mb-2 border-b border-slate-50">
             <div className="bg-emerald-600 text-white p-2.5 rounded-xl shadow-md shadow-emerald-600/30">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
@@ -125,7 +126,7 @@ export default function App() {
             <h1 className="text-base font-black text-slate-800 tracking-wide leading-tight">គ្រប់គ្រង<br/><span className="text-emerald-600">ស្តុកទំនិញ</span></h1>
         </div>
 
-        <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible justify-start md:justify-start flex-nowrap w-full h-[65px] md:h-auto pb-2 md:pb-0 pt-2 md:pt-4 px-2 md:px-4 md:space-y-2 custom-scroll space-x-3 md:space-x-0 shrink-0">
+        <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible justify-between md:justify-start flex-nowrap w-full h-[75px] md:h-auto pb-safe-bottom pt-2 md:pt-4 px-3 md:px-4 md:space-y-2 custom-scroll space-x-2 md:space-x-0 shrink-0 border-t md:border-t-0 border-slate-100">
             {currentUser.role === 'Admin' || currentUser.role === 'Server' ? (
               <>
                 <button onClick={() => setActiveAdminView('stockOut')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all shrink-0 ${activeAdminView === 'stockOut' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
@@ -235,49 +236,56 @@ export default function App() {
       </nav>
 
       {/* MAIN RIGHT AREA (Header + Content) */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[#f1f5f9] order-1 md:order-2 relative">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50 order-1 md:order-2 relative">
           {/* Sleek Mobile Header */}
-          <header className={`md:hidden bg-emerald-600 border-b border-emerald-700 px-4 sm:px-5 flex items-center shrink-0 relative z-20 shadow-md transition-all duration-300 ease-in-out ${
+          <header className={`md:hidden bg-white/95 backdrop-blur-md border-b border-slate-200/60 px-4 sm:px-5 flex items-center shrink-0 relative z-20 shadow-sm transition-all duration-300 ease-in-out ${
             isHeaderVisible 
-              ? 'h-[72px] py-4 opacity-100 translate-y-0' 
-              : 'h-0 py-0 opacity-0 -translate-y-full overflow-hidden border-b-0'
+              ? 'h-[65px] opacity-100 translate-y-0' 
+              : 'h-0 opacity-0 -translate-y-full overflow-hidden border-b-0'
           }`}>
               <button 
                 onClick={() => setIsUserMenuOpen(true)}
                 className="flex items-center space-x-2.5 sm:space-x-3 text-left cursor-pointer group relative z-10 shrink-0"
               >
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/20 border border-white/30 text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-sm backdrop-blur-sm transition-transform group-active:scale-95">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-600 flex items-center justify-center font-black text-xs sm:text-sm shadow-sm transition-transform group-active:scale-95">
                       {currentUser.username.charAt(0).toUpperCase()}
                   </div>
                   <div className="hidden sm:block">
-                      <h4 className="text-[10px] text-emerald-100/80 font-bold uppercase tracking-wider leading-none">គណនី</h4>
-                      <h2 className="text-sm font-bold text-white mt-1">{currentUser.username}</h2>
+                      <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">គណនី</h4>
+                      <h2 className="text-sm font-bold text-slate-800 mt-1">{currentUser.username}</h2>
                   </div>
               </button>
               
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
-                  <h1 className="text-white font-black text-[13px] sm:text-base drop-shadow-sm whitespace-nowrap">ប្រព័ន្ធគ្រប់គ្រងទំនិញ</h1>
+                  <h1 className="text-slate-800 font-black text-[14px] sm:text-base whitespace-nowrap">ប្រព័ន្ធ<span className="text-emerald-600">គ្រប់គ្រងទំនិញ</span></h1>
               </div>
           </header>
 
           <main 
-            className="flex-1 flex flex-col overflow-hidden relative z-10 w-full px-2 md:px-4 pt-5 pb-0 md:pb-8"
+            className="flex-1 flex flex-col overflow-hidden relative z-10 w-full px-2 md:px-4 pt-3 md:pt-5 pb-0 md:pb-8"
             onScroll={(e) => {
               const currentScrollY = e.currentTarget.scrollTop;
-              // If we are close to the top, show header
               if (currentScrollY <= 15) {
                 setIsHeaderVisible(true);
               } else if (currentScrollY > lastScrollY.current + 10) {
-                // Scrolling down - show header
-                setIsHeaderVisible(true);
-              } else if (currentScrollY < lastScrollY.current - 10) {
-                // Scrolling up - hide header
+                // Scrolling down - hide header
                 setIsHeaderVisible(false);
+              } else if (currentScrollY < lastScrollY.current - 10) {
+                // Scrolling up - show header
+                setIsHeaderVisible(true);
               }
               lastScrollY.current = currentScrollY;
             }}
           >
-            <div className="w-full h-full flex flex-col min-h-0 overflow-hidden animate-in fade-in duration-300">
+            <AnimatePresence mode="wait">
+              <motion.div 
+                key={currentUser.role === 'Admin' || currentUser.role === 'Server' ? `admin-${activeAdminView}` : `user-${activeUserView}`}
+                initial={{ opacity: 0, y: 10, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.99 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="w-full h-full flex flex-col min-h-0 overflow-hidden"
+              >
                 {currentUser.role === 'Admin' || currentUser.role === 'Server' ? (
                   <AdminDashboard 
                     currentUser={currentUser}
@@ -300,7 +308,8 @@ export default function App() {
                     activeTab={activeUserView}
                   />
                 )}
-            </div>
+              </motion.div>
+            </AnimatePresence>
           </main>
       </div>
 

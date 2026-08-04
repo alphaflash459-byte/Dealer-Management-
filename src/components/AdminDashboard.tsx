@@ -215,6 +215,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [editTxCustomerName, setកែប្រែTxCustomerName] = useState('');
   const [editTxLocation, setកែប្រែTxLocation] = useState('');
   const [editTxតម្លៃ, setកែប្រែTxតម្លៃ] = useState('');
+  
+  // Editable Report State
+  const [isEditingReport, setIsEditingReport] = useState(false);
+  const [editedReportData, setEditedReportData] = useState<Record<string, { stockOut: string, stockSold: string, stockExchanged: string, stockPromo: string, stockReturn: string }>>({});
 
   // Stock Order Admin States
   const [isបង្កើតOrderModalOpen, setIsបង្កើតOrderModalOpen] = useState(false);
@@ -2356,13 +2360,14 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         [productName: string]: {
           stockOut: number;
           stockSold: number;
+          stockExchanged: number;
           stockPromo: number;
           stockReturn: number;
         }
       } = {};
 
       exportProductsList.forEach(p => {
-        groupedMap[p.code] = { stockOut: 0, stockSold: 0, stockPromo: 0, stockReturn: 0 };
+        groupedMap[p.code] = { stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0 };
       });
 
       userTxs.forEach(t => {
@@ -2372,7 +2377,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         if (pName === 'D ORD') pName = 'DAZZ ORD';
 
         if (!groupedMap[pName]) {
-          groupedMap[pName] = { stockOut: 0, stockSold: 0, stockPromo: 0, stockReturn: 0 };
+          groupedMap[pName] = { stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0 };
         }
         const group = groupedMap[pName];
         if (t.type === 'Stock Out') group.stockOut += t.quantity;
@@ -2578,10 +2583,164 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       }
     }
 
-    if (!hasData) {
-      alert("គ្មានទិន្នន័យសម្រាប់នាំចេញឡើយ");
-      return;
+    // === NEW TOTAL STOCK SHEET ===
+    const totalStockWs = workbook.addWorksheet('ទិន្នន័យស្តុកសរុប', {
+      pageSetup: {
+        paperSize: 9, // A4
+        orientation: 'landscape',
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 1,
+        margins: { left: 0.39, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 }
+      }
+    });
+    delete totalStockWs.pageSetup.scale;
+    totalStockWs.pageSetup.fitToPage = true;
+    totalStockWs.pageSetup.fitToWidth = 1;
+    totalStockWs.pageSetup.fitToHeight = 1;
+
+    totalStockWs.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
+    
+    totalStockWs.addRow([`របាយការណ៍ស្តុកសរុប ( ${dateRangeText} )`, "", "", "", "", "", "", "", ""]);
+    totalStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "ស្តុកឃ្លាំង(ស្តុកចុងក្រោយមុនមួយថ្ងៃ)", "ស្តុកចូល", "ស្តុកឡើងឡាន", "ស្តុកត្រឡប់", "ចំនួនលក់", "ដូរក្រវិល", "ចំនួនថែម"]);
+    
+    let totalRowIndex = 1;
+    const localKhmerNumerals = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+    const toKhmerNumeralLocal = (num: number) => {
+      return num.toString().split('').map(digit => localKhmerNumerals[parseInt(digit)]).join('');
+    };
+    
+    exportProductsList.forEach(p => {
+      let dbName = p.code;
+      if (dbName === 'WICE') dbName = 'WURKZ ICE';
+      if (dbName === 'WURKZ ORD') dbName = 'W ORD';
+      if (dbName === 'DAZZ ORD') dbName = 'D ORD';
+
+      const actualProduct = products.find(prod => prod.name === dbName || prod.name === p.code);
+      const currentStock = actualProduct?.warehouseStock || 0;
+
+      let rangeStockIn = 0;
+      let rangeStockOut = 0;
+      let rangeStockReturn = 0;
+      let rangeStockSold = 0;
+      let rangeStockExchanged = 0;
+      let rangeStockPromo = 0;
+
+      let rollbackStockIn = 0;
+      let rollbackStockOut = 0;
+      let rollbackStockReturn = 0;
+
+      warehouseStockIns.forEach((record: any) => {
+        const dateStr = record.date ? record.date.split('T')[0] : '';
+        const item = record.items?.find((i: any) => i.productName === actualProduct?.name || i.productName === dbName || i.productName === p.code);
+        if (item && item.quantity) {
+          const qty = Number(item.quantity);
+          const matchStart = !filterTxStartDate || dateStr >= filterTxStartDate;
+          const matchEnd = !filterTxEndDate || dateStr <= filterTxEndDate;
+          if (matchStart && matchEnd) {
+            rangeStockIn += qty;
+          }
+          if (filterTxStartDate && dateStr >= filterTxStartDate) {
+            rollbackStockIn += qty;
+          } else if (!filterTxStartDate) {
+            rollbackStockIn += qty;
+          }
+        }
+      });
+
+      managedTransactions.forEach(t => {
+        let tName = t.productName;
+        if (tName === 'WURKZ ICE') tName = 'WICE';
+        if (tName === 'W ORD') tName = 'WURKZ ORD';
+        if (tName === 'D ORD') tName = 'DAZZ ORD';
+        
+        if (tName === p.code) {
+          const dateStr = t.date ? t.date.split('T')[0] : '';
+          const matchStart = !filterTxStartDate || dateStr >= filterTxStartDate;
+          const matchEnd = !filterTxEndDate || dateStr <= filterTxEndDate;
+          
+          if (matchStart && matchEnd) {
+            if (t.type === 'Stock Out') rangeStockOut += t.quantity;
+            if (t.type === 'Stock Return') rangeStockReturn += t.quantity;
+            if (t.type === 'Stock Sold') {
+               rangeStockSold += t.quantity;
+               rangeStockPromo += (t.promoQty || 0);
+               rangeStockExchanged += (t.exchangedQty || 0);
+            }
+          }
+
+          if (filterTxStartDate && dateStr >= filterTxStartDate) {
+            if (t.type === 'Stock Out') rollbackStockOut += t.quantity;
+            if (t.type === 'Stock Return') rollbackStockReturn += t.quantity;
+          } else if (!filterTxStartDate) {
+            if (t.type === 'Stock Out') rollbackStockOut += t.quantity;
+            if (t.type === 'Stock Return') rollbackStockReturn += t.quantity;
+          }
+        }
+      });
+
+      const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
+      
+      totalStockWs.addRow([
+        toKhmerNumeralLocal(totalRowIndex++),
+        p.khmerName,
+        openingStock || '0',
+        rangeStockIn || '',
+        rangeStockOut || '',
+        rangeStockReturn || '',
+        rangeStockSold || '',
+        rangeStockExchanged || '',
+        rangeStockPromo || ''
+      ]);
+    });
+
+    totalStockWs.mergeCells('A1:I1');
+    totalStockWs.getRow(1).height = 35;
+    totalStockWs.getRow(2).height = 35;
+    for (let i = 3; i <= totalStockWs.rowCount; i++) {
+      totalStockWs.getRow(i).height = 20;
     }
+    totalStockWs.columns = [
+      { width: 10 },  // ល.រ
+      { width: 41 }, // ឈ្មោះទំនិញ
+      { width: 20 }, // ស្តុកឃ្លាំង
+      { width: 16 }, // ស្តុកចូល
+      { width: 16 }, // ស្តុកឡើងឡាន
+      { width: 16 }, // ស្តុកត្រឡប់
+      { width: 16 }, // ចំនួនលក់
+      { width: 16 }, // ដូរក្រវិល
+      { width: 16 }  // ចំនួនថែម
+    ];
+    totalStockWs.eachRow((row, rowNumber) => {
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (colNumber > 9) return;
+        let borderStyle: Partial<ExcelJS.Borders> = {
+          top: { style: 'thin', color: { argb: 'FF002060' } },
+          bottom: { style: 'thin', color: { argb: 'FF002060' } },
+          left: { style: 'thin', color: { argb: 'FF002060' } },
+          right: { style: 'thin', color: { argb: 'FF002060' } }
+        };
+        if (rowNumber === 1) {
+          borderStyle = {};
+          cell.font = { name: 'Khmer OS Muol Light', size: 16, color: { argb: 'FF002060' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        } else if (rowNumber === 2) {
+          cell.border = borderStyle;
+          cell.font = { name: 'Khmer OS Muol Light', size: 10, color: { argb: 'FF002060' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        } else {
+          cell.border = borderStyle;
+          cell.alignment = { vertical: 'middle', horizontal: colNumber === 2 ? 'left' : 'center' };
+          const fontStyle: Partial<ExcelJS.Font> = { size: 12, color: { argb: 'FF002060' }, bold: true };
+          if (colNumber === 2) {
+            cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
+          } else {
+            cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
+          }
+        }
+      });
+    });
 
     const fileName = `របាយការណ៍ស្តុកលក់_${dateRangeText.replace(/\//g, '-')}.xlsx`;
 
@@ -2609,7 +2768,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         productName: string;
         stockOut: number;
         stockSold: number;
-        stockExchanged: number;
+          stockExchanged: number;
         stockPromo: number;
         stockReturn: number;
         totalSoldQty: number; // For total calculation if needed
@@ -2667,6 +2826,117 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       .sort((a, b) => a.productName.localeCompare(b.productName));
   })();
 
+  const handleSaveReport = async () => {
+    setLoading(true);
+    try {
+      for (const p of txGroupedByProduct) {
+        const edited = editedReportData[p.productName];
+        if (!edited) continue;
+        
+        const diffOut = (parseInt(edited.stockOut) || 0) - p.stockOut;
+        const diffReturn = (parseInt(edited.stockReturn) || 0) - p.stockReturn;
+        const diffSold = (parseInt(edited.stockSold) || 0) - p.stockSold;
+        const diffExchanged = (parseInt(edited.stockExchanged) || 0) - p.stockExchanged;
+        const diffPromo = (parseInt(edited.stockPromo) || 0) - p.stockPromo;
+        
+        const product = products.find(prod => prod.name === p.productName);
+        if (!product) continue;
+
+        if (diffOut !== 0) {
+          const existingOut = filteredTransactions.find(t => t.type === 'Stock Out' && t.productName === p.productName);
+          if (existingOut) {
+            const newQty = existingOut.quantity + diffOut;
+            if (newQty <= 0) {
+               await deleteDoc(doc(db, 'transactions', existingOut.id));
+            } else {
+               await updateDoc(doc(db, 'transactions', existingOut.id), { quantity: newQty });
+            }
+          } else if (diffOut > 0) {
+            const newTx = {
+               id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+               userId: filterTxUserId === 'all' ? currentUser.id : filterTxUserId,
+               type: 'Stock Out',
+               productName: p.productName,
+               quantity: diffOut,
+               date: filterTxStartDate ? `${filterTxStartDate}T12:00:00.000Z` : new Date().toISOString(),
+               createdBy: currentUser.username
+            };
+            await setDoc(doc(db, 'transactions', newTx.id), newTx);
+          }
+          await updateDoc(doc(db, 'products', product.id), { warehouseStock: increment(-diffOut) });
+        }
+
+        if (diffReturn !== 0) {
+          const existingReturn = filteredTransactions.find(t => t.type === 'Stock Return' && t.productName === p.productName);
+          if (existingReturn) {
+            const newQty = existingReturn.quantity + diffReturn;
+            if (newQty <= 0) {
+               await deleteDoc(doc(db, 'transactions', existingReturn.id));
+            } else {
+               await updateDoc(doc(db, 'transactions', existingReturn.id), { quantity: newQty });
+            }
+          } else if (diffReturn > 0) {
+            const newTx = {
+               id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+               userId: filterTxUserId === 'all' ? currentUser.id : filterTxUserId,
+               type: 'Stock Return',
+               productName: p.productName,
+               quantity: diffReturn,
+               date: filterTxStartDate ? `${filterTxStartDate}T12:00:00.000Z` : new Date().toISOString(),
+               createdBy: currentUser.username
+            };
+            await setDoc(doc(db, 'transactions', newTx.id), newTx);
+          }
+          await updateDoc(doc(db, 'products', product.id), { warehouseStock: increment(diffReturn) });
+        }
+
+        if (diffSold !== 0 || diffExchanged !== 0 || diffPromo !== 0) {
+           const existingSold = filteredTransactions.find(t => t.type === 'Stock Sold' && t.productName === p.productName);
+           if (existingSold) {
+              const newSold = (existingSold.soldQty !== undefined ? existingSold.soldQty : Math.max(0, existingSold.quantity - (existingSold.promoQty || 0) - (existingSold.exchangedQty || 0))) + diffSold;
+              const newEx = (existingSold.exchangedQty || 0) + diffExchanged;
+              const newPro = (existingSold.promoQty || 0) + diffPromo;
+              const newTot = newSold + newEx + newPro;
+
+              if (newTot <= 0) {
+                 await deleteDoc(doc(db, 'transactions', existingSold.id));
+              } else {
+                 await updateDoc(doc(db, 'transactions', existingSold.id), {
+                   quantity: newTot,
+                   soldQty: newSold > 0 ? newSold : deleteField(),
+                   exchangedQty: newEx > 0 ? newEx : deleteField(),
+                   promoQty: newPro > 0 ? newPro : deleteField()
+                 });
+              }
+           } else if (diffSold > 0 || diffExchanged > 0 || diffPromo > 0) {
+              const newTx = {
+                 id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                 userId: filterTxUserId === 'all' ? currentUser.id : filterTxUserId,
+                 type: 'Stock Sold',
+                 productName: p.productName,
+                 quantity: diffSold + diffExchanged + diffPromo,
+                 soldQty: diffSold > 0 ? diffSold : undefined,
+                 exchangedQty: diffExchanged > 0 ? diffExchanged : undefined,
+                 promoQty: diffPromo > 0 ? diffPromo : undefined,
+                 date: filterTxStartDate ? `${filterTxStartDate}T12:00:00.000Z` : new Date().toISOString(),
+                 createdBy: currentUser.username,
+                 price: product.price || 0
+              };
+              // remove undefined keys for firestore
+              Object.keys(newTx).forEach(key => (newTx as any)[key] === undefined && delete (newTx as any)[key]);
+              await setDoc(doc(db, 'transactions', newTx.id), newTx);
+           }
+        }
+      }
+      setIsEditingReport(false);
+    } catch (e) {
+      console.error(e);
+      alert('មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filter and sort stock orders
   const filteredStockOrders = [...managedStockOrders]
     .filter(order => {
@@ -2723,7 +2993,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   return (
     <div className="w-full h-full flex flex-col min-w-0 overflow-hidden">
       {activeTab === 'users' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
+        <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
           <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
             <div>
               <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">បញ្ជីអ្នកប្រើប្រាស់</h3>
@@ -2742,7 +3012,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             </div>
           </div>
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះអ្នកប្រើប្រាស់</th>
@@ -2784,7 +3054,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       )}
 
       {activeTab === 'products' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
+        <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
           <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <div>
@@ -2817,7 +3087,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             </button>
           </div>
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញ</th>
@@ -2872,13 +3142,62 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       )}
 
       {activeTab === 'transactions' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
+        <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0 gap-2">
             <div>
               <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
               <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">របាយការណ៍ផ្ទៀងផ្ទាត់ និងតុល្យភាពស្តុកទំនិញ</p>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {!isEditingReport ? (
+                <button
+                  onClick={() => {
+                    const initialData: Record<string, any> = {};
+                    txGroupedByProduct.forEach(p => {
+                      initialData[p.productName] = {
+                        stockOut: String(p.stockOut),
+                        stockSold: String(p.stockSold),
+                        stockExchanged: String(p.stockExchanged),
+                        stockPromo: String(p.stockPromo),
+                        stockReturn: String(p.stockReturn)
+                      };
+                    });
+                    setEditedReportData(initialData);
+                    setIsEditingReport(true);
+                  }}
+                  className="flex items-center space-x-1.5 bg-blue-500 hover:bg-blue-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-blue-500/20 active:scale-95 transition cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span>កែប្រែ</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setIsEditingReport(false)}
+                    className="flex items-center space-x-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold active:scale-95 transition cursor-pointer"
+                  >
+                    <span>បោះបង់</span>
+                  </button>
+                  <button
+                    disabled={loading}
+                    onClick={handleSaveReport}
+                    className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition cursor-pointer disabled:opacity-50"
+                  >
+                    {loading ? (
+                       <span>កំពុងរក្សាទុក...</span>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>រក្សាទុក</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
               <button
                 onClick={handleExportSelectedUserStockExcel}
                 className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition cursor-pointer"
@@ -2948,7 +3267,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           </div>
 
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[10px] sm:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                   <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
@@ -2987,19 +3306,54 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                         {p.productName}
                       </td>
                       <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-rose-500">
-                        {p.stockOut || '-'}
+                        {isEditingReport ? (
+                          <input 
+                            type="number" 
+                            className="w-12 md:w-16 text-center border border-slate-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-rose-400"
+                            value={editedReportData[p.productName]?.stockOut ?? ''}
+                            onChange={(e) => setEditedReportData(prev => ({ ...prev, [p.productName]: { ...prev[p.productName], stockOut: e.target.value } }))}
+                          />
+                        ) : (p.stockOut || '-')}
                       </td>
                       <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-emerald-600">
-                        {p.stockSold || '-'}
+                        {isEditingReport ? (
+                          <input 
+                            type="number" 
+                            className="w-12 md:w-16 text-center border border-slate-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-emerald-400"
+                            value={editedReportData[p.productName]?.stockSold ?? ''}
+                            onChange={(e) => setEditedReportData(prev => ({ ...prev, [p.productName]: { ...prev[p.productName], stockSold: e.target.value } }))}
+                          />
+                        ) : (p.stockSold || '-')}
                       </td>
                       <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-violet-500">
-                        {p.stockExchanged || '-'}
+                        {isEditingReport ? (
+                          <input 
+                            type="number" 
+                            className="w-12 md:w-16 text-center border border-slate-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-violet-400"
+                            value={editedReportData[p.productName]?.stockExchanged ?? ''}
+                            onChange={(e) => setEditedReportData(prev => ({ ...prev, [p.productName]: { ...prev[p.productName], stockExchanged: e.target.value } }))}
+                          />
+                        ) : (p.stockExchanged || '-')}
                       </td>
                       <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-amber-500">
-                        {p.stockPromo || '-'}
+                        {isEditingReport ? (
+                          <input 
+                            type="number" 
+                            className="w-12 md:w-16 text-center border border-slate-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-amber-400"
+                            value={editedReportData[p.productName]?.stockPromo ?? ''}
+                            onChange={(e) => setEditedReportData(prev => ({ ...prev, [p.productName]: { ...prev[p.productName], stockPromo: e.target.value } }))}
+                          />
+                        ) : (p.stockPromo || '-')}
                       </td>
                       <td className="px-1.5 md:px-3 py-2 text-center font-black text-xs sm:text-sm md:text-base text-indigo-600">
-                        {p.stockReturn || '-'}
+                        {isEditingReport ? (
+                          <input 
+                            type="number" 
+                            className="w-12 md:w-16 text-center border border-slate-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-indigo-400"
+                            value={editedReportData[p.productName]?.stockReturn ?? ''}
+                            onChange={(e) => setEditedReportData(prev => ({ ...prev, [p.productName]: { ...prev[p.productName], stockReturn: e.target.value } }))}
+                          />
+                        ) : (p.stockReturn || '-')}
                       </td>
                       <td className="px-1.5 md:px-3 py-2 text-center">
                         {badge}
@@ -3057,7 +3411,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
             <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
                 <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកឡើងឡានរបស់អ្នកប្រើប្រាស់</h3>
@@ -3123,7 +3477,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
             {/* Grouped Table Layout (Matching User design exactly) */}
             <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
                 <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកប្រើប្រាស់</th>
@@ -3248,7 +3602,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
             <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
                 <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកលក់ចេញរបស់អ្នកប្រើប្រាស់</h3>
@@ -3318,7 +3672,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
             {/* Grouped Table Layout (Matching User design exactly) */}
             <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
                 <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកប្រើប្រាស់</th>
@@ -3445,7 +3799,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
-          <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
             <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
               <div>
                 <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកត្រឡប់របស់អ្នកប្រើប្រាស់</h3>
@@ -3511,7 +3865,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
             {/* Grouped Table Layout (Matching User design exactly) */}
             <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
                 <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកប្រើប្រាស់</th>
@@ -3598,7 +3952,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       })()}
 
       {activeTab === 'stockOrders' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
+        <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
           <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
             <div>
               <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកកម្មង់</h3>
@@ -3635,7 +3989,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           </div>
 
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                   <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកកម្មង់</th>
@@ -3722,7 +4076,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       )}
 
       {activeTab === 'warehouse' && (
-        <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-300">
+        <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-300">
           
           {/* Header */}
           <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2 shrink-0">
@@ -3840,7 +4194,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
           {/* Table Container */}
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-[11px] uppercase font-bold tracking-wider border-b border-slate-100">
                   <th className="px-1 md:px-3 py-2 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>

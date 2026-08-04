@@ -641,6 +641,9 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     setCurrentPage(1);
   }, [activeTab]);
   const [editQuantity, setកែប្រែបរិមាណ] = useState('');
+  const [editSoldQty, setEditSoldQty] = useState('');
+  const [editExchangedQty, setEditExchangedQty] = useState('');
+  const [editPromoQty, setEditPromoQty] = useState('');
   const [editDate, setកែប្រែDate] = useState('');
   const [editNote, setកែប្រែNote] = useState('');
   const [editCustomerName, setកែប្រែCustomerName] = useState('');
@@ -652,6 +655,17 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     setកែប្រែProductName(t.productName);
     setកែប្រែបរិមាណ(String(t.quantity));
     
+    if (t.type === 'Stock Sold') {
+      const soldQ = t.soldQty !== undefined ? t.soldQty : Math.max(0, t.quantity - (t.exchangedQty || 0) - (t.promoQty || 0));
+      setEditSoldQty(String(soldQ));
+      setEditExchangedQty(t.exchangedQty ? String(t.exchangedQty) : '');
+      setEditPromoQty(t.promoQty ? String(t.promoQty) : '');
+    } else {
+      setEditSoldQty('');
+      setEditExchangedQty('');
+      setEditPromoQty('');
+    }
+
     const prod = products.find(p => p.name === t.productName);
     setកែប្រែតម្លៃ(t.price !== undefined ? String(t.price) : (prod?.price !== undefined ? String(prod.price) : ''));
     
@@ -1933,7 +1947,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   return (
     <div className="w-full h-full flex flex-col">
       {/* History Section */}
-      <div className="bg-white rounded-t-3xl md:rounded-3xl border-b-0 shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-5 md:p-6">
+      <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 p-4 sm:p-5 md:p-6">
                         <div className="bg-slate-50 p-2 md:p-3.5 rounded-xl md:rounded-2xl mb-3 md:mb-4 border border-slate-100 flex flex-row items-end justify-between gap-2 md:gap-3 shrink-0 w-full overflow-x-auto custom-scroll">
           {activeTab !== 'Stock Order' ? (
             <div className="flex flex-row flex-1 max-w-sm gap-2">
@@ -2054,7 +2068,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 </div>
               ) : (
                 <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
                     <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                       <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100 text-center">
                         <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
@@ -2147,7 +2161,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   </div>
                 ) : (
                   <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll animate-in fade-in duration-200">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
                       <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                         <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                           <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អតិថិជន</th>
@@ -2229,7 +2243,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             </div>
           ) : (
             <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">
@@ -2675,18 +2689,56 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
               </div>
 
               {/* បរិមាណ Input */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ចំនួនទំនិញ</label>
-                <input
-                  type="number"
-                  value={editQuantity}
-                  onChange={e => setកែប្រែបរិមាណ(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-black text-slate-800"
-                  required
-                  min="1"
-                  placeholder="ចំនួន"
-                />
-              </div>
+              {editingTransaction.type === 'Stock Sold' ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] md:text-xs font-bold text-slate-500 px-1 truncate">ចំនួនលក់</label>
+                    <input
+                      type="number"
+                      value={editSoldQty}
+                      onChange={e => setEditSoldQty(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-black text-slate-800 text-center"
+                      min="0"
+                      placeholder="០"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] md:text-xs font-bold text-slate-500 px-1 truncate">ដូរក្រវិល</label>
+                    <input
+                      type="number"
+                      value={editExchangedQty}
+                      onChange={e => setEditExchangedQty(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-sm focus:bg-white focus:border-amber-400 outline-none font-black text-slate-800 text-center"
+                      min="0"
+                      placeholder="០"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] md:text-xs font-bold text-slate-500 px-1 truncate">ចំនួនថែម</label>
+                    <input
+                      type="number"
+                      value={editPromoQty}
+                      onChange={e => setEditPromoQty(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-sm focus:bg-white focus:border-sky-400 outline-none font-black text-slate-800 text-center"
+                      min="0"
+                      placeholder="០"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ចំនួនទំនិញ</label>
+                  <input
+                    type="number"
+                    value={editQuantity}
+                    onChange={e => setកែប្រែបរិមាណ(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 outline-none font-black text-slate-800"
+                    required
+                    min="1"
+                    placeholder="ចំនួន"
+                  />
+                </div>
+              )}
 
               {/* តម្លៃ Input (Only for Stock Sold) */}
               {editingTransaction.type === 'Stock Sold' && (
