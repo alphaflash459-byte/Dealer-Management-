@@ -279,7 +279,7 @@ export default function App() {
           >
             <AnimatePresence mode="wait">
               <motion.div 
-                key={currentUser.role === 'Admin' || currentUser.role === 'Server' ? `admin-${activeAdminView}` : `user-${activeUserView}`}
+                key={currentUser.role === 'Admin' || currentUser.role === 'Server' ? 'admin' : 'user'}
                 initial={{ opacity: 0, y: 10, scale: 0.99 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.99 }}

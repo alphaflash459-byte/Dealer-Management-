@@ -557,11 +557,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     setOrderItems([]);
     setOrderCustomerName('');
     setOrderLocation('');
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    setOrderDate(`${yyyy}-${mm}-${dd}`);
     setIsOrderModalOpen(true);
   };
 
@@ -1042,11 +1037,6 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     setLocation('');
     setProductSearchTerm('');
     setIsProductSelectOpen(false);
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    setDate(`${yyyy}-${mm}-${dd}`);
     setIsModalOpen(true);
   };
 
