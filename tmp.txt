@@ -1,31 +1,8 @@
-      const groupedMap: {
-        [productName: string]: {
-          stockOut: number;
-          stockSold: number;
-          stockPromo: number;
-          stockReturn: number;
-        }
-      } = {};
-
-      exportProductsList.forEach(p => {
-        groupedMap[p.code] = { stockOut: 0, stockSold: 0, stockPromo: 0, stockReturn: 0 };
-      });
-
-      userTxs.forEach(t => {
-        let pName = t.productName;
-        if (pName === 'WURKZ ICE') pName = 'WICE';
-        if (pName === 'W ORD') pName = 'WURKZ ORD';
-        if (pName === 'D ORD') pName = 'DAZZ ORD';
-
-        if (!groupedMap[pName]) {
-          groupedMap[pName] = { stockOut: 0, stockSold: 0, stockPromo: 0, stockReturn: 0 };
-        }
-        const group = groupedMap[pName];
-        if (t.type === 'Stock Out') group.stockOut += t.quantity;
-        else if (t.type === 'Stock Sold') { group.stockSold += t.quantity; group.stockPromo += (t.promoQty || 0); }
-        else if (t.type === 'Stock Return') group.stockReturn += t.quantity;
-      });
-
-      const khmerNumerals = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
-      const toKhmerNumeral = (num: number) => {
-        return num.toString().split('').map(digit => khmerNumerals[parseInt(digit)]).join('');
+            if (t.type === 'Stock Out') rangeStockOut += t.quantity;
+            if (t.type === 'Stock Return') rangeStockReturn += t.quantity;
+            if (t.type === 'Stock Sold') {
+               rangeStockSold += t.quantity;
+               rangeStockPromo += (t.promoQty || 0);
+               rangeStockExchanged += (t.exchangedQty || 0);
+            }
+          }

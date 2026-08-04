@@ -2381,7 +2381,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         }
         const group = groupedMap[pName];
         if (t.type === 'Stock Out') group.stockOut += t.quantity;
-        else if (t.type === 'Stock Sold') { group.stockSold += t.quantity; group.stockPromo += (t.promoQty || 0); }
+        else if (t.type === 'Stock Sold') { 
+          const soldOnly = t.soldQty !== undefined ? t.soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - (t.exchangedQty || 0));
+          group.stockSold += soldOnly; 
+          group.stockPromo += (t.promoQty || 0); 
+          group.stockExchanged += (t.exchangedQty || 0);
+        }
         else if (t.type === 'Stock Return') group.stockReturn += t.quantity;
       });
 
@@ -2663,7 +2668,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             if (t.type === 'Stock Out') rangeStockOut += t.quantity;
             if (t.type === 'Stock Return') rangeStockReturn += t.quantity;
             if (t.type === 'Stock Sold') {
-               rangeStockSold += t.quantity;
+               const soldOnly = (t as any).soldQty !== undefined ? (t as any).soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
+               rangeStockSold += soldOnly;
                rangeStockPromo += (t.promoQty || 0);
                rangeStockExchanged += (t.exchangedQty || 0);
             }
