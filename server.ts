@@ -20,12 +20,13 @@ async function startServer() {
         return res.status(400).json({ error: "No image provided" });
       }
 
-      if (!process.env.GEMINI_API_KEY) {
+      const apiKey = process.env.CUSTOM_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+      if (!apiKey) {
         return res.status(500).json({ error: "Gemini API Key is not configured." });
       }
 
       const ai = new GoogleGenAI({ 
-        apiKey: process.env.GEMINI_API_KEY,
+        apiKey: apiKey,
         httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
       });
       
@@ -90,7 +91,7 @@ Extract the data into a structured JSON array. Each item must have:
 
 Ensure the output is ONLY a valid JSON array matching the structure. If you can't read an item clearly, skip it or put your best guess. Do not wrap the JSON in markdown codeblocks like \`\`\`json. Return raw JSON.`;
 
-      const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash", "gemini-2.0-flash"];
+      const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
       let response;
       let lastError: any = null;
 
@@ -142,8 +143,11 @@ Ensure the output is ONLY a valid JSON array matching the structure. If you can'
             const isUnavailable = e.status === "UNAVAILABLE" || errStr.includes("503");
 
             if (isRateLimit) {
-              console.log(`Rate limit / Quota reached for ${modelName}, switching to next model...`);
-              break; // Try next model immediately
+              console.log(`Rate limit / Quota reached for ${modelName}, waiting 10 seconds...`);
+              if (retries === 0) break;
+              retries--;
+              await new Promise(resolve => setTimeout(resolve, 10000));
+              continue;
             }
 
             if (retries === 0 || !isUnavailable) {
