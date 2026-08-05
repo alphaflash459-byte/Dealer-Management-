@@ -2427,17 +2427,17 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       hasData = true;
 
       // Add Data
-      ws.addRow([`របាយការណ៍លក់ប្រចាំថ្ងៃ ( ${user.username || ''} )`, "", "", "", "", "", "", "", ""]);
+      ws.addRow([`របាយការណ៍លក់ប្រចាំថ្ងៃ ( ${user.username || ''} )`, null, null, null, null, null, null, null, null]);
       ws.addRow([
         `ឈ្មោះអ្នកលក់៖ ${user.username || ""}`,
-        "",
+        null,
         `លេខទូរស័ព្ទ៖ ${user.phone || ''}`,
-        "",
+        null,
         `កាលបរិច្ឆេទ៖ ${dateRangeText}`,
-        "",
+        null,
         `ស្លាកលេខឡាន៖ ${user.carPlate || ''}`,
-        "",
-        ""
+        null,
+        null
       ]);
       ws.addRow([
         "ល.រ",
@@ -2458,12 +2458,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           toKhmerNumeral(rowIndex++),
           item.khmerName,
           item.code,
-          pData.stockOut || '',
-          pData.stockSold || '',
-          pData.stockExchanged || '',
-          pData.stockPromo || '',
-          pData.stockReturn || '',
-          ''
+          pData.stockOut || null,
+          pData.stockSold || null,
+          pData.stockExchanged || null,
+          pData.stockPromo || null,
+          pData.stockReturn || null,
+          null
         ]);
       });
 
@@ -2606,7 +2606,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
     totalStockWs.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
     
-    totalStockWs.addRow([`របាយការណ៍ស្តុកសរុប ( ${dateRangeText} )`, "", "", "", "", "", "", "", ""]);
+    totalStockWs.addRow([`របាយការណ៍ស្តុកសរុប ( ${dateRangeText} )`, null, null, null, null, null, null, null, null]);
     totalStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "ស្តុកឃ្លាំង(ស្តុកចុងក្រោយមុនមួយថ្ងៃ)", "ស្តុកចូល", "ស្តុកឡើងឡាន", "ស្តុកត្រឡប់", "ចំនួនលក់", "ដូរក្រវិល", "ចំនួនថែម"]);
     
     let totalRowIndex = 1;
@@ -2690,13 +2690,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       totalStockWs.addRow([
         toKhmerNumeralLocal(totalRowIndex++),
         p.khmerName,
-        openingStock || '0',
-        rangeStockIn || '',
-        rangeStockOut || '',
-        rangeStockReturn || '',
-        rangeStockSold || '',
-        rangeStockExchanged || '',
-        rangeStockPromo || ''
+        openingStock || null,
+        rangeStockIn || null,
+        rangeStockOut || null,
+        rangeStockReturn || null,
+        rangeStockSold || null,
+        rangeStockExchanged || null,
+        rangeStockPromo || null
       ]);
     });
 
