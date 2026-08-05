@@ -2451,9 +2451,28 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         "ផ្សេងៗ"
       ]);
 
+      const hasAnySalesActivity = exportProductsList.some(item => {
+        const p = groupedMap[item.code];
+        return (p.stockSold + p.stockReturn) > 0;
+      });
+
       let rowIndex = 1;
       exportProductsList.forEach((item) => {
         const pData = groupedMap[item.code];
+        let remark = null;
+        if (pData.stockOut > 0 || pData.stockSold > 0 || pData.stockExchanged > 0 || pData.stockPromo > 0 || pData.stockReturn > 0) {
+          const diff = pData.stockOut - (pData.stockSold + pData.stockExchanged + pData.stockPromo + pData.stockReturn);
+          if (!hasAnySalesActivity && diff > 0) {
+            remark = "-";
+          } else if (diff === 0) {
+            remark = null;
+          } else if (diff > 0) {
+            remark = `បាត់ (${diff})`;
+          } else {
+            remark = `លើស (${Math.abs(diff)})`;
+          }
+        }
+        
         ws.addRow([
           toKhmerNumeral(rowIndex++),
           item.khmerName,
@@ -2463,7 +2482,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           pData.stockExchanged || null,
           pData.stockPromo || null,
           pData.stockReturn || null,
-          null
+          remark
         ]);
       });
 
@@ -2606,8 +2625,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
     totalStockWs.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
     
-    totalStockWs.addRow([`របាយការណ៍ស្តុកសរុប ( ${dateRangeText} )`, null, null, null, null, null, null, null, null]);
-    totalStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "ស្តុកឃ្លាំង(ស្តុកចុងក្រោយមុនមួយថ្ងៃ)", "ស្តុកចូល", "ស្តុកឡើងឡាន", "ស្តុកត្រឡប់", "ចំនួនលក់", "ដូរក្រវិល", "ចំនួនថែម"]);
+    totalStockWs.addRow([`របាយការណ៍ស្តុកសរុប ( ${dateRangeText} )`, null, null, null, null, null, null, null, null, null]);
+    totalStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "ស្តុកឃ្លាំង(ស្តុកចុងក្រោយមុនមួយថ្ងៃ)", "ស្តុកចូល", "ស្តុកឡើងឡាន", "ស្តុកត្រឡប់", "ចំនួនលក់", "ដូរក្រវិល", "ចំនួនថែម", "ស្តុកសល់"]);
     
     let totalRowIndex = 1;
     const localKhmerNumerals = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
@@ -2615,6 +2634,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       return num.toString().split('').map(digit => localKhmerNumerals[parseInt(digit)]).join('');
     };
     
+    const globalHasAnySalesActivity = managedTransactions.some(t => {
+      const dateStr = t.date ? t.date.split('T')[0] : '';
+      const matchStart = !filterTxStartDate || dateStr >= filterTxStartDate;
+      const matchEnd = !filterTxEndDate || dateStr <= filterTxEndDate;
+      return matchStart && matchEnd && (t.type === 'Stock Sold' || t.type === 'Stock Return');
+    });
+
     exportProductsList.forEach(p => {
       let dbName = p.code;
       if (dbName === 'WICE') dbName = 'WURKZ ICE';
@@ -2686,6 +2712,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       });
 
       const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
+      const closingStock = openingStock + rangeStockIn - rangeStockOut + rangeStockReturn;
       
       totalStockWs.addRow([
         toKhmerNumeralLocal(totalRowIndex++),
@@ -2696,11 +2723,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         rangeStockReturn || null,
         rangeStockSold || null,
         rangeStockExchanged || null,
-        rangeStockPromo || null
+        rangeStockPromo || null,
+        closingStock || null
       ]);
     });
-
-    totalStockWs.mergeCells('A1:I1');
+    totalStockWs.mergeCells('A1:J1');
     totalStockWs.getRow(1).height = 35;
     totalStockWs.getRow(2).height = 35;
     for (let i = 3; i <= totalStockWs.rowCount; i++) {
@@ -2715,11 +2742,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       { width: 16 }, // ស្តុកត្រឡប់
       { width: 16 }, // ចំនួនលក់
       { width: 16 }, // ដូរក្រវិល
-      { width: 16 }  // ចំនួនថែម
+      { width: 16 }, // ចំនួនថែម
+      { width: 16 }  // ផ្សេងៗ
     ];
     totalStockWs.eachRow((row, rowNumber) => {
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        if (colNumber > 9) return;
+        if (colNumber > 10) return;
         let borderStyle: Partial<ExcelJS.Borders> = {
           top: { style: 'thin', color: { argb: 'FF002060' } },
           bottom: { style: 'thin', color: { argb: 'FF002060' } },
@@ -2742,7 +2770,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           if (colNumber === 2) {
             cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
           } else {
-            cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
+            if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
+              cell.font = { ...fontStyle, name: 'Khmer OS Siemreap', size: 11 };
+            } else {
+              cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
+            }
           }
         }
       });
