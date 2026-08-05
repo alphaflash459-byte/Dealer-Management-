@@ -2607,6 +2607,27 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       }
     }
 
+    // === VERIFY STOCK SHEET ===
+    const verifyStockWs = workbook.addWorksheet('ស្តុករាប់បញ្ជាក់', {
+      pageSetup: {
+        paperSize: 9, // A4
+        orientation: 'landscape',
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 1,
+        margins: { left: 0.39, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 }
+      }
+    });
+    delete verifyStockWs.pageSetup.scale;
+    verifyStockWs.pageSetup.fitToPage = true;
+    verifyStockWs.pageSetup.fitToWidth = 1;
+    verifyStockWs.pageSetup.fitToHeight = 1;
+    verifyStockWs.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
+    
+    verifyStockWs.addRow([`របាយការណ៍ស្តុករាប់បញ្ជាក់ ( ${dateRangeText} )`, null, null, null, null, null, null, null]);
+    verifyStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកលក់", "ស្តុកសល់", "ផ្សេងៗ"]);
+    let verifyRowIndex = 1;
+
     // === NEW TOTAL STOCK SHEET ===
     const totalStockWs = workbook.addWorksheet('ទិន្នន័យស្តុកសរុប', {
       pageSetup: {
@@ -2626,7 +2647,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     totalStockWs.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
     
     totalStockWs.addRow([`របាយការណ៍ស្តុកសរុប ( ${dateRangeText} )`, null, null, null, null, null, null, null, null, null]);
-    totalStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "ស្តុកឃ្លាំង(ស្តុកចុងក្រោយមុនមួយថ្ងៃ)", "ស្តុកចូល", "ស្តុកឡើងឡាន", "ស្តុកត្រឡប់", "ចំនួនលក់", "ដូរក្រវិល", "ចំនួនថែម", "ស្តុកសល់"]);
+    totalStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកដើមគ្រា", "ស្តុកចូល", "ស្តុកឡើងឡាន", "ស្តុកត្រឡប់", "ចំនួនលក់", "ដូរក្រវិល", "ចំនួនថែម", "ស្តុកសល់"]);
     
     let totalRowIndex = 1;
     const localKhmerNumerals = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
@@ -2640,6 +2661,16 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       const matchEnd = !filterTxEndDate || dateStr <= filterTxEndDate;
       return matchStart && matchEnd && (t.type === 'Stock Sold' || t.type === 'Stock Return');
     });
+
+    let previousDayStr = '';
+    if (filterTxStartDate) {
+      const d = new Date(filterTxStartDate + 'T00:00:00');
+      d.setDate(d.getDate() - 1);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      previousDayStr = `${year}-${month}-${day}`;
+    }
 
     exportProductsList.forEach(p => {
       let dbName = p.code;
@@ -2660,6 +2691,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       let rollbackStockIn = 0;
       let rollbackStockOut = 0;
       let rollbackStockReturn = 0;
+      let stockReturnPreviousDay = 0;
+      let priorStockOut = 0;
+      let priorStockSoldTotal = 0;
 
       warehouseStockIns.forEach((record: any) => {
         const dateStr = record.date ? record.date.split('T')[0] : '';
@@ -2708,15 +2742,47 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             if (t.type === 'Stock Out') rollbackStockOut += t.quantity;
             if (t.type === 'Stock Return') rollbackStockReturn += t.quantity;
           }
+          if (filterTxStartDate && previousDayStr && dateStr === previousDayStr) {
+            if (t.type === 'Stock Return') stockReturnPreviousDay += t.quantity;
+          }
+          
+          if (filterTxStartDate && dateStr < filterTxStartDate) {
+            if (t.type === 'Stock Out') priorStockOut += t.quantity;
+            if (t.type === 'Stock Sold') {
+               const soldOnly = (t as any).soldQty !== undefined ? (t as any).soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
+               priorStockSoldTotal += (soldOnly + (t.promoQty || 0) + ((t as any).exchangedQty || 0));
+            }
+          }
         }
       });
 
       const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
       const closingStock = openingStock + rangeStockIn - rangeStockOut + rangeStockReturn;
       
+      let verifyOpeningStock = openingStock;
+      if (filterTxStartDate) {
+         verifyOpeningStock = openingStock + priorStockOut - priorStockSoldTotal - stockReturnPreviousDay;
+      }
+      
+      const stockSoldTotal = rangeStockSold + rangeStockExchanged + rangeStockPromo;
+      const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - stockSoldTotal;
+      
+      verifyStockWs.addRow([
+        toKhmerNumeralLocal(verifyRowIndex++),
+        p.khmerName,
+        p.code,
+        verifyOpeningStock || null,
+        rangeStockIn || null,
+        stockReturnPreviousDay || null,
+        stockSoldTotal || null,
+        verifyClosingStock || null,
+        null
+      ]);
+      
       totalStockWs.addRow([
         toKhmerNumeralLocal(totalRowIndex++),
         p.khmerName,
+        p.code,
         openingStock || null,
         rangeStockIn || null,
         rangeStockOut || null,
@@ -2727,7 +2793,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         closingStock || null
       ]);
     });
-    totalStockWs.mergeCells('A1:J1');
+    totalStockWs.mergeCells('A1:K1');
     totalStockWs.getRow(1).height = 35;
     totalStockWs.getRow(2).height = 35;
     for (let i = 3; i <= totalStockWs.rowCount; i++) {
@@ -2736,6 +2802,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     totalStockWs.columns = [
       { width: 10 },  // ល.រ
       { width: 41 }, // ឈ្មោះទំនិញ
+      { width: 17 }, // កូដសម្គាល់
       { width: 20 }, // ស្តុកឃ្លាំង
       { width: 16 }, // ស្តុកចូល
       { width: 16 }, // ស្តុកឡើងឡាន
@@ -2743,11 +2810,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       { width: 16 }, // ចំនួនលក់
       { width: 16 }, // ដូរក្រវិល
       { width: 16 }, // ចំនួនថែម
-      { width: 16 }  // ផ្សេងៗ
+      { width: 16 }  // ស្តុកសល់
     ];
     totalStockWs.eachRow((row, rowNumber) => {
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        if (colNumber > 10) return;
+        if (colNumber > 11) return;
         let borderStyle: Partial<ExcelJS.Borders> = {
           top: { style: 'thin', color: { argb: 'FF002060' } },
           bottom: { style: 'thin', color: { argb: 'FF002060' } },
@@ -2765,9 +2832,63 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         } else {
           cell.border = borderStyle;
-          cell.alignment = { vertical: 'middle', horizontal: colNumber === 2 ? 'left' : 'center' };
+          cell.alignment = { vertical: 'middle', horizontal: (colNumber === 2 || colNumber === 3) ? 'left' : 'center' };
           const fontStyle: Partial<ExcelJS.Font> = { size: 12, color: { argb: 'FF002060' }, bold: true };
-          if (colNumber === 2) {
+          if (colNumber === 2 || colNumber === 3) {
+            cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
+          } else {
+            if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
+              cell.font = { ...fontStyle, name: 'Khmer OS Siemreap', size: 11 };
+            } else {
+              cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
+            }
+          }
+        }
+      });
+    });
+
+
+    // Formatting verifyStockWs
+    verifyStockWs.mergeCells('A1:I1');
+    verifyStockWs.getRow(1).height = 35;
+    verifyStockWs.getRow(2).height = 35;
+    for (let i = 3; i <= verifyStockWs.rowCount; i++) {
+      verifyStockWs.getRow(i).height = 20;
+    }
+    verifyStockWs.columns = [
+      { width: 10 }, // ល.រ
+      { width: 41 }, // ឈ្មោះទំនិញ
+      { width: 17 }, // កូដសម្គាល់
+      { width: 16 }, // ស្តុកឃ្លាំង
+      { width: 16 }, // ស្តុកចូល
+      { width: 16 }, // ស្តុកលើឡាន
+      { width: 16 }, // ស្តកលក់
+      { width: 16 }, // ស្តុកសល់
+      { width: 16 }  // ផ្សេងៗ
+    ];
+    verifyStockWs.eachRow((row, rowNumber) => {
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (colNumber > 9) return;
+        let borderStyle = {
+          top: { style: 'thin', color: { argb: 'FF002060' } },
+          bottom: { style: 'thin', color: { argb: 'FF002060' } },
+          left: { style: 'thin', color: { argb: 'FF002060' } },
+          right: { style: 'thin', color: { argb: 'FF002060' } }
+        };
+        if (rowNumber === 1) {
+          borderStyle = {};
+          cell.font = { name: 'Khmer OS Muol Light', size: 16, color: { argb: 'FF002060' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        } else if (rowNumber === 2) {
+          cell.border = borderStyle;
+          cell.font = { name: 'Khmer OS Muol Light', size: 10, color: { argb: 'FF002060' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        } else {
+          cell.border = borderStyle;
+          cell.alignment = { vertical: 'middle', horizontal: (colNumber === 2 || colNumber === 3) ? 'left' : 'center' };
+          const fontStyle = { size: 12, color: { argb: 'FF002060' }, bold: true };
+          if (colNumber === 2 || colNumber === 3) {
             cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
           } else {
             if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
