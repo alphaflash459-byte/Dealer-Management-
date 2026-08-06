@@ -40,24 +40,22 @@ async function startServer() {
       const normalizedTargetType = (targetType || '').toLowerCase();
       if (normalizedTargetType.includes('sold') || normalizedTargetType.includes('sell') || targetType === 'Stock Sold' || targetType === 'ស្តុកលក់ចេញ') {
         typeSpecificInstructions = `
-CRITICAL RULE FOR STOCK SOLD (ស្តុកលក់ / ស្តុកលក់ចេញ):
-You must extract the OUTGOING stock. The table has several numeric columns. YOU MUST EXAMINE THE COLUMN HEADERS CAREFULLY.
-- EXTRACT from "ចំនួនលក់" (Sold) -> put in 'soldQuantity'
-- EXTRACT from "ដូរក្រវិល" / "ចំនួនដបប្រវិល" (Exchanged/Ring pull) -> put in 'exchangedQuantity'
-- EXTRACT from "ចំនួនថែម" / "ជួនថែម" / "ថែម" (Promo/Free) -> put in 'promoQuantity'
+*** ABSOLUTE STRICT RULE FOR STOCK SOLD (ស្តុកលក់ / ស្តុកលក់ចេញ) ***
+You must extract data for THREE SPECIFIC COLUMNS for every product row. 
+Look at the table headers in the image and locate these three columns:
+1. Column with header "ចំនួនលក់", "លក់", or "Sold" -> This is your 'soldQuantity'
+2. Column with header "ដូរក្រវិល", "ក្រវិល", "ចំនួនដបប្រវិល", "ដូរ", or "Exchanged" -> This is your 'exchangedQuantity'
+3. Column with header "ចំនួនថែម", "ថែម", "ជួនថែម", or "Promo" -> This is your 'promoQuantity'
 
-VISUAL GUIDE for the table layout (Left to Right):
-1. First numeric column is often "ក្នុងឡាន" or "ស្តុកឡើង" (Loaded Stock). -> DO NOT EXTRACT (Ignore this!)
-2. Second numeric column is often "ចំនួនដបប្រវិល" / "ដូរក្រវិល". -> Put in 'exchangedQuantity'
-3. Third numeric column is often "ចំនួនលក់" (Sold). -> Put in 'soldQuantity'
-4. Other columns might be "ថែម" (Promo) -> Put in 'promoQuantity'
-5. Towards the right is "ចំនួនសល់" (Remaining Stock). -> DO NOT EXTRACT (Ignore this!)
+For EACH product row, trace your eyes horizontally to these specific columns and extract the number. 
+If the cell is blank, has a dash, or is empty, use 0.
+You MUST output a number (even if 0) for ALL THREE fields: 'soldQuantity', 'exchangedQuantity', and 'promoQuantity'.
 
-Example: If a row has 127 in column 1, 4 in column 2, 15 in column 3, and 108 in column 5.
-Then 'exchangedQuantity' = 4, 'soldQuantity' = 15, and 'promoQuantity' = 0.
-IGNORE 127 and 108 completely!
+DO NOT mix them up.
+DO NOT extract numbers from the "ស្តុកឡើងឡាន" (Loaded) or "ក្នុងឡាន" column.
+DO NOT extract numbers from the "ស្តុកសល់" (Remaining) column.
 
-In the 'description', write EXACTLY: "លក់: [val], ដូរក្រវិល: [val], ថែម: [val]" using only non-zero values.
+In the 'description' field, write EXACTLY: "លក់: [soldQuantity], ដូរក្រវិល: [exchangedQuantity], ថែម: [promoQuantity]" using the actual extracted numbers.
 `;
       } else if (normalizedTargetType.includes('return') || targetType === 'Stock Return' || targetType === 'ស្តុកត្រឡប់') {
         typeSpecificInstructions = `
@@ -127,7 +125,7 @@ Ensure the output is ONLY a valid JSON array matching the structure. If you can'
                       unit: { type: Type.STRING },
                       description: { type: Type.STRING }
                     },
-                    required: ["productName"]
+                    required: ["productName", "soldQuantity", "exchangedQuantity", "promoQuantity"]
                   }
                 }
               }
