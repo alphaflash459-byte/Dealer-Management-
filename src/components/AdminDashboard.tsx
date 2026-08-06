@@ -2878,7 +2878,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       }
       
       const stockSoldTotal = rangeStockSold + rangeStockExchanged + rangeStockPromo;
-      const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - stockSoldTotal;
+      const verifyStockSold = rangeStockOut - rangeStockReturn;
+      const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - verifyStockSold;
       
       verifyStockWs.addRow([
         toKhmerNumeralLocal(verifyRowIndex++),
@@ -2887,7 +2888,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         verifyOpeningStock || null,
         rangeStockIn || null,
         stockReturnPreviousDay || null,
-        stockSoldTotal || null,
+        verifyStockSold || null,
         verifyClosingStock || null,
         null
       ]);
