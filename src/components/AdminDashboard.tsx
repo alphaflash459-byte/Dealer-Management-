@@ -2802,18 +2802,19 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     totalStockWs.columns = [
       { width: 10 },  // ល.រ
       { width: 41 }, // ឈ្មោះទំនិញ
-      { width: 20 }, // ស្តុកឃ្លាំង
+      { width: 17 }, // កូដសម្គាល់
+      { width: 20 }, // ស្តុកដើមគ្រា
       { width: 16 }, // ស្តុកចូល
       { width: 16 }, // ស្តុកឡើងឡាន
       { width: 16 }, // ស្តុកត្រឡប់
       { width: 16 }, // ចំនួនលក់
       { width: 16 }, // ដូរក្រវិល
       { width: 16 }, // ចំនួនថែម
-      { width: 16 }  // ផ្សេងៗ
+      { width: 16 }  // ស្តុកសល់
     ];
     totalStockWs.eachRow((row, rowNumber) => {
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        if (colNumber > 10) return;
+        if (colNumber > 11) return;
         let borderStyle: Partial<ExcelJS.Borders> = {
           top: { style: 'thin', color: { argb: 'FF002060' } },
           bottom: { style: 'thin', color: { argb: 'FF002060' } },
@@ -2841,6 +2842,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             } else {
               cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
             }
+          }
+          if (colNumber === 11) {
+            cell.font = { ...cell.font, color: { argb: 'FFFF0000' }, bold: true };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
           }
         }
       });
