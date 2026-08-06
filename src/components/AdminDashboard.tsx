@@ -2738,7 +2738,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     verifyStockWs.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
     
     verifyStockWs.addRow([`របាយការណ៍ស្តុករាប់បញ្ជាក់ ( ${dateRangeText} )`, null, null, null, null, null, null, null]);
-    verifyStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកលក់", "ស្តុកសល់", "ផ្សេងៗ"]);
+    verifyStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកក្នុងឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកឡើងឡាន", "ស្តុកសល់", "ផ្សេងៗ"]);
     let verifyRowIndex = 1;
 
     // === NEW TOTAL STOCK SHEET ===
@@ -2872,14 +2872,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
       const closingStock = openingStock + rangeStockIn - rangeStockOut + rangeStockReturn;
       
-      let verifyOpeningStock = openingStock;
-      if (filterTxStartDate) {
-         verifyOpeningStock = openingStock + priorStockOut - priorStockSoldTotal - stockReturnPreviousDay;
-      }
+      let verifyOpeningStock = openingStock - stockReturnPreviousDay;
       
       const stockSoldTotal = rangeStockSold + rangeStockExchanged + rangeStockPromo;
       const verifyStockSold = rangeStockOut - rangeStockReturn;
-      const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - verifyStockSold;
+      const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
       
       verifyStockWs.addRow([
         toKhmerNumeralLocal(verifyRowIndex++),
@@ -2888,7 +2885,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         verifyOpeningStock || null,
         rangeStockIn || null,
         stockReturnPreviousDay || null,
-        verifyStockSold || null,
+        rangeStockOut || null,
         verifyClosingStock || null,
         null
       ]);
