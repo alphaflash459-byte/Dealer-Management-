@@ -55,41 +55,54 @@ DO NOT mix them up.
 DO NOT extract numbers from the "ស្តុកឡើងឡាន" (Loaded) or "ក្នុងឡាន" column.
 DO NOT extract numbers from the "ស្តុកសល់" (Remaining) column.
 
-In the 'description' field, write EXACTLY: "លក់: [soldQuantity], ដូរក្រវិល: [exchangedQuantity], ថែម: [promoQuantity]" using the actual extracted numbers.
+In the 'description' field, write: "លក់: [soldQuantity], ដូរ: [exchangedQuantity], ថែម: [promoQuantity]". IF there is an actual note/remark on this row in the image, APPEND it like this: "លក់: ..., ដូរ: ..., ថែម: ... | [Extracted Note]".
 `;
       } else if (normalizedTargetType.includes('return') || targetType === 'Stock Return' || targetType === 'ស្តុកត្រឡប់') {
         typeSpecificInstructions = `
-INSTRUCTIONS FOR STOCK RETURN (ស្តុកត្រឡប់):
-Extract only the returned stock quantity (ស្តុកត្រឡប់ / ត្រឡប់).
+*** ABSOLUTE STRICT RULE FOR STOCK RETURN (ស្តុកត្រឡប់ / ត្រឡប់) ***
+Your task is to extract the quantity of products being returned or left over.
+Look for columns like "ស្តុកត្រឡប់", "ត្រឡប់", "សល់", "ស្តុកសល់", "ចំនួន", or "Returned".
+Extract the number for each product row and put it EXACTLY into the 'quantity' field.
+If the cell is blank, has a dash, or is empty, use 0.
+DO NOT extract numbers from 'ស្តុកឡើងឡាន', 'ក្នុងឡាន', 'លក់'.
 `;
       } else if (normalizedTargetType.includes('out') || targetType === 'Stock Out' || targetType === 'ស្តុកឡើងឡាន') {
         typeSpecificInstructions = `
-INSTRUCTIONS FOR STOCK OUT (ស្តុកឡើង / ស្តុកឡើងឡាន):
-Extract only the loaded stock quantity (ស្តុកឡើង / ចំនួនឡើង).
+*** ABSOLUTE STRICT RULE FOR STOCK OUT (ស្តុកឡើង / ស្តុកឡើងឡាន) ***
+Your task is to extract the quantity of products being loaded or prepared.
+Look for columns like "ស្តុកឡើង", "ចំនួនឡើង", "ស្តុកឡើងឡាន", "ក្នុងឡាន", "ចំនួន", or "Loaded".
+Extract the number for each product row and put it EXACTLY into the 'quantity' field.
+If the cell is blank, has a dash, or is empty, use 0.
+DO NOT extract numbers from 'ចំនួនលក់', 'ស្តុកសល់', 'ត្រឡប់'.
 `;
       }
 
-      const prompt = `You are an expert data entry AI assistant. Extract inventory transactions from the provided image (handwritten or printed, Khmer or English).
+      const prompt = `You are an expert data entry AI assistant. Your primary goal is to achieve 100% accuracy in extracting numerical values from the provided inventory document (handwritten or printed, Khmer or English).
 Target Transaction Type: ${targetType || 'General'}
 ${typeSpecificInstructions}
 
-CRITICAL RULES:
-1. Ignore noise, irrelevant text, or crossed-out items. Only extract valid product lines.
-2. AGGREGATE DUPLICATES: If the same product appears multiple times, SUM the quantities together into a single item. NEVER output duplicate \`productName\`s.
-3. EXACT MATCH: Map the product name to the provided list if possible. Pay close attention to extra words or suffixes.
+CRITICAL RULES FOR ACCURACY:
+1. NUMBERS ARE CRITICAL: Pay extreme attention to every digit. Carefully distinguish between similar-looking numbers (e.g., 1 and 7, 0 and 8, 5 and 6, 3 and 8). Double-check your reading against the column headers.
+2. ROW ALIGNMENT: Read strictly row by row. Ensure the numbers you extract belong exactly to the product on that row.
+3. KHMER NUMERALS & TEXT: Be aware that numbers might be written in Khmer numerals (១, ២, ៣, ៤, ៥, ៦, ៧, ៨, ៩, ០) or Arabic numerals. Convert any Khmer numerals to standard Arabic numbers in your JSON output.
+4. Ignore noise, irrelevant text, or crossed-out items. Only extract valid product lines.
+5. AGGREGATE DUPLICATES: If the same product appears multiple times, SUM the quantities together into a single item. NEVER output duplicate \`productName\`s.
+6. EXACT MATCH: Map the product name to the provided list if possible. Pay close attention to extra words or suffixes.
+7. NOTES/REMARKS (កំណត់សម្គាល់): Look for a column named "កំណត់សម្គាល់", "ផ្សេងៗ", "Note", or any extra text/remarks written next to a product. Extract this text!
+7. NOTES/REMARKS (កំណត់សម្គាល់): Look for a column named "កំណត់សម្គាល់", "ផ្សេងៗ", "Note", or any extra text/remarks written next to a product. Extract this text!
 
-Extract the data into a structured JSON array. Each item must have:
+Extract the data into a structured JSON array. Each item MUST have ALL of the following fields (if a value is missing or empty on the document, use 0 for numbers):
 - \`productName\` (string, the name of the product)
-- \`quantity\` (number, the primary quantity. For Stock Sold, DO NOT calculate this, leave it 0 or omit it)
-- \`soldQuantity\` (number, required for Stock Sold. Extract from ចំនួនលក់)
-- \`exchangedQuantity\` (number, required for Stock Sold. Extract from ដូរក្រវិល)
-- \`promoQuantity\` (number, required for Stock Sold. Extract from ចំនួនថែម)
+- \`quantity\` (number, ALWAYS output a number. If none, use 0)
+- \`soldQuantity\` (number, ALWAYS output a number. Extract from ចំនួនលក់. If none, use 0)
+- \`exchangedQuantity\` (number, ALWAYS output a number. Extract from ដូរក្រវិល. If none, use 0)
+- \`promoQuantity\` (number, ALWAYS output a number. Extract from ចំនួនថែម. If none, use 0)
 - \`unit\` (string, optional, e.g., \`case\`, \`box\`)
-- \`description\` (string, optional, any extra notes for the item)${availableProductsStr}
+- \`description\` (string, PUT ANY EXTRACTED NOTES/REMARKS HERE. If none, leave empty. For Stock Sold, follow its specific rule)${availableProductsStr}
 
-Ensure the output is ONLY a valid JSON array matching the structure. If you can't read an item clearly, skip it or put your best guess. Do not wrap the JSON in markdown codeblocks like \`\`\`json. Return raw JSON.`;
+Ensure the output is ONLY a valid JSON array matching the structure. Do not wrap the JSON in markdown codeblocks like \`\`\`json. Return raw JSON.`;
 
-      const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+      const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-pro-latest"];
       let response;
       let lastError: any = null;
 
@@ -111,6 +124,7 @@ Ensure the output is ONLY a valid JSON array matching the structure. If you can'
                 ]
               },
               config: {
+                temperature: 0.1,
                 responseMimeType: "application/json",
                 responseSchema: {
                   type: Type.ARRAY,
@@ -125,7 +139,7 @@ Ensure the output is ONLY a valid JSON array matching the structure. If you can'
                       unit: { type: Type.STRING },
                       description: { type: Type.STRING }
                     },
-                    required: ["productName", "soldQuantity", "exchangedQuantity", "promoQuantity"]
+                    required: ["productName", "quantity", "soldQuantity", "exchangedQuantity", "promoQuantity"]
                   }
                 }
               }
@@ -141,10 +155,13 @@ Ensure the output is ONLY a valid JSON array matching the structure. If you can'
             const isUnavailable = e.status === "UNAVAILABLE" || errStr.includes("503");
 
             if (isRateLimit) {
-              console.log(`Rate limit / Quota reached for ${modelName}, waiting 10 seconds...`);
+              console.log(`Rate limit / Quota reached for ${modelName}. Moving to next model if limit is 0, or waiting if it's transient...`);
+              if (errStr.includes("limit: 0")) {
+                  break; // Move to next model immediately
+              }
               if (retries === 0) break;
               retries--;
-              await new Promise(resolve => setTimeout(resolve, 10000));
+              await new Promise(resolve => setTimeout(resolve, 2000)); // wait 2s instead of 10s to avoid timeout
               continue;
             }
 
@@ -174,11 +191,14 @@ Ensure the output is ONLY a valid JSON array matching the structure. If you can'
         });
       }
       
-      const textResponse = response?.text || "[]";
+      let textResponse = response?.text || "[]";
       let parsed = [];
       try {
+        // Clean markdown backticks if any
+        textResponse = textResponse.replace(/^\s*```(json)?/m, '').replace(/```\s*$/m, '').trim();
         parsed = JSON.parse(textResponse);
       } catch(e) {
+        console.error("Failed to parse JSON response:", textResponse);
         // failed
       }
       

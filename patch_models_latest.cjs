@@ -1,0 +1,10 @@
+const fs = require('fs');
+let code = fs.readFileSync('server.ts', 'utf8');
+
+const regex = /const modelsToTry = \[.*?\];/;
+const replacement = 'const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-pro-latest"];';
+
+if (regex.test(code)) {
+  fs.writeFileSync('server.ts', code.replace(regex, replacement));
+  console.log('Patched modelsToTry with more flash models successfully');
+}

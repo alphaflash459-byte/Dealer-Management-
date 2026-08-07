@@ -1,0 +1,22 @@
+const fs = require('fs');
+let code = fs.readFileSync('server.ts', 'utf8');
+
+const target = 'const prompt = `You are an expert data entry AI assistant. Extract inventory transactions from the provided image (handwritten or printed, Khmer or English).\nTarget Transaction Type: ${targetType || \'General\'}\n${typeSpecificInstructions}\n\nCRITICAL RULES:\n1. Ignore noise, irrelevant text, or crossed-out items. Only extract valid product lines.\n2. AGGREGATE DUPLICATES: If the same product appears multiple times, SUM the quantities together into a single item. NEVER output duplicate \\`productName\\`s.\n3. EXACT MATCH: Map the product name to the provided list if possible. Pay close attention to extra words or suffixes.\n\nExtract the data into a structured JSON array. Each item must have:\n- \\`productName\\` (string, the name of the product)\n- \\`quantity\\` (number, the primary quantity. For Stock Sold, DO NOT calculate this, leave it 0 or omit it)\n- \\`soldQuantity\\` (number, required for Stock Sold. Extract from ចំនួនលក់)\n- \\`exchangedQuantity\\` (number, required for Stock Sold. Extract from ដូរក្រវិល)\n- \\`promoQuantity\\` (number, required for Stock Sold. Extract from ចំនួនថែម)\n- \\`unit\\` (string, optional, e.g., \\`case\\`, \\`box\\`)\n- \\`description\\` (string, optional, any extra notes for the item)${availableProductsStr}\n\nEnsure the output is ONLY a valid JSON array matching the structure. If you can\'t read an item clearly, skip it or put your best guess. Do not wrap the JSON in markdown codeblocks like \\`\\`\\`json. Return raw JSON.`;\n\n      const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"];';
+
+const replacement = 'const prompt = `You are an expert data entry AI assistant. Your primary goal is to achieve 100% accuracy in extracting numerical values from the provided inventory document (handwritten or printed, Khmer or English).\nTarget Transaction Type: ${targetType || \'General\'}\n${typeSpecificInstructions}\n\nCRITICAL RULES FOR ACCURACY:\n1. NUMBERS ARE CRITICAL: Pay extreme attention to every digit. Carefully distinguish between similar-looking numbers (e.g., 1 and 7, 0 and 8, 5 and 6, 3 and 8). Double-check your reading against the column headers.\n2. ROW ALIGNMENT: Read strictly row by row. Ensure the numbers you extract belong exactly to the product on that row.\n3. KHMER NUMERALS & TEXT: Be aware that numbers might be written in Khmer numerals (១, ២, ៣, ៤, ៥, ៦, ៧, ៨, ៩, ០) or Arabic numerals. Convert any Khmer numerals to standard Arabic numbers in your JSON output.\n4. Ignore noise, irrelevant text, or crossed-out items. Only extract valid product lines.\n5. AGGREGATE DUPLICATES: If the same product appears multiple times, SUM the quantities together into a single item. NEVER output duplicate \\`productName\\`s.\n6. EXACT MATCH: Map the product name to the provided list if possible. Pay close attention to extra words or suffixes.\n\nExtract the data into a structured JSON array. Each item must have:\n- \\`productName\\` (string, the name of the product)\n- \\`quantity\\` (number, the primary quantity. For Stock Sold, DO NOT calculate this, leave it 0)\n- \\`soldQuantity\\` (number, required for Stock Sold. Extract from ចំនួនលក់)\n- \\`exchangedQuantity\\` (number, required for Stock Sold. Extract from ដូរក្រវិល)\n- \\`promoQuantity\\` (number, required for Stock Sold. Extract from ចំនួនថែម)\n- \\`unit\\` (string, optional, e.g., \\`case\\`, \\`box\\`)\n- \\`description\\` (string, optional, any extra notes for the item)${availableProductsStr}\n\nEnsure the output is ONLY a valid JSON array matching the structure. Do not wrap the JSON in markdown codeblocks like \\`\\`\\`json. Return raw JSON.`;\n\n      const modelsToTry = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"];';
+
+if (code.includes(target)) {
+  fs.writeFileSync('server.ts', code.replace(target, replacement));
+  console.log('Patched successfully');
+} else {
+  console.log('Target not found. Doing fallback replace.');
+  // Fallback to regex or manual
+  
+  const regexPrompt = /const prompt = `You are an expert data entry AI assistant[\s\S]*?const modelsToTry = \[.*?\];/;
+  if (regexPrompt.test(code)) {
+    fs.writeFileSync('server.ts', code.replace(regexPrompt, replacement));
+    console.log('Patched using regex fallback');
+  } else {
+    console.log('Regex fallback also failed');
+  }
+}
