@@ -3,7 +3,7 @@ const ai = new GoogleGenAI({ apiKey: "AIzaSyB-Vm_fcJxb06GQ9a0QTX5LTW2o8JJdMXQ" }
 async function run() {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash-latest",
       contents: "hello"
     });
     console.log(response.text);

@@ -41,21 +41,18 @@ async function startServer() {
       if (normalizedTargetType.includes('sold') || normalizedTargetType.includes('sell') || targetType === 'Stock Sold' || targetType === 'ស្តុកលក់ចេញ') {
         typeSpecificInstructions = `
 *** ABSOLUTE STRICT RULE FOR STOCK SOLD (ស្តុកលក់ / ស្តុកលក់ចេញ) ***
-You must extract data for THREE SPECIFIC COLUMNS for every product row. 
-Look at the table headers in the image and locate these three columns:
-1. Column with header "ចំនួនលក់", "លក់", or "Sold" -> This is your 'soldQuantity'
-2. Column with header "ដូរក្រវិល", "ក្រវិល", "ចំនួនដបប្រវិល", "ដូរ", or "Exchanged" -> This is your 'exchangedQuantity'
-3. Column with header "ចំនួនថែម", "ថែម", "ជួនថែម", or "Promo" -> This is your 'promoQuantity'
+ការស្កេន សម្រាប់ លក់ចេញ ចាប់យកទិន្នន័យតែបី column គឺ ចំនួនលក់, ក្រវិល, និង ថែម។ ហាមច្រឡំ column ក្រវិល និង ថែម ដាច់ខាត! សូមពិនិត្យមើលក្បាល column អោយច្បាស់មុននឹងទាញយកទិន្នន័យ!
+1. ចាប់យក ទិន្នន័យពី column "ចំនួនលក់" ឬ "លក់" ដាក់ក្នុង 'soldQuantity'
+2. ចាប់យក ទិន្នន័យពី column "ដូរក្រវិល" ឬ "ក្រវិល" ដាក់ក្នុង 'exchangedQuantity' (បញ្ជាក់៖ កុំយកទិន្នន័យពី column ថែម មកដាក់ក្នុងនេះ)
+3. ចាប់យក ទិន្នន័យពី column "ចំនួនថែម" ឬ "ថែម" ដាក់ក្នុង 'promoQuantity' (បញ្ជាក់៖ កុំយកទិន្នន័យពី column ក្រវិល មកដាក់ក្នុងនេះ)
 
-For EACH product row, trace your eyes horizontally to these specific columns and extract the number. 
-If the cell is blank, has a dash, or is empty, use 0.
+For EACH product row, extract ONLY the numbers from these 3 columns.
+If a cell is blank, has a dash, or is empty, use 0.
 You MUST output a number (even if 0) for ALL THREE fields: 'soldQuantity', 'exchangedQuantity', and 'promoQuantity'.
 
-DO NOT mix them up.
-DO NOT extract numbers from the "ស្តុកឡើងឡាន" (Loaded) or "ក្នុងឡាន" column.
-DO NOT extract numbers from the "ស្តុកសល់" (Remaining) column.
+DO NOT extract numbers from any other columns (e.g., ignore "ស្តុកឡើងឡាន", "ក្នុងឡាន", "ស្តុកសល់", etc.).
 
-In the 'description' field, write EXACTLY: "លក់: [soldQuantity], ដូរក្រវិល: [exchangedQuantity], ថែម: [promoQuantity]" using the actual extracted numbers.
+In the 'description' field, write EXACTLY: "លក់: [soldQuantity], ក្រវិល: [exchangedQuantity], ថែម: [promoQuantity]" using the actual extracted numbers.
 `;
       } else if (normalizedTargetType.includes('return') || targetType === 'Stock Return' || targetType === 'ស្តុកត្រឡប់') {
         typeSpecificInstructions = `
@@ -140,13 +137,11 @@ Ensure the output is ONLY a valid JSON array matching the structure. If you can'
             const isRateLimit = e.status === 429 || e.status === "RESOURCE_EXHAUSTED" || errStr.includes("429") || errStr.includes("Quota") || errStr.includes("RESOURCE_EXHAUSTED");
             const isUnavailable = e.status === "UNAVAILABLE" || errStr.includes("503");
 
-            if (isRateLimit) {
-              console.log(`Rate limit / Quota reached for ${modelName}, waiting 10 seconds...`);
-              if (retries === 0) break;
-              retries--;
-              await new Promise(resolve => setTimeout(resolve, 10000));
-              continue;
-            }
+            
+          if (isRateLimit) {
+            console.log(`Rate limit / Quota reached for ${modelName}`);
+            break; // Fail fast for this model, try next one
+          }
 
             if (retries === 0 || !isUnavailable) {
               break; // Try next model
@@ -165,7 +160,7 @@ Ensure the output is ONLY a valid JSON array matching the structure. If you can'
         if (errStr.includes("429") || errStr.includes("Quota") || errStr.includes("RESOURCE_EXHAUSTED")) {
           return res.status(429).json({ 
             success: false,
-            error: "ប្រព័ន្ធ AI កំពុងមមាញឹក ឬអស់កូតាក្នុងការស្កេន (429 Quota Exceeded)។ សូមរង់ចាំប្រហែល 30 វិនាទី រួចព្យាយាមម្តងទៀត។" 
+            error: "ការស្កេនបរាជ័យ (429 Quota Exceeded): ប្រព័ន្ធ AI របស់អ្នកអស់កូតាប្រើប្រាស់ឥតគិតថ្លៃប្រចាំថ្ងៃ (Limit Reached)។ ដើម្បីប្រើប្រាស់មុខងារនេះឥតដែនកំណត់នៅលើ Vercel អ្នកត្រូវចូលទៅកាន់ Google AI Studio បង្កើត API Key ថ្មីដែលមានភ្ជាប់ Billing (Pay-as-you-go) រួចយកទៅដាក់ក្នុង Environment Variables របស់ Vercel ឈ្មោះ GEMINI_API_KEY។" 
           });
         }
         return res.status(500).json({
