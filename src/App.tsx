@@ -15,7 +15,7 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [stockOrders, setStockOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn' | 'warehouse'>('stockOut');
+  const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn' | 'warehouse' | 'dashboard'>('stockOut');
   const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return' | 'Report' | 'Stock Order'>('Stock Out');
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -336,6 +336,31 @@ export default function App() {
               <div className="space-y-2 mb-5 border-t border-b border-slate-100 py-3.5 w-full">
                 <p className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-wider px-2">ការគ្រប់គ្រងប្រព័ន្ធ</p>
                 
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setActiveAdminView('dashboard');
+                    setIsUserMenuOpen(false);
+                  }} 
+                  className={`w-full flex items-center p-2.5 rounded-2xl transition-all cursor-pointer ${
+                    activeAdminView === 'dashboard' 
+                      ? 'text-emerald-700 bg-emerald-50 border border-emerald-100/50' 
+                      : 'text-slate-600 hover:bg-slate-50 border border-transparent'
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-xl mr-3 ${
+                    activeAdminView === 'dashboard' 
+                      ? 'bg-emerald-100 text-emerald-700' 
+                      : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-black">Dashboard ក្រាប</span>
+                </button>
+
                 <button 
                   type="button"
                   onClick={() => {

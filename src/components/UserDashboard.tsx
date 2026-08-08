@@ -2058,7 +2058,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 </div>
               ) : (
                 <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll">
-                  <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+                  <table className="w-full text-left border-collapse ">
                     <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                       <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100 text-center">
                         <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
@@ -2151,7 +2151,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   </div>
                 ) : (
                   <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll animate-in fade-in duration-200">
-                    <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+                    <table className="w-full text-left border-collapse ">
                       <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                         <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                           <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អតិថិជន</th>
@@ -2233,7 +2233,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             </div>
           ) : (
             <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll">
-              <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+              <table className="w-full text-left border-collapse ">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">

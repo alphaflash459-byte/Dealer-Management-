@@ -6,6 +6,7 @@ import { saveAs } from 'file-saver';
 import { User, Transaction, Product, StockOrder, PromotionTier, Role, TransactionType } from '../types';
 import { doc, setDoc, deleteDoc, updateDoc, deleteField, increment, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 export function cleanUndefined<T extends object>(obj: T): T {
   const newObj = { ...obj } as any;
@@ -3280,8 +3281,197 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const totalOrderItems = sortedGroupedStockOrders.length;
   const paginatedStockOrders = sortedGroupedStockOrders;
 
+  const [dashboardMetric, setDashboardMetric] = useState<'sales' | 'out' | 'return'>('sales');
+  const [dashboardFilterProduct, setDashboardFilterProduct] = useState<string>('all');
+
+  const { pieData: dashboardChartData, lineData: dashboardLineData, lineProducts: dashboardLineProducts } = useMemo(() => {
+    const dataMap: Record<string, number> = {};
+    const dataByDate: Record<string, Record<string, number>> = {};
+    const productNames = new Set<string>();
+
+    managedTransactions.forEach(t => {
+      const type = t.type;
+      
+      const txDateStr = t.date ? t.date.split('T')[0] : '';
+      const matchStart = !filterTxStartDate || txDateStr >= filterTxStartDate;
+      const matchEnd = !filterTxEndDate || txDateStr <= filterTxEndDate;
+      const matchUser = filterTxUserId === 'all' || t.userId === filterTxUserId;
+      const matchProduct = dashboardFilterProduct === 'all' || t.productName === dashboardFilterProduct;
+      
+      if (!matchStart || !matchEnd || !matchUser || !matchProduct || !txDateStr) return;
+
+      let isValid = false;
+      if (dashboardMetric === 'sales' && type === 'Stock Sold') isValid = true;
+      if (dashboardMetric === 'out' && type === 'Stock Out') isValid = true;
+      if (dashboardMetric === 'return' && type === 'Stock Return') isValid = true;
+      
+      if (isValid) {
+        if (!dataMap[t.productName]) {
+          dataMap[t.productName] = 0;
+        }
+        dataMap[t.productName] += t.quantity;
+
+        if (!dataByDate[txDateStr]) {
+          dataByDate[txDateStr] = {};
+        }
+        if (!dataByDate[txDateStr][t.productName]) {
+          dataByDate[txDateStr][t.productName] = 0;
+        }
+        dataByDate[txDateStr][t.productName] += t.quantity;
+        productNames.add(t.productName);
+      }
+    });
+    
+    const pieData = Object.entries(dataMap).map(([name, qty]) => ({ name, value: qty })).sort((a, b) => b.value - a.value);
+    
+    const lineData = Object.entries(dataByDate).map(([date, products]) => ({
+      date,
+      ...products
+    })).sort((a, b) => a.date.localeCompare(b.date));
+
+    return { pieData, lineData, lineProducts: Array.from(productNames) };
+  }, [managedTransactions, dashboardMetric, filterTxStartDate, filterTxEndDate, filterTxUserId, dashboardFilterProduct]);
+
+  const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#64748b'];
+
   return (
     <div className="w-full h-full flex flex-col min-w-0 overflow-hidden">
+      {activeTab === 'dashboard' && (
+        <div className="bg-white rounded-3xl border shadow-sm border-slate-100 flex flex-col flex-1 min-h-0 w-full min-w-0 p-4">
+          <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-4 shrink-0">
+            <div>
+              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">Dashboard ក្រាប</h3>
+              <p className="text-slate-500 text-xs mt-0.5 font-medium">ទិន្នន័យរួម និងសកម្មភាពស្តុក</p>
+            </div>
+            <div>
+              <select
+                value={dashboardMetric}
+                onChange={(e) => setDashboardMetric(e.target.value as any)}
+                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              >
+                <option value="sales">ស្តុកលក់</option>
+                <option value="out">ស្តុកឡើងឡាន</option>
+                <option value="return">ស្តុកត្រឡប់</option>
+              </select>
+            </div>
+          </div>
+          
+          {/* Shared Filters */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-3 mb-4 bg-slate-50 p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shrink-0">
+            <div className="flex flex-col space-y-0.5">
+              <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">អ្នកប្រើប្រាស់</label>
+              <select
+                value={filterTxUserId}
+                onChange={(e) => setFilterTxUserId(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+              >
+                <option value="all">ទាំងអស់</option>
+                {(currentUser.role === 'Server'
+                  ? users.filter(u => u.role === 'User')
+                  : managedUsers.filter(u => u.role === 'User')
+                ).map(u => (
+                  <option key={u.id} value={u.id}>{u.username}</option>
+                ))}
+              </select>
+            </div>
+            {/* Product Filter */}
+            <div className="flex flex-col space-y-0.5">
+              <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">មុខទំនិញ</label>
+              <select
+                value={dashboardFilterProduct}
+                onChange={(e) => setDashboardFilterProduct(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+              >
+                <option value="all">ទាំងអស់</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.name}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            {/* Start Date Filter */}
+            <div className="flex flex-col space-y-0.5">
+              <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>ចាប់ផ្តើម
+              </label>
+              <input
+                type="date"
+                value={filterTxStartDate}
+                onChange={(e) => setFilterTxStartDate(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+              />
+            </div>
+            {/* End Date Filter */}
+            <div className="flex flex-col space-y-0.5">
+              <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>បញ្ចប់
+              </label>
+              <input
+                type="date"
+                value={filterTxEndDate}
+                onChange={(e) => setFilterTxEndDate(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+              />
+            </div>
+          </div>
+          
+          <div className="flex-1 flex flex-col gap-4 min-h-0 overflow-y-auto custom-scroll pb-10">
+            {/* Line Chart */}
+            <div className="flex-none bg-slate-50/50 border border-slate-100 rounded-2xl p-4 h-[400px]">
+              <h4 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-wider text-center">បរិមាណតាមមុខទំនិញ</h4>
+              <ResponsiveContainer width="100%" height="90%">
+                <LineChart data={dashboardLineData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <RechartsTooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', fontWeight: 'bold', fontSize: '12px' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b' }} />
+                  {dashboardLineProducts.map((product, index) => (
+                    <Line 
+                      key={product} 
+                      type="monotone" 
+                      dataKey={product} 
+                      stroke={COLORS[index % COLORS.length]} 
+                      strokeWidth={2}
+                      dot={{ r: 3, strokeWidth: 2 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Pie Chart */}
+            <div className="flex-none bg-slate-50/50 border border-slate-100 rounded-2xl p-4 h-[400px]">
+              <h4 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-wider text-center">ភាគរយតាមមុខទំនិញ</h4>
+              <ResponsiveContainer width="100%" height="90%">
+                <PieChart>
+                  <Pie
+                    data={dashboardChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {dashboardChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', fontWeight: 'bold', fontSize: '12px' }}
+                  />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'users' && (
         <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
           <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
