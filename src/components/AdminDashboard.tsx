@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 
 import ExcelJS from 'exceljs';
@@ -2423,7 +2423,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
     const exportProductsList = [
       { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
-      { khmerName: "ស្រាបៀរកម្ពុជា (អត់រង្វាន់)", code: "CBC ORD" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
       { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
       { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
       { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
@@ -2488,6 +2488,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         if (pName === 'WURKZ ICE') pName = 'WICE';
         if (pName === 'W ORD') pName = 'WURKZ ORD';
         if (pName === 'D ORD') pName = 'DAZZ ORD';
+        if (pName === 'CBC ORD') pName = 'CED ORD';
 
         if (!groupedMap[pName]) {
           groupedMap[pName] = { stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0 };
@@ -2790,6 +2791,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       if (dbName === 'WICE') dbName = 'WURKZ ICE';
       if (dbName === 'WURKZ ORD') dbName = 'W ORD';
       if (dbName === 'DAZZ ORD') dbName = 'D ORD';
+      if (dbName === 'CED ORD') dbName = 'CBC ORD';
 
       const actualProduct = products.find(prod => prod.name === dbName || prod.name === p.code);
       const currentStock = actualProduct?.warehouseStock || 0;
@@ -3023,6 +3025,20 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     saveAs(blob, fileName);
   };
 
+
+  // User IDs with transactions in the selected date range
+  const userIdsWithData = useMemo(() => {
+    const ids = new Set<string>();
+    managedTransactions.forEach(t => {
+      const txDateStr = t.date ? t.date.split('T')[0] : '';
+      const matchStart = !filterTxStartDate || txDateStr >= filterTxStartDate;
+      const matchEnd = !filterTxEndDate || txDateStr <= filterTxEndDate;
+      if (matchStart && matchEnd) {
+        ids.add(t.userId);
+      }
+    });
+    return ids;
+  }, [managedTransactions, filterTxStartDate, filterTxEndDate]);
 
   // Filtered transactions for Admin tab
   const filteredTransactions = managedTransactions.filter(t => {
@@ -3286,7 +3302,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             </div>
           </div>
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-            <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+            <table className="w-full text-left border-collapse ">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះអ្នកប្រើប្រាស់</th>
@@ -3361,7 +3377,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             </button>
           </div>
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-            <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+            <table className="w-full text-left border-collapse ">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញ</th>
@@ -3384,12 +3400,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                         {product.promotions && product.promotions.length > 0 ? (
                           <div className="flex flex-wrap gap-1 justify-center max-w-[200px] mx-auto">
                             {product.promotions.slice(0, 2).map((promo, idx) => (
-                              <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 whitespace-nowrap">
+                              <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 ">
                                 ទិញ {promo.buyQty} ថែម {promo.getQty}
                               </span>
                             ))}
                             {product.promotions.length > 2 && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200 whitespace-nowrap">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200 ">
                                 ច្រើនទៀត
                               </span>
                             )}
@@ -3507,7 +3523,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 {(currentUser.role === 'Server'
                   ? users.filter(u => u.role === 'User')
                   : managedUsers.filter(u => u.role === 'User')
-                ).map(u => (
+                ).filter(u => userIdsWithData.has(u.id)).map(u => (
                   <option key={u.id} value={u.id}>{u.username}</option>
                 ))}
               </select>
@@ -3541,7 +3557,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           </div>
 
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-            <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+            <table className="w-full text-left border-collapse ">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[10px] sm:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                   <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
@@ -3718,7 +3734,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   {(currentUser.role === 'Server'
                     ? users.filter(u => u.role === 'User')
                     : managedUsers.filter(u => u.role === 'User')
-                  ).map(u => (
+                  ).filter(u => userIdsWithData.has(u.id)).map(u => (
                     <option key={u.id} value={u.id}>{u.username}</option>
                   ))}
                 </select>
@@ -3751,7 +3767,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
             {/* Grouped Table Layout (Matching User design exactly) */}
             <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-              <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+              <table className="w-full text-left border-collapse ">
                 <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកប្រើប្រាស់</th>
@@ -3791,7 +3807,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                           )}
                         </td>
                         {/* Column 4: Date */}
-                        <td className="px-1.5 md:px-3 py-2 text-center font-medium text-slate-500 whitespace-nowrap">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium text-slate-500 ">
                           {(() => {
                             const d = new Date(inv.date);
                             const day = String(d.getDate()).padStart(2, '0');
@@ -3815,7 +3831,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center justify-center">
-                                <span className="font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap">
+                                <span className="font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded text-[10px] sm:text-xs ">
                                   {item.quantity}
                                 </span>
                               </div>
@@ -3913,7 +3929,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   {(currentUser.role === 'Server'
                     ? users.filter(u => u.role === 'User')
                     : managedUsers.filter(u => u.role === 'User')
-                  ).map(u => (
+                  ).filter(u => userIdsWithData.has(u.id)).map(u => (
                     <option key={u.id} value={u.id}>{u.username}</option>
                   ))}
                 </select>
@@ -3946,7 +3962,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
             {/* Grouped Table Layout (Matching User design exactly) */}
             <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-              <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+              <table className="w-full text-left border-collapse ">
                 <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកប្រើប្រាស់</th>
@@ -3986,7 +4002,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                           )}
                         </td>
                         {/* Column 4: Date */}
-                        <td className="px-1.5 md:px-3 py-2 text-center font-medium text-slate-500 whitespace-nowrap">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium text-slate-500 ">
                           {(() => {
                             const d = new Date(inv.date);
                             const day = String(d.getDate()).padStart(2, '0');
@@ -4010,7 +4026,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center justify-center">
-                                <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap">
+                                <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] sm:text-xs ">
                                   {item.quantity}
                                   {item.promoQty && item.promoQty > 0 ? (
                                     <span className="text-amber-500 ml-1 font-bold">+{item.promoQty}</span>
@@ -4106,7 +4122,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   {(currentUser.role === 'Server'
                     ? users.filter(u => u.role === 'User')
                     : managedUsers.filter(u => u.role === 'User')
-                  ).map(u => (
+                  ).filter(u => userIdsWithData.has(u.id)).map(u => (
                     <option key={u.id} value={u.id}>{u.username}</option>
                   ))}
                 </select>
@@ -4139,7 +4155,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
             {/* Grouped Table Layout (Matching User design exactly) */}
             <div className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-              <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+              <table className="w-full text-left border-collapse ">
                 <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកប្រើប្រាស់</th>
@@ -4179,7 +4195,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                           )}
                         </td>
                         {/* Column 4: Date */}
-                        <td className="px-1.5 md:px-3 py-2 text-center font-medium text-slate-500 whitespace-nowrap">
+                        <td className="px-1.5 md:px-3 py-2 text-center font-medium text-slate-500 ">
                           {(() => {
                             const d = new Date(inv.date);
                             const day = String(d.getDate()).padStart(2, '0');
@@ -4203,7 +4219,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                           <div className="flex flex-col space-y-1.5 items-center">
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center justify-center">
-                                <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap">
+                                <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-[10px] sm:text-xs ">
                                   {item.quantity}
                                 </span>
                               </div>
@@ -4263,7 +4279,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           </div>
 
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-            <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+            <table className="w-full text-left border-collapse ">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                   <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">អ្នកកម្មង់</th>
@@ -4298,7 +4314,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                           <span className="text-slate-300 font-bold">-</span>
                         )}
                       </td>
-                      <td className="px-1.5 md:px-3 py-2 text-center text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">
+                      <td className="px-1.5 md:px-3 py-2 text-center text-[10px] sm:text-xs text-slate-500 ">
                         <div className="flex flex-col items-center justify-center space-y-1">
                           <span className="font-medium text-slate-500">
                             {(() => {
@@ -4324,7 +4340,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                         <div className="flex flex-col space-y-1.5 items-center">
                           {orderGroup.items.map((item: any, idx: number) => (
                             <div key={idx} className="h-6 flex items-center justify-center">
-                              <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] sm:text-xs whitespace-nowrap">
+                              <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] sm:text-xs ">
                                 {item.quantity}
                               </span>
                             </div>
@@ -4461,7 +4477,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
           {/* Table Container */}
           <div ref={tableContainerRef} className="w-full flex-1 min-h-0 overflow-auto custom-scroll -mx-1 md:-mx-2 px-1 md:px-2">
-            <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+            <table className="w-full text-left border-collapse ">
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-[11px] uppercase font-bold tracking-wider border-b border-slate-100">
                   <th className="px-1 md:px-3 py-2 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
@@ -4605,7 +4621,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       <button
                         type="button"
                         onClick={() => stockInFileInputRef.current?.click()}
-                        className="bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer border border-transparent whitespace-nowrap shrink-0"
+                        className="bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer border border-transparent  shrink-0"
                       >
                         ជ្រើសរើសរូបភាព
                       </button>
@@ -4659,7 +4675,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   
                   {stockInItems.length > 0 ? (
                     <div className="border border-slate-200 rounded-2xl overflow-y-auto custom-scroll flex-1 max-h-[40vh]">
-                      <table className="w-full text-left text-sm min-w-[500px]">
+                      <table className="w-full text-left text-sm ">
                         <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs sticky top-0 z-10">
                           <tr>
                             <th className="p-3">ឈ្មោះទំនិញ / ផលិតផល</th>
@@ -4764,7 +4780,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       <button
                         type="button"
                         onClick={() => manualAddFileInputRef.current?.click()}
-                        className="bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer border border-transparent whitespace-nowrap shrink-0"
+                        className="bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer border border-transparent  shrink-0"
                       >
                         ជ្រើសរើសរូបភាព
                       </button>
@@ -4801,7 +4817,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 />
               </div>
               <div className="flex-1 overflow-auto custom-scroll border border-slate-200 rounded-2xl">
-                <table className="w-full text-left text-sm min-w-[500px]">
+                <table className="w-full text-left text-sm ">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs sticky top-0 z-10">
                     <tr>
                       <th className="p-3 w-48">ឈ្មោះទំនិញ</th>
@@ -4969,7 +4985,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             
             <div className="p-4 sm:p-6 flex flex-col min-h-0 overflow-hidden flex-1">
               <div className="flex-1 overflow-auto custom-scroll border border-slate-200 rounded-2xl">
-                <table className="w-full text-left text-sm min-w-[500px]">
+                <table className="w-full text-left text-sm ">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs sticky top-0 z-10">
                     <tr>
                       <th className="p-3 w-48">ឈ្មោះទំនិញ</th>
@@ -5219,7 +5235,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer border border-transparent whitespace-nowrap shrink-0"
+                      className="bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer border border-transparent  shrink-0"
                     >
                       ជ្រើសរើសរូបភាព
                     </button>
@@ -5279,7 +5295,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 </div>
                 {aiScannerResults.length > 0 ? (
                   <div className="border border-slate-200 rounded-2xl overflow-x-auto">
-                    <table className="w-full text-left text-sm min-w-[500px]">
+                    <table className="w-full text-left text-sm ">
                       <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-xs">
                         <tr>
                           <th className="p-3">ឈ្មោះទំនិញ / ផលិតផល</th>
@@ -6331,7 +6347,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   {selectedProductDetail.promotions && selectedProductDetail.promotions.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {selectedProductDetail.promotions.map((promo, idx) => (
-                        <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 whitespace-nowrap">
+                        <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 ">
                           ទិញ {promo.buyQty} ថែម {promo.getQty}
                         </span>
                       ))}
@@ -7642,7 +7658,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               ) : (
                 <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
                   <div className="overflow-x-auto custom-scroll">
-                    <table className="w-full text-left border-collapse whitespace-nowrap">
+                    <table className="w-full text-left border-collapse ">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 text-[10px] sm:text-xs font-bold border-b border-slate-100">
                           <th className="px-4 py-3">កាលបរិច្ឆេទ</th>
