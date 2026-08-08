@@ -3624,10 +3624,6 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       {activeTab === 'transactions' && (
         <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0 gap-2">
-            <div>
-              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ប្រតិបត្តិការទាំងអស់</h3>
-              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">របាយការណ៍ផ្ទៀងផ្ទាត់ និងតុល្យភាពស្តុកទំនិញ</p>
-            </div>
             <div className="flex flex-wrap items-center gap-2">
               {!isEditingReport ? (
                 <button
@@ -3892,24 +3888,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
         return (
           <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
-            <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
-              <div>
-                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកឡើងឡានរបស់អ្នកប្រើប្រាស់</h3>
-                <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យឡើងឡានរបស់ភ្នាក់ងារលក់</p>
-              </div>
-            </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 gap-2 mb-3 shrink-0">
-              <div className="bg-rose-50/50 border border-rose-100/50 p-2.5 rounded-xl flex flex-col justify-between">
-                <span className="text-[10px] sm:text-xs font-black text-slate-500">សរុបឡើងឡាន</span>
-                <span className="text-sm sm:text-2xl font-black text-rose-600 mt-0.5">{totalOutQty}</span>
-              </div>
-              <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex flex-col justify-between">
-                <span className="text-[10px] sm:text-xs font-black text-slate-500 font-bold">ប្រតិបត្តិការសរុប</span>
-                <span className="text-sm sm:text-2xl font-black text-slate-800 mt-0.5">{sortedOutInvoices.length} វិក្កយបត្រ</span>
-              </div>
-            </div>
 
             {/* Shared Filters */}
             <div className="grid grid-cols-3 gap-1.5 md:gap-3 mb-3 bg-slate-50 p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shrink-0">
@@ -4083,28 +4062,6 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
         return (
           <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
-            <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
-              <div>
-                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកលក់ចេញរបស់អ្នកប្រើប្រាស់</h3>
-                <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យលក់ចេញ និងការថែមជូនប្រម៉ូសិនរបស់ភ្នាក់ងារលក់</p>
-              </div>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-3 gap-2 mb-3 shrink-0">
-              <div className="bg-emerald-50/50 border border-emerald-100/50 p-2 rounded-xl flex flex-col justify-between">
-                <span className="text-[9px] sm:text-xs font-black text-slate-500 truncate">សរុបលក់ចេញ</span>
-                <span className="text-xs sm:text-2xl font-black text-emerald-600 mt-0.5">{totalSoldQty}</span>
-              </div>
-              <div className="bg-amber-50/50 border border-amber-100/50 p-2 rounded-xl flex flex-col justify-between">
-                <span className="text-[9px] sm:text-xs font-black text-slate-500 truncate">សរុបថែម</span>
-                <span className="text-xs sm:text-2xl font-black text-amber-500 mt-0.5">{totalPromoQty}</span>
-              </div>
-              <div className="bg-slate-50 border border-slate-100 p-2 rounded-xl flex flex-col justify-between">
-                <span className="text-[9px] sm:text-xs font-black text-slate-500 font-bold truncate">ប្រតិបត្តិការ</span>
-                <span className="text-xs sm:text-2xl font-black text-slate-800 mt-0.5">{sortedSoldInvoices.length} វិក្កយបត្រ</span>
-              </div>
-            </div>
 
             {/* Shared Filters */}
             <div className="grid grid-cols-3 gap-1.5 md:gap-3 mb-3 bg-slate-50 p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shrink-0">
@@ -4280,24 +4237,6 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
         return (
           <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-200">
-            <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2.5 shrink-0">
-              <div>
-                <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកត្រឡប់របស់អ្នកប្រើប្រាស់</h3>
-                <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">តាមដានរាល់ទិន្នន័យត្រឡប់របស់ភ្នាក់ងារលក់</p>
-              </div>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 gap-2 mb-3 shrink-0">
-              <div className="bg-indigo-50/50 border border-indigo-100/50 p-2.5 rounded-xl flex flex-col justify-between">
-                <span className="text-[10px] sm:text-xs font-black text-slate-500">សរុបត្រឡប់</span>
-                <span className="text-sm sm:text-2xl font-black text-indigo-600 mt-0.5">{totalReturnQty}</span>
-              </div>
-              <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex flex-col justify-between">
-                <span className="text-[10px] sm:text-xs font-black text-slate-500 font-bold">ប្រតិបត្តិការសរុប</span>
-                <span className="text-sm sm:text-2xl font-black text-slate-800 mt-0.5">{sortedReturnInvoices.length} វិក្កយបត្រ</span>
-              </div>
-            </div>
 
             {/* Shared Filters */}
             <div className="grid grid-cols-3 gap-1.5 md:gap-3 mb-3 bg-slate-50 p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shrink-0">
@@ -4434,11 +4373,6 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       {activeTab === 'stockOrders' && (
         <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
           <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0">
-            <div>
-              <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-800">ស្តុកកម្មង់</h3>
-              <p className="text-slate-500 text-[9px] sm:text-xs mt-0.5 font-medium">ការកម្មង់សរុប៖ {stockOrders.length} ជួរ</p>
-            </div>
-            
             <div className="flex flex-wrap items-center gap-3">
               {/* ស្ថានភាព filter */}
               <div className="bg-slate-100/80 p-1 rounded-2xl flex space-x-1 border border-slate-200/50">

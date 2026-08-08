@@ -20,6 +20,7 @@ export default function App() {
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isAIScannerModalOpen, setIsAIScannerModalOpen] = useState(false);
+  const [isNavHidden, setIsNavHidden] = useState(false);
   const lastScrollY = useRef(0);
 
   // Initial load
@@ -98,6 +99,18 @@ export default function App() {
     return products.filter(p => p.createdBy === adminId || (!p.createdBy && adminId === 'admin-1'));
   };
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    // Only toggle on PC/Tablet sizes (md and up)
+    if (window.innerWidth < 768) return;
+    
+    const target = e.target as HTMLElement;
+    // Don't toggle if clicking on interactive elements
+    if (['INPUT', 'BUTTON', 'TEXTAREA', 'SELECT', 'A', 'LABEL', 'OPTION'].includes(target.tagName) || target.closest('button, a, input, select, textarea')) {
+      return;
+    }
+    setIsNavHidden(!isNavHidden);
+  };
+
   // Reset mobile header visibility when switching tabs
   useEffect(() => {
     setIsHeaderVisible(true);
@@ -116,9 +129,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row w-full h-[100dvh] overflow-x-hidden font-sans bg-slate-50">
+    <div className="flex flex-col md:flex-row w-full h-[100dvh] overflow-x-hidden font-sans bg-slate-50" onDoubleClick={handleDoubleClick}>
       {/* NAVIGATION (Sidebar on Tablet/PC, Bottom Bar on Mobile) */}
-      <nav className="md:relative w-full md:w-64 bg-white/80 md:bg-white backdrop-blur-xl md:backdrop-blur-none border-t md:border-t-0 md:border-r border-slate-200/50 z-50 shrink-0 order-2 md:order-1 transition-all shadow-[0_-10px_30px_-10px_rgba(0,0,0,0.1)] md:shadow-none pb-safe rounded-t-3xl md:rounded-none">
+      <nav className={`md:relative w-full ${isNavHidden ? 'md:hidden' : 'md:w-64'} bg-white/80 md:bg-white backdrop-blur-xl md:backdrop-blur-none border-t md:border-t-0 md:border-r border-slate-200/50 z-50 shrink-0 order-2 md:order-1 transition-all shadow-[0_-10px_30px_-10px_rgba(0,0,0,0.1)] md:shadow-none pb-safe rounded-t-3xl md:rounded-none`}>
         <div className="hidden md:flex items-center space-x-3 p-6 mb-2 border-b border-slate-50">
             <div className="bg-emerald-600 text-white p-2.5 rounded-xl shadow-md shadow-emerald-600/30">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
