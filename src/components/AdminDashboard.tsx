@@ -121,6 +121,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFileType, setExportFileType] = useState<'pdf' | 'excel'>('excel');
   const [exportDocType, setExportDocType] = useState<string>('reports');
+  const [exportUserId, setExportUserId] = useState<string>('all');
   const ttyUser = users.find(u => u.username.toUpperCase() === 'TTY');
   const managedUsers = currentUser.role === 'Server'
     ? users.filter(u => u.role === 'Admin')
@@ -2258,7 +2259,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
     let pagesHtml = '';
 
-    if (filterTxUserId === 'all') {
+    if (exportUserId === 'all') {
       const activeUsers = currentUser.role === 'Server' ? users.filter(u => u.role === 'User' || u.role === 'Admin' || u.role === 'Server') : managedUsers.filter(u => u.role === 'User');
       const renderedPages = activeUsers.map(u => renderUserPage(u)).filter(html => html !== '');
       
@@ -2269,7 +2270,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       }
       pagesHtml = renderedPages.join('');
     } else {
-      const selectedUser = users.find(u => u.id === filterTxUserId);
+      const selectedUser = users.find(u => u.id === exportUserId);
       if (selectedUser) {
         pagesHtml = renderUserPage(selectedUser);
       }
@@ -2831,7 +2832,14 @@ const handleExportLostExcessExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     let hasData = false;
 
-    users.forEach(user => {
+    let usersToExport = users;
+    if (exportUserId !== 'all') {
+       usersToExport = users.filter(u => u.id === exportUserId);
+    } else {
+       usersToExport = currentUser.role === 'Server' ? users.filter(u => u.role === 'User' || u.role === 'Admin' || u.role === 'Server') : managedUsers.filter(u => u.role === 'User');
+    }
+
+    usersToExport.forEach(user => {
       const userTxs = transactions.filter(t => {
         const matchUser = t.userId === user.id;
         const txDateStr = t.date ? t.date.split('T')[0] : '';
@@ -3043,7 +3051,14 @@ const handleExportLostExcessExcel = async () => {
 
     let allPagesHtml = '';
 
-    users.forEach(user => {
+    let usersToExport = users;
+    if (exportUserId !== 'all') {
+       usersToExport = users.filter(u => u.id === exportUserId);
+    } else {
+       usersToExport = currentUser.role === 'Server' ? users.filter(u => u.role === 'User' || u.role === 'Admin' || u.role === 'Server') : managedUsers.filter(u => u.role === 'User');
+    }
+
+    usersToExport.forEach(user => {
       const userTxs = transactions.filter(t => {
         const matchUser = t.userId === user.id;
         const txDateStr = t.date ? t.date.split('T')[0] : '';
@@ -3721,11 +3736,11 @@ const handleExportSelectedUserStockExcel = async () => {
       // ExcelJS requires applying borders to all cells in a merge to look right sometimes, but applying to the first is usually enough if others are empty, but we did includeEmpty: true
     };
     
-    if (filterTxUserId === 'all') {
+    if (exportUserId === 'all') {
       const activeUsers = currentUser.role === 'Server' ? users.filter(u => u.role === 'User' || u.role === 'Admin' || u.role === 'Server') : managedUsers.filter(u => u.role === 'User');
       activeUsers.forEach(u => processUser(u));
     } else {
-      const selectedUser = users.find(u => u.id === filterTxUserId);
+      const selectedUser = users.find(u => u.id === exportUserId);
       if (selectedUser) {
         processUser(selectedUser);
       }
@@ -5878,7 +5893,22 @@ const handleExportSelectedUserStockExcel = async () => {
                 </select>
               </div>
 
-
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-2">អ្នកប្រើប្រាស់</label>
+                <select 
+                  value={exportUserId} 
+                  onChange={(e) => setExportUserId(e.target.value)}
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 cursor-pointer transition"
+                >
+                  <option value="all">ទាំងអស់</option>
+                  {(currentUser.role === 'Server'
+                    ? users.filter(u => u.role === 'User' || u.role === 'Admin' || u.role === 'Server')
+                    : managedUsers.filter(u => u.role === 'User')
+                  ).map(u => (
+                    <option key={u.id} value={u.id}>{u.username || u.id}</option>
+                  ))}
+                </select>
+              </div>
 
               <div className="flex gap-3">
                 <div className="flex-1">
