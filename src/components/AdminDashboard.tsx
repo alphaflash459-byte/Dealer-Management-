@@ -112,12 +112,15 @@ interface AdminDashboardProps {
   transactions: Transaction[];
   products: Product[];
   stockOrders: StockOrder[];
-  activeTab: 'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn' | 'warehouse';
+  activeTab: 'dashboard' | 'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn' | 'warehouse';
   isAIScannerModalOpen: boolean;
   setIsAIScannerModalOpen: (val: boolean) => void;
 }
 
 export default function AdminDashboard({ currentUser, users, setUsers, transactions, products, stockOrders, activeTab, isAIScannerModalOpen, setIsAIScannerModalOpen }: AdminDashboardProps) {
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportFileType, setExportFileType] = useState<'pdf' | 'excel'>('excel');
+  const [exportDocType, setExportDocType] = useState<string>('reports');
   const ttyUser = users.find(u => u.username.toUpperCase() === 'TTY');
   const managedUsers = currentUser.role === 'Server'
     ? users.filter(u => u.role === 'Admin')
@@ -277,6 +280,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
   // Warehouse Stock states
   const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
+  const [stockInputType, setStockInputType] = useState<'in' | 'count'>('in');
+  const [stockHistoryFilter, setStockHistoryFilter] = useState<'all' | 'in' | 'count'>('all');
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
   const [quickAddItems, setQuickAddItems] = useState<{productName: string, quantity: string}[]>([]);
   const [isកែប្រែWarehouseStockModalOpen, setIsកែប្រែWarehouseStockModalOpen] = useState(false);
@@ -613,16 +618,24 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         const product = products.find(p => p.name === item.productName);
         if (product) {
           const qty = parseInt(item.quantity);
-          const currentStock = product.warehouseStock || 0;
-          await updateDoc(doc(db, 'products', product.id), {
-            warehouseStock: currentStock + qty
-          });
+          if (stockInputType === 'count') {
+            await updateDoc(doc(db, 'products', product.id), {
+              actualStock: qty,
+              lastStockTake: new Date().toISOString()
+            });
+          } else {
+            const currentStock = product.warehouseStock || 0;
+            await updateDoc(doc(db, 'products', product.id), {
+              warehouseStock: currentStock + qty
+            });
+          }
         }
       }));
 
       // បន្ថែម Stock In history record
       const stockInRecord = {
         id: `stock-in-${Date.now()}`,
+        type: stockInputType,
         date: stockInDate,
         deliverer: stockInDeliverer || 'Admin',
         items: validItems.map(item => ({
@@ -649,10 +662,16 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       await Promise.all(record.items.map(async (item: any) => {
         const product = products.find(p => p.name === item.productName);
         if (product) {
-          const currentStock = product.warehouseStock || 0;
-          await updateDoc(doc(db, 'products', product.id), {
-            warehouseStock: currentStock - item.quantity
-          });
+          if (record.type === 'count') {
+            await updateDoc(doc(db, 'products', product.id), {
+              actualStock: 0 // Optional: reset actual stock or just leave it. We'll set to 0.
+            });
+          } else {
+            const currentStock = product.warehouseStock || 0;
+            await updateDoc(doc(db, 'products', product.id), {
+              warehouseStock: currentStock - item.quantity
+            });
+          }
         }
       }));
       await deleteDoc(doc(db, 'warehouse_stock_ins', record.id));
@@ -2400,7 +2419,585 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
 
   
-  const handleExportSelectedUserStockExcel = async () => {
+  
+  
+  const handleExportVerifyStockExcel = async (existingWorkbook?: ExcelJS.Workbook) => {
+    const workbook = existingWorkbook || new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('ស្តុករាប់បញ្ជាក់', {
+      pageSetup: {
+        paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 1,
+        margins: { left: 0.39, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 }
+      }
+    });
+    delete ws.pageSetup.scale;
+    ws.pageSetup.fitToPage = true;
+    ws.pageSetup.fitToWidth = 1;
+    ws.pageSetup.fitToHeight = 1;
+    ws.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
+    
+    let dateRangeText = "ទាំងអស់";
+    if (filterTxStartDate) {
+      const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-GB');
+      };
+      if (filterTxEndDate && filterTxStartDate !== filterTxEndDate) {
+        dateRangeText = `${formatDate(filterTxStartDate)} ដល់ ${formatDate(filterTxEndDate)}`;
+      } else {
+        dateRangeText = formatDate(filterTxStartDate);
+      }
+    }
+    
+    ws.addRow([`របាយការណ៍ស្តុករាប់បញ្ជាក់ ( ${dateRangeText} )`, null, null, null, null, null, null, null, null]);
+    ws.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកក្នុងឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកឡើងឡាន", "ស្តុកសល់", "ផ្សេងៗ"]);
+    
+    let previousDayStr = '';
+    if (filterTxStartDate) {
+      const d = new Date(filterTxStartDate + 'T00:00:00');
+      d.setDate(d.getDate() - 1);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      previousDayStr = `${year}-${month}-${day}`;
+    }
+    
+    let rowIndex = 1;
+    const localKhmerNumerals = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+    const toKhmerNumeralLocal = (num: number) => {
+      return num.toString().split('').map(digit => localKhmerNumerals[parseInt(digit)]).join('');
+    };
+    
+    const exportProductsList = [
+      { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
+      { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
+      { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
+      { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
+      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
+      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
+      { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
+      { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
+      { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
+      { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
+      { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
+      { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
+      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
+      { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
+      { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
+      { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
+      { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
+      { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
+      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
+    ];
+    
+    exportProductsList.forEach(p => {
+      let dbName = p.code;
+      if (dbName === 'WICE') dbName = 'WURKZ ICE';
+      if (dbName === 'WURKZ ORD') dbName = 'W ORD';
+      if (dbName === 'DAZZ ORD') dbName = 'D ORD';
+      if (dbName === 'CED ORD') dbName = 'CBC ORD';
+      
+      const actualProduct = products.find(prod => prod.name === dbName || prod.name === p.code);
+      const currentStock = actualProduct?.warehouseStock || 0;
+      
+      let rangeStockIn = 0;
+      let rangeStockOut = 0;
+      let rollbackStockIn = 0;
+      let rollbackStockOut = 0;
+      let rollbackStockReturn = 0;
+      let stockReturnPreviousDay = 0;
+      
+      const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
+      productStockIns.forEach(r => {
+        const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName);
+        if (item) {
+          const dateStr = r.date ? r.date.split('T')[0] : '';
+          if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
+          if (filterTxStartDate && dateStr >= filterTxStartDate) {
+            rollbackStockIn += item.quantity;
+          }
+        }
+      });
+      
+      const productTxs = transactions.filter(t => t.productName === p.code || t.productName === dbName);
+      productTxs.forEach(t => {
+        const dateStr = t.date ? t.date.split('T')[0] : '';
+        if (t.type === 'Stock Out') {
+          if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockOut += t.quantity; }
+          if (filterTxStartDate && dateStr >= filterTxStartDate) {
+            rollbackStockOut += t.quantity;
+          }
+        } else if (t.type === 'Stock Return') {
+          if (filterTxStartDate && dateStr >= filterTxStartDate) {
+            rollbackStockReturn += t.quantity;
+          }
+          if (previousDayStr && dateStr === previousDayStr) {
+            stockReturnPreviousDay += t.quantity;
+          }
+        }
+      });
+      
+      const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
+      let verifyOpeningStock = openingStock - stockReturnPreviousDay;
+      const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
+      
+      ws.addRow([
+        toKhmerNumeralLocal(rowIndex++),
+        p.khmerName,
+        p.code,
+        verifyOpeningStock || null,
+        rangeStockIn || null,
+        stockReturnPreviousDay || null,
+        rangeStockOut || null,
+        verifyClosingStock || null,
+        null
+      ]);
+    });
+    
+    ws.mergeCells('A1:I1');
+    ws.getRow(1).height = 35;
+    ws.getRow(2).height = 35;
+    for (let i = 3; i <= ws.rowCount; i++) {
+      ws.getRow(i).height = 20;
+    }
+    
+    ws.columns = [
+      { width: 10 }, { width: 41 }, { width: 17 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }
+    ];
+    
+    ws.eachRow((row, rowNumber) => {
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (colNumber > 9) return;
+        let borderStyle: any = { top: { style: 'thin', color: { argb: 'FF002060' } }, bottom: { style: 'thin', color: { argb: 'FF002060' } }, left: { style: 'thin', color: { argb: 'FF002060' } }, right: { style: 'thin', color: { argb: 'FF002060' } } };
+        if (rowNumber === 1) {
+          borderStyle = {}; cell.font = { name: 'Khmer OS Muol Light', size: 16, color: { argb: 'FF002060' } }; cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        } else if (rowNumber === 2) {
+          cell.border = borderStyle; cell.font = { name: 'Khmer OS Muol Light', size: 10, color: { argb: 'FF002060' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        } else {
+          cell.border = borderStyle; cell.alignment = { vertical: 'middle', horizontal: (colNumber === 2 || colNumber === 3) ? 'left' : 'center' };
+          const fontStyle = { size: 12, color: { argb: 'FF002060' }, bold: true };
+          if (colNumber === 2 || colNumber === 3) {
+            cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
+          } else {
+            if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
+              cell.font = { ...fontStyle, name: 'Khmer OS Siemreap', size: 11 };
+            } else {
+              cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
+            }
+          }
+        }
+      });
+    });
+    
+    if (!existingWorkbook) {
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), `របាយការណ៍ស្តុករាប់បញ្ជាក់.xlsx`);
+    }
+  };
+
+  const handleExportTotalStockExcel = async (existingWorkbook?: ExcelJS.Workbook) => {
+    const workbook = existingWorkbook || new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('ទិន្នន័យស្តុកសរុប', {
+      pageSetup: {
+        paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 1,
+        margins: { left: 0.39, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 }
+      }
+    });
+    delete ws.pageSetup.scale;
+    ws.pageSetup.fitToPage = true;
+    ws.pageSetup.fitToWidth = 1;
+    ws.pageSetup.fitToHeight = 1;
+    ws.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
+    
+    let dateRangeText = "ទាំងអស់";
+    if (filterTxStartDate) {
+      const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-GB');
+      };
+      if (filterTxEndDate && filterTxStartDate !== filterTxEndDate) {
+        dateRangeText = `${formatDate(filterTxStartDate)} ដល់ ${formatDate(filterTxEndDate)}`;
+      } else {
+        dateRangeText = formatDate(filterTxStartDate);
+      }
+    }
+    
+    ws.addRow([`របាយការណ៍ស្តុកសរុប ( ${dateRangeText} )`, null, null, null, null, null, null, null, null, null, null]);
+    ws.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកដើមគ្រា", "ស្តុកចូល", "ស្តុកឡើងឡាន", "ស្តុកត្រឡប់", "ចំនួនលក់", "ដូរក្រវិល", "ចំនួនថែម", "ស្តុកសល់"]);
+    
+    let rowIndex = 1;
+    const localKhmerNumerals = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+    const toKhmerNumeralLocal = (num: number) => {
+      return num.toString().split('').map(digit => localKhmerNumerals[parseInt(digit)]).join('');
+    };
+    
+    const exportProductsList = [
+      { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
+      { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
+      { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
+      { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
+      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
+      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
+      { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
+      { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
+      { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
+      { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
+      { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
+      { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
+      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
+      { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
+      { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
+      { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
+      { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
+      { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
+      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
+    ];
+    
+    exportProductsList.forEach(p => {
+      let dbName = p.code;
+      if (dbName === 'WICE') dbName = 'WURKZ ICE';
+      if (dbName === 'WURKZ ORD') dbName = 'W ORD';
+      if (dbName === 'DAZZ ORD') dbName = 'D ORD';
+      if (dbName === 'CED ORD') dbName = 'CBC ORD';
+      
+      const actualProduct = products.find(prod => prod.name === dbName || prod.name === p.code);
+      const currentStock = actualProduct?.warehouseStock || 0;
+      
+      let rangeStockIn = 0, rangeStockOut = 0, rangeStockReturn = 0, rangeStockSold = 0, rangeStockExchanged = 0, rangeStockPromo = 0;
+      let rollbackStockIn = 0, rollbackStockOut = 0, rollbackStockReturn = 0;
+      
+      const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
+      productStockIns.forEach(r => {
+        const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName);
+        if (item) {
+          const dateStr = r.date ? r.date.split('T')[0] : '';
+          if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) rangeStockIn += item.quantity;
+          if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockIn += item.quantity;
+        }
+      });
+      
+      const productTxs = transactions.filter(t => t.productName === p.code || t.productName === dbName);
+      productTxs.forEach(t => {
+        const dateStr = t.date ? t.date.split('T')[0] : '';
+        const inRange = (!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate);
+        
+        if (t.type === 'Stock Out') {
+          if (inRange) rangeStockOut += t.quantity;
+          if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockOut += t.quantity;
+        } else if (t.type === 'Stock Return') {
+          if (inRange) rangeStockReturn += t.quantity;
+          if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockReturn += t.quantity;
+        } else if (t.type === 'Stock Sold') {
+          if (inRange) {
+            rangeStockSold += t.soldQty || t.quantity;
+            rangeStockExchanged += t.exchangedQty || 0;
+            rangeStockPromo += t.promoQty || 0;
+          }
+        }
+      });
+      
+      const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
+      const closingStock = openingStock + rangeStockIn - rangeStockOut + rangeStockReturn;
+      
+      ws.addRow([
+        toKhmerNumeralLocal(rowIndex++),
+        p.khmerName,
+        p.code,
+        openingStock || null,
+        rangeStockIn || null,
+        rangeStockOut || null,
+        rangeStockReturn || null,
+        rangeStockSold || null,
+        rangeStockExchanged || null,
+        rangeStockPromo || null,
+        closingStock || null
+      ]);
+    });
+    
+    ws.mergeCells('A1:K1');
+    ws.getRow(1).height = 35;
+    ws.getRow(2).height = 35;
+    for (let i = 3; i <= ws.rowCount; i++) ws.getRow(i).height = 20;
+    
+    ws.columns = [ { width: 10 }, { width: 41 }, { width: 17 }, { width: 20 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 } ];
+    
+    ws.eachRow((row, rowNumber) => {
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (colNumber > 11) return;
+        let borderStyle: any = { top: { style: 'thin', color: { argb: 'FF002060' } }, bottom: { style: 'thin', color: { argb: 'FF002060' } }, left: { style: 'thin', color: { argb: 'FF002060' } }, right: { style: 'thin', color: { argb: 'FF002060' } } };
+        if (rowNumber === 1) {
+          borderStyle = {}; cell.font = { name: 'Khmer OS Muol Light', size: 16, color: { argb: 'FF002060' } }; cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        } else if (rowNumber === 2) {
+          cell.border = borderStyle; cell.font = { name: 'Khmer OS Muol Light', size: 10, color: { argb: 'FF002060' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        } else {
+          cell.border = borderStyle; cell.alignment = { vertical: 'middle', horizontal: (colNumber === 2 || colNumber === 3) ? 'left' : 'center' };
+          const fontStyle: any = { size: 12, color: { argb: 'FF002060' }, bold: true };
+          if (colNumber === 2 || colNumber === 3) {
+            cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
+          } else {
+            if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
+              cell.font = { ...fontStyle, name: 'Khmer OS Siemreap', size: 11 };
+            } else {
+              cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
+            }
+          }
+          if (colNumber === 11) {
+            cell.font = { ...cell.font, color: { argb: 'FFFF0000' }, bold: true };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
+          }
+        }
+      });
+    });
+    
+    if (!existingWorkbook) {
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), `ទិន្នន័យស្តុកសរុប.xlsx`);
+    }
+  };
+const handleGeneralExport = async () => {
+    if (exportDocType === 'reports') {
+      if (exportFileType === 'pdf') {
+        handleExportSelectedUserStockPDF();
+      } else {
+        handleExportSelectedUserStockExcel();
+      }
+      setIsExportModalOpen(false);
+      return;
+    }
+
+    if (exportFileType === 'pdf') {
+      let printWindow = window.open('', '_blank');
+      if (!printWindow) return;
+
+      let title = '';
+      let headers: string[] = [];
+      let rows: any[][] = [];
+
+      if (exportDocType === 'warehouse') {
+        title = 'របាយការណ៍ស្តុកឃ្លាំង';
+        headers = ['ល.រ', 'ឈ្មោះទំនិញ', 'ស្តុកឃ្លាំង'];
+        rows = filteredWarehouseProducts.map((p, idx) => [idx + 1, p.name, p.warehouseStock || 0]);
+      } else if (exportDocType === 'stock_in') {
+        title = 'របាយការណ៍ស្តុកចូល';
+        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រគល់', 'ទំនិញ', 'បរិមាណ'];
+        const stockIns = warehouseStockIns.filter(r => r.type !== 'count');
+        rows = stockIns.map((r, idx) => [
+          idx + 1,
+          r.date,
+          r.deliverer,
+          r.items.map((i: any) => i.productName).join(', '),
+          r.items.map((i: any) => i.quantity).join(', ')
+        ]);
+      } else if (exportDocType === 'stock_count') {
+        title = 'របាយការណ៍ស្តុករាប់';
+        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នករាប់', 'ទំនិញ', 'បរិមាណ'];
+        const counts = warehouseStockIns.filter(r => r.type === 'count');
+        rows = counts.map((r, idx) => [
+          idx + 1,
+          r.date,
+          r.deliverer,
+          r.items.map((i: any) => i.productName).join(', '),
+          r.items.map((i: any) => i.quantity).join(', ')
+        ]);
+      } else if (exportDocType === 'stock_out') {
+        title = 'របាយការណ៍ស្តុកឡើងឡាន';
+        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណ'];
+        const outs = filteredTransactions.filter(tx => tx.type === 'Stock Out');
+        rows = outs.map((tx, idx) => [
+          idx + 1,
+          new Date(tx.date).toLocaleDateString('en-GB'),
+          users.find(u => u.id === tx.userId)?.username || tx.userId,
+          tx.productName,
+          tx.quantity
+        ]);
+      } else if (exportDocType === 'stock_sold') {
+        title = 'របាយការណ៍ស្តុកលក់';
+        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណលក់', 'ថែម', 'ដូរ'];
+        const solds = filteredTransactions.filter(tx => tx.type === 'Stock Sold');
+        rows = solds.map((tx, idx) => [
+          idx + 1,
+          new Date(tx.date).toLocaleDateString('en-GB'),
+          users.find(u => u.id === tx.userId)?.username || tx.userId,
+          tx.productName,
+          tx.soldQty || tx.quantity,
+          tx.promoQty || 0,
+          tx.exchangedQty || 0
+        ]);
+      } else if (exportDocType === 'stock_return') {
+        title = 'របាយការណ៍ស្តុកត្រឡប់';
+        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណ'];
+        const returns = filteredTransactions.filter(tx => tx.type === 'Stock Return');
+        rows = returns.map((tx, idx) => [
+          idx + 1,
+          new Date(tx.date).toLocaleDateString('en-GB'),
+          users.find(u => u.id === tx.userId)?.username || tx.userId,
+          tx.productName,
+          tx.quantity
+        ]);
+      } else if (exportDocType === 'stock_lost_excess') {
+        title = 'របាយការណ៍ស្តុកបាត់/លើស';
+        headers = ['ល.រ', 'ឈ្មោះទំនិញ', 'ស្តុកឃ្លាំង', 'ស្តុករាប់', 'បាត់/លើស'];
+        rows = filteredWarehouseProducts.map((p, idx) => {
+          const wStock = p.warehouseStock || 0;
+          const aStock = p.actualStock || 0;
+          return [idx + 1, p.name, wStock, aStock, aStock - wStock];
+        });
+      }
+
+      let dateRangeText = "ទាំងអស់";
+      if (filterTxStartDate && filterTxEndDate) {
+        dateRangeText = `${filterTxStartDate} ដល់ ${filterTxEndDate}`;
+      }
+
+      const html = `
+        <html>
+          <head>
+            <title>${title}</title>
+            <style>
+              @import url('https://fonts.googleapis.com/css2?family=Moul&family=Inter:wght@400;500;700;900&family=Kantumruy+Pro:wght@400;500;700;900&display=swap');
+              body { font-family: 'Kantumruy Pro', sans-serif; padding: 20px; }
+              h2 { font-family: 'Moul', serif; text-align: center; font-size: 24px; margin-bottom: 5px; }
+              p { text-align: center; margin-bottom: 20px; font-size: 14px; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+              th { background-color: #f8fafc; font-weight: bold; }
+              td { text-align: center; }
+            </style>
+          </head>
+          <body>
+            <h2>${title}</h2>
+            <p>កាលបរិច្ឆេទ៖ ${dateRangeText}</p>
+            <table>
+              <thead>
+                <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+              </thead>
+              <tbody>
+                ${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `;
+
+      printWindow.document.write(html);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow?.print();
+      }, 500);
+
+    } else if (exportFileType === 'excel') {
+      const workbook = new ExcelJS.Workbook();
+      const ws = workbook.addWorksheet('Export Data');
+      
+      let title = '';
+      let headers: string[] = [];
+      let rows: any[][] = [];
+
+      if (exportDocType === 'warehouse') {
+        title = 'របាយការណ៍ស្តុកឃ្លាំង';
+        headers = ['ល.រ', 'ឈ្មោះទំនិញ', 'ស្តុកឃ្លាំង'];
+        rows = filteredWarehouseProducts.map((p, idx) => [idx + 1, p.name, p.warehouseStock || 0]);
+      } else if (exportDocType === 'stock_in') {
+        title = 'របាយការណ៍ស្តុកចូល';
+        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រគល់', 'ទំនិញ', 'បរិមាណ'];
+        const stockIns = warehouseStockIns.filter(r => r.type !== 'count');
+        rows = stockIns.map((r, idx) => [
+          idx + 1,
+          r.date,
+          r.deliverer,
+          r.items.map((i: any) => i.productName).join(', '),
+          r.items.map((i: any) => i.quantity).join(', ')
+        ]);
+      } else if (exportDocType === 'stock_count') {
+        title = 'របាយការណ៍ស្តុករាប់';
+        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នករាប់', 'ទំនិញ', 'បរិមាណ'];
+        const counts = warehouseStockIns.filter(r => r.type === 'count');
+        rows = counts.map((r, idx) => [
+          idx + 1,
+          r.date,
+          r.deliverer,
+          r.items.map((i: any) => i.productName).join(', '),
+          r.items.map((i: any) => i.quantity).join(', ')
+        ]);
+      } else if (exportDocType === 'stock_out') {
+        title = 'របាយការណ៍ស្តុកឡើងឡាន';
+        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណ'];
+        const outs = filteredTransactions.filter(tx => tx.type === 'Stock Out');
+        rows = outs.map((tx, idx) => [
+          idx + 1,
+          new Date(tx.date).toLocaleDateString('en-GB'),
+          users.find(u => u.id === tx.userId)?.username || tx.userId,
+          tx.productName,
+          tx.quantity
+        ]);
+      } else if (exportDocType === 'stock_sold') {
+        title = 'របាយការណ៍ស្តុកលក់';
+        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណលក់', 'ថែម', 'ដូរ'];
+        const solds = filteredTransactions.filter(tx => tx.type === 'Stock Sold');
+        rows = solds.map((tx, idx) => [
+          idx + 1,
+          new Date(tx.date).toLocaleDateString('en-GB'),
+          users.find(u => u.id === tx.userId)?.username || tx.userId,
+          tx.productName,
+          tx.soldQty || tx.quantity,
+          tx.promoQty || 0,
+          tx.exchangedQty || 0
+        ]);
+      } else if (exportDocType === 'stock_return') {
+        title = 'របាយការណ៍ស្តុកត្រឡប់';
+        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណ'];
+        const returns = filteredTransactions.filter(tx => tx.type === 'Stock Return');
+        rows = returns.map((tx, idx) => [
+          idx + 1,
+          new Date(tx.date).toLocaleDateString('en-GB'),
+          users.find(u => u.id === tx.userId)?.username || tx.userId,
+          tx.productName,
+          tx.quantity
+        ]);
+      } else if (exportDocType === 'stock_lost_excess') {
+        title = 'របាយការណ៍ស្តុកបាត់/លើស';
+        headers = ['ល.រ', 'ឈ្មោះទំនិញ', 'ស្តុកឃ្លាំង', 'ស្តុករាប់', 'បាត់/លើស'];
+        rows = filteredWarehouseProducts.map((p, idx) => {
+          const wStock = p.warehouseStock || 0;
+          const aStock = p.actualStock || 0;
+          return [idx + 1, p.name, wStock, aStock, aStock - wStock];
+        });
+      }
+
+      ws.addRow([title]);
+      ws.addRow(headers);
+      rows.forEach(r => ws.addRow(r));
+
+      // Style header
+      ws.getRow(1).font = { bold: true, size: 16 };
+      ws.getRow(2).font = { bold: true };
+      
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), `${title}.xlsx`);
+    }
+    
+    setIsExportModalOpen(false);
+  };
+const handleExportSelectedUserStockExcel = async () => {
     let dateRangeText = "ទាំងអស់";
     if (filterTxStartDate) {
       const formatDate = (dateStr: string) => {
@@ -2634,7 +3231,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           if (colNumber > 9) return; // Only style up to column I
           
-          let borderStyle: Partial<ExcelJS.Borders> = {
+          let borderStyle: any = {
             top: { style: 'thin', color: { argb: 'FF002060' } },
             bottom: { style: 'thin', color: { argb: 'FF002060' } },
             left: { style: 'thin', color: { argb: 'FF002060' } },
@@ -2711,7 +3308,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       // Fix borders for merged cells in row 2 (bottom dotted border)
       // ExcelJS requires applying borders to all cells in a merge to look right sometimes, but applying to the first is usually enough if others are empty, but we did includeEmpty: true
     };
-
+    
     if (filterTxUserId === 'all') {
       const activeUsers = currentUser.role === 'Server' ? users.filter(u => u.role === 'User' || u.role === 'Admin' || u.role === 'Server') : managedUsers.filter(u => u.role === 'User');
       activeUsers.forEach(u => processUser(u));
@@ -2721,303 +3318,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         processUser(selectedUser);
       }
     }
-
-    // === VERIFY STOCK SHEET ===
-    const verifyStockWs = workbook.addWorksheet('ស្តុករាប់បញ្ជាក់', {
-      pageSetup: {
-        paperSize: 9, // A4
-        orientation: 'landscape',
-        fitToPage: true,
-        fitToWidth: 1,
-        fitToHeight: 1,
-        margins: { left: 0.39, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 }
-      }
-    });
-    delete verifyStockWs.pageSetup.scale;
-    verifyStockWs.pageSetup.fitToPage = true;
-    verifyStockWs.pageSetup.fitToWidth = 1;
-    verifyStockWs.pageSetup.fitToHeight = 1;
-    verifyStockWs.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
     
-    verifyStockWs.addRow([`របាយការណ៍ស្តុករាប់បញ្ជាក់ ( ${dateRangeText} )`, null, null, null, null, null, null, null]);
-    verifyStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកក្នុងឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកឡើងឡាន", "ស្តុកសល់", "ផ្សេងៗ"]);
-    let verifyRowIndex = 1;
-
-    // === NEW TOTAL STOCK SHEET ===
-    const totalStockWs = workbook.addWorksheet('ទិន្នន័យស្តុកសរុប', {
-      pageSetup: {
-        paperSize: 9, // A4
-        orientation: 'landscape',
-        fitToPage: true,
-        fitToWidth: 1,
-        fitToHeight: 1,
-        margins: { left: 0.39, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 }
-      }
-    });
-    delete totalStockWs.pageSetup.scale;
-    totalStockWs.pageSetup.fitToPage = true;
-    totalStockWs.pageSetup.fitToWidth = 1;
-    totalStockWs.pageSetup.fitToHeight = 1;
-
-    totalStockWs.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
-    
-    totalStockWs.addRow([`របាយការណ៍ស្តុកសរុប ( ${dateRangeText} )`, null, null, null, null, null, null, null, null, null]);
-    totalStockWs.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកដើមគ្រា", "ស្តុកចូល", "ស្តុកឡើងឡាន", "ស្តុកត្រឡប់", "ចំនួនលក់", "ដូរក្រវិល", "ចំនួនថែម", "ស្តុកសល់"]);
-    
-    let totalRowIndex = 1;
-    const localKhmerNumerals = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
-    const toKhmerNumeralLocal = (num: number) => {
-      return num.toString().split('').map(digit => localKhmerNumerals[parseInt(digit)]).join('');
-    };
-    
-    const globalHasAnySalesActivity = managedTransactions.some(t => {
-      const dateStr = t.date ? t.date.split('T')[0] : '';
-      const matchStart = !filterTxStartDate || dateStr >= filterTxStartDate;
-      const matchEnd = !filterTxEndDate || dateStr <= filterTxEndDate;
-      return matchStart && matchEnd && (t.type === 'Stock Sold' || t.type === 'Stock Return');
-    });
-
-    let previousDayStr = '';
-    if (filterTxStartDate) {
-      const d = new Date(filterTxStartDate + 'T00:00:00');
-      d.setDate(d.getDate() - 1);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      previousDayStr = `${year}-${month}-${day}`;
-    }
-
-    exportProductsList.forEach(p => {
-      let dbName = p.code;
-      if (dbName === 'WICE') dbName = 'WURKZ ICE';
-      if (dbName === 'WURKZ ORD') dbName = 'W ORD';
-      if (dbName === 'DAZZ ORD') dbName = 'D ORD';
-      if (dbName === 'CED ORD') dbName = 'CBC ORD';
-
-      const actualProduct = products.find(prod => prod.name === dbName || prod.name === p.code);
-      const currentStock = actualProduct?.warehouseStock || 0;
-
-      let rangeStockIn = 0;
-      let rangeStockOut = 0;
-      let rangeStockReturn = 0;
-      let rangeStockSold = 0;
-      let rangeStockExchanged = 0;
-      let rangeStockPromo = 0;
-
-      let rollbackStockIn = 0;
-      let rollbackStockOut = 0;
-      let rollbackStockReturn = 0;
-      let stockReturnPreviousDay = 0;
-      let priorStockOut = 0;
-      let priorStockSoldTotal = 0;
-
-      warehouseStockIns.forEach((record: any) => {
-        const dateStr = record.date ? record.date.split('T')[0] : '';
-        const item = record.items?.find((i: any) => i.productName === actualProduct?.name || i.productName === dbName || i.productName === p.code);
-        if (item && item.quantity) {
-          const qty = Number(item.quantity);
-          const matchStart = !filterTxStartDate || dateStr >= filterTxStartDate;
-          const matchEnd = !filterTxEndDate || dateStr <= filterTxEndDate;
-          if (matchStart && matchEnd) {
-            rangeStockIn += qty;
-          }
-          if (filterTxStartDate && dateStr >= filterTxStartDate) {
-            rollbackStockIn += qty;
-          } else if (!filterTxStartDate) {
-            rollbackStockIn += qty;
-          }
-        }
-      });
-
-      managedTransactions.forEach(t => {
-        let tName = t.productName;
-        if (tName === 'WURKZ ICE') tName = 'WICE';
-        if (tName === 'W ORD') tName = 'WURKZ ORD';
-        if (tName === 'D ORD') tName = 'DAZZ ORD';
-        
-        if (tName === p.code) {
-          const dateStr = t.date ? t.date.split('T')[0] : '';
-          const matchStart = !filterTxStartDate || dateStr >= filterTxStartDate;
-          const matchEnd = !filterTxEndDate || dateStr <= filterTxEndDate;
-          
-          if (matchStart && matchEnd) {
-            if (t.type === 'Stock Out') rangeStockOut += t.quantity;
-            if (t.type === 'Stock Return') rangeStockReturn += t.quantity;
-            if (t.type === 'Stock Sold') {
-               const soldOnly = (t as any).soldQty !== undefined ? (t as any).soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
-               rangeStockSold += soldOnly;
-               rangeStockPromo += (t.promoQty || 0);
-               rangeStockExchanged += (t.exchangedQty || 0);
-            }
-          }
-
-          if (filterTxStartDate && dateStr >= filterTxStartDate) {
-            if (t.type === 'Stock Out') rollbackStockOut += t.quantity;
-            if (t.type === 'Stock Return') rollbackStockReturn += t.quantity;
-          } else if (!filterTxStartDate) {
-            if (t.type === 'Stock Out') rollbackStockOut += t.quantity;
-            if (t.type === 'Stock Return') rollbackStockReturn += t.quantity;
-          }
-          if (filterTxStartDate && previousDayStr && dateStr === previousDayStr) {
-            if (t.type === 'Stock Return') stockReturnPreviousDay += t.quantity;
-          }
-          
-          if (filterTxStartDate && dateStr < filterTxStartDate) {
-            if (t.type === 'Stock Out') priorStockOut += t.quantity;
-            if (t.type === 'Stock Sold') {
-               const soldOnly = (t as any).soldQty !== undefined ? (t as any).soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
-               priorStockSoldTotal += (soldOnly + (t.promoQty || 0) + ((t as any).exchangedQty || 0));
-            }
-          }
-        }
-      });
-
-      const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
-      const closingStock = openingStock + rangeStockIn - rangeStockOut + rangeStockReturn;
-      
-      let verifyOpeningStock = openingStock - stockReturnPreviousDay;
-      
-      const stockSoldTotal = rangeStockSold + rangeStockExchanged + rangeStockPromo;
-      const verifyStockSold = rangeStockOut - rangeStockReturn;
-      const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
-      
-      verifyStockWs.addRow([
-        toKhmerNumeralLocal(verifyRowIndex++),
-        p.khmerName,
-        p.code,
-        verifyOpeningStock || null,
-        rangeStockIn || null,
-        stockReturnPreviousDay || null,
-        rangeStockOut || null,
-        verifyClosingStock || null,
-        null
-      ]);
-      
-      totalStockWs.addRow([
-        toKhmerNumeralLocal(totalRowIndex++),
-        p.khmerName,
-        p.code,
-        openingStock || null,
-        rangeStockIn || null,
-        rangeStockOut || null,
-        rangeStockReturn || null,
-        rangeStockSold || null,
-        rangeStockExchanged || null,
-        rangeStockPromo || null,
-        closingStock || null
-      ]);
-    });
-    totalStockWs.mergeCells('A1:K1');
-    totalStockWs.getRow(1).height = 35;
-    totalStockWs.getRow(2).height = 35;
-    for (let i = 3; i <= totalStockWs.rowCount; i++) {
-      totalStockWs.getRow(i).height = 20;
-    }
-    totalStockWs.columns = [
-      { width: 10 },  // ល.រ
-      { width: 41 }, // ឈ្មោះទំនិញ
-      { width: 17 }, // កូដសម្គាល់
-      { width: 20 }, // ស្តុកដើមគ្រា
-      { width: 16 }, // ស្តុកចូល
-      { width: 16 }, // ស្តុកឡើងឡាន
-      { width: 16 }, // ស្តុកត្រឡប់
-      { width: 16 }, // ចំនួនលក់
-      { width: 16 }, // ដូរក្រវិល
-      { width: 16 }, // ចំនួនថែម
-      { width: 16 }  // ស្តុកសល់
-    ];
-    totalStockWs.eachRow((row, rowNumber) => {
-      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        if (colNumber > 11) return;
-        let borderStyle: Partial<ExcelJS.Borders> = {
-          top: { style: 'thin', color: { argb: 'FF002060' } },
-          bottom: { style: 'thin', color: { argb: 'FF002060' } },
-          left: { style: 'thin', color: { argb: 'FF002060' } },
-          right: { style: 'thin', color: { argb: 'FF002060' } }
-        };
-        if (rowNumber === 1) {
-          borderStyle = {};
-          cell.font = { name: 'Khmer OS Muol Light', size: 16, color: { argb: 'FF002060' } };
-          cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        } else if (rowNumber === 2) {
-          cell.border = borderStyle;
-          cell.font = { name: 'Khmer OS Muol Light', size: 10, color: { argb: 'FF002060' } };
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
-          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        } else {
-          cell.border = borderStyle;
-          cell.alignment = { vertical: 'middle', horizontal: (colNumber === 2 || colNumber === 3) ? 'left' : 'center' };
-          const fontStyle: Partial<ExcelJS.Font> = { size: 12, color: { argb: 'FF002060' }, bold: true };
-          if (colNumber === 2 || colNumber === 3) {
-            cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
-          } else {
-            if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
-              cell.font = { ...fontStyle, name: 'Khmer OS Siemreap', size: 11 };
-            } else {
-              cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
-            }
-          }
-          if (colNumber === 11) {
-            cell.font = { ...cell.font, color: { argb: 'FFFF0000' }, bold: true };
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
-          }
-        }
-      });
-    });
-
-
-    // Formatting verifyStockWs
-    verifyStockWs.mergeCells('A1:I1');
-    verifyStockWs.getRow(1).height = 35;
-    verifyStockWs.getRow(2).height = 35;
-    for (let i = 3; i <= verifyStockWs.rowCount; i++) {
-      verifyStockWs.getRow(i).height = 20;
-    }
-    verifyStockWs.columns = [
-      { width: 10 }, // ល.រ
-      { width: 41 }, // ឈ្មោះទំនិញ
-      { width: 17 }, // កូដសម្គាល់
-      { width: 16 }, // ស្តុកឃ្លាំង
-      { width: 16 }, // ស្តុកចូល
-      { width: 16 }, // ស្តុកលើឡាន
-      { width: 16 }, // ស្តកលក់
-      { width: 16 }, // ស្តុកសល់
-      { width: 16 }  // ផ្សេងៗ
-    ];
-    verifyStockWs.eachRow((row, rowNumber) => {
-      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        if (colNumber > 9) return;
-        let borderStyle = {
-          top: { style: 'thin', color: { argb: 'FF002060' } },
-          bottom: { style: 'thin', color: { argb: 'FF002060' } },
-          left: { style: 'thin', color: { argb: 'FF002060' } },
-          right: { style: 'thin', color: { argb: 'FF002060' } }
-        };
-        if (rowNumber === 1) {
-          borderStyle = {};
-          cell.font = { name: 'Khmer OS Muol Light', size: 16, color: { argb: 'FF002060' } };
-          cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        } else if (rowNumber === 2) {
-          cell.border = borderStyle;
-          cell.font = { name: 'Khmer OS Muol Light', size: 10, color: { argb: 'FF002060' } };
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
-          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        } else {
-          cell.border = borderStyle;
-          cell.alignment = { vertical: 'middle', horizontal: (colNumber === 2 || colNumber === 3) ? 'left' : 'center' };
-          const fontStyle = { size: 12, color: { argb: 'FF002060' }, bold: true };
-          if (colNumber === 2 || colNumber === 3) {
-            cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
-          } else {
-            if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
-              cell.font = { ...fontStyle, name: 'Khmer OS Siemreap', size: 11 };
-            } else {
-              cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
-            }
-          }
-        }
-      });
-    });
+    await handleExportVerifyStockExcel(workbook);
+    await handleExportTotalStockExcel(workbook);
 
     const fileName = `របាយការណ៍ស្តុកលក់_${dateRangeText.replace(/\//g, '-')}.xlsx`;
 
@@ -3281,7 +3584,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const totalOrderItems = sortedGroupedStockOrders.length;
   const paginatedStockOrders = sortedGroupedStockOrders;
 
-  const [dashboardMetric, setDashboardMetric] = useState<'sales' | 'out' | 'return'>('sales');
+  const [dashboardMetric, setDashboardMetric] = useState<'sales' | 'out' | 'return' | 'warehouse' | 'in'>('sales');
   const [dashboardFilterProduct, setDashboardFilterProduct] = useState<string>('all');
 
   const { pieData: dashboardChartData, lineData: dashboardLineData, lineProducts: dashboardLineProducts } = useMemo(() => {
@@ -3289,39 +3592,75 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     const dataByDate: Record<string, Record<string, number>> = {};
     const productNames = new Set<string>();
 
-    managedTransactions.forEach(t => {
-      const type = t.type;
-      
-      const txDateStr = t.date ? t.date.split('T')[0] : '';
-      const matchStart = !filterTxStartDate || txDateStr >= filterTxStartDate;
-      const matchEnd = !filterTxEndDate || txDateStr <= filterTxEndDate;
-      const matchUser = filterTxUserId === 'all' || t.userId === filterTxUserId;
-      const matchProduct = dashboardFilterProduct === 'all' || t.productName === dashboardFilterProduct;
-      
-      if (!matchStart || !matchEnd || !matchUser || !matchProduct || !txDateStr) return;
+    if (dashboardMetric === 'warehouse') {
+      products.forEach(p => {
+        if (dashboardFilterProduct !== 'all' && p.name !== dashboardFilterProduct) return;
+        const qty = p.warehouseStock || 0;
+        if (qty > 0) {
+          dataMap[p.name] = qty;
+          productNames.add(p.name);
+          if (!dataByDate["បច្ចុប្បន្ន"]) dataByDate["បច្ចុប្បន្ន"] = {};
+          dataByDate["បច្ចុប្បន្ន"][p.name] = qty;
+        }
+      });
+    } else if (dashboardMetric === 'in') {
+      warehouseStockIns.forEach((record: any) => {
+        const txDateStr = record.date ? record.date.split('T')[0] : '';
+        const matchStart = !filterTxStartDate || txDateStr >= filterTxStartDate;
+        const matchEnd = !filterTxEndDate || txDateStr <= filterTxEndDate;
+        if (!matchStart || !matchEnd || !txDateStr) return;
+        
+        record.items?.forEach((item: any) => {
+          const matchProduct = dashboardFilterProduct === 'all' || item.productName === dashboardFilterProduct;
+          if (!matchProduct) return;
+          
+          const qty = Number(item.quantity) || 0;
+          if (qty > 0) {
+            if (!dataMap[item.productName]) dataMap[item.productName] = 0;
+            dataMap[item.productName] += qty;
+            
+            if (!dataByDate[txDateStr]) dataByDate[txDateStr] = {};
+            if (!dataByDate[txDateStr][item.productName]) dataByDate[txDateStr][item.productName] = 0;
+            dataByDate[txDateStr][item.productName] += qty;
+            productNames.add(item.productName);
+          }
+        });
+      });
+    } else {
+      managedTransactions.forEach(t => {
+        const type = t.type;
+        
+        const txDateStr = t.date ? t.date.split('T')[0] : '';
+        const matchStart = !filterTxStartDate || txDateStr >= filterTxStartDate;
+        const matchEnd = !filterTxEndDate || txDateStr <= filterTxEndDate;
+        const matchUser = filterTxUserId === 'all' || t.userId === filterTxUserId;
+        const matchProduct = dashboardFilterProduct === 'all' || t.productName === dashboardFilterProduct;
+        
+        if (!matchStart || !matchEnd || !matchUser || !matchProduct || !txDateStr) return;
 
-      let isValid = false;
-      if (dashboardMetric === 'sales' && type === 'Stock Sold') isValid = true;
-      if (dashboardMetric === 'out' && type === 'Stock Out') isValid = true;
-      if (dashboardMetric === 'return' && type === 'Stock Return') isValid = true;
-      
-      if (isValid) {
-        if (!dataMap[t.productName]) {
-          dataMap[t.productName] = 0;
-        }
-        dataMap[t.productName] += t.quantity;
+        let isValid = false;
+        if (dashboardMetric === 'sales' && type === 'Stock Sold') isValid = true;
+        if (dashboardMetric === 'out' && type === 'Stock Out') isValid = true;
+        if (dashboardMetric === 'return' && type === 'Stock Return') isValid = true;
+        
+        if (isValid) {
+          if (!dataMap[t.productName]) {
+            dataMap[t.productName] = 0;
+          }
+          dataMap[t.productName] += t.quantity;
 
-        if (!dataByDate[txDateStr]) {
-          dataByDate[txDateStr] = {};
+          if (!dataByDate[txDateStr]) {
+            dataByDate[txDateStr] = {};
+          }
+          if (!dataByDate[txDateStr][t.productName]) {
+            dataByDate[txDateStr][t.productName] = 0;
+          }
+          dataByDate[txDateStr][t.productName] += t.quantity;
+          productNames.add(t.productName);
         }
-        if (!dataByDate[txDateStr][t.productName]) {
-          dataByDate[txDateStr][t.productName] = 0;
-        }
-        dataByDate[txDateStr][t.productName] += t.quantity;
-        productNames.add(t.productName);
-      }
-    });
-    
+      });
+    }
+
     const pieData = Object.entries(dataMap).map(([name, qty]) => ({ name, value: qty })).sort((a, b) => b.value - a.value);
     
     const lineData = Object.entries(dataByDate).map(([date, products]) => ({
@@ -3330,7 +3669,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     })).sort((a, b) => a.date.localeCompare(b.date));
 
     return { pieData, lineData, lineProducts: Array.from(productNames) };
-  }, [managedTransactions, dashboardMetric, filterTxStartDate, filterTxEndDate, filterTxUserId, dashboardFilterProduct]);
+  }, [managedTransactions, warehouseStockIns, products, dashboardMetric, filterTxStartDate, filterTxEndDate, filterTxUserId, dashboardFilterProduct]);
 
   const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#64748b'];
 
@@ -3349,9 +3688,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                 onChange={(e) => setDashboardMetric(e.target.value as any)}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
               >
-                <option value="sales">ស្តុកលក់</option>
                 <option value="out">ស្តុកឡើងឡាន</option>
+                <option value="sales">ស្តុកលក់ចេញ</option>
                 <option value="return">ស្តុកត្រឡប់</option>
+                <option value="warehouse">ស្តុកក្នុងឃ្លាំង</option>
+                <option value="in">ស្តុកចូល</option>
               </select>
             </div>
           </div>
@@ -3624,7 +3965,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       {activeTab === 'transactions' && (
         <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 sm:mb-3 border-b border-slate-100 pb-2 shrink-0 gap-2">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
               {!isEditingReport ? (
                 <button
                   onClick={() => {
@@ -3641,7 +3982,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     setEditedReportData(initialData);
                     setIsEditingReport(true);
                   }}
-                  className="flex items-center space-x-1.5 bg-blue-500 hover:bg-blue-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-blue-500/20 active:scale-95 transition cursor-pointer"
+                  className="flex-1 flex justify-center items-center space-x-1.5 bg-blue-500 hover:bg-blue-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-blue-500/20 active:scale-95 transition cursor-pointer whitespace-nowrap"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -3649,45 +3990,45 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   <span>កែប្រែ</span>
                 </button>
               ) : (
-                <>
+                <div className="col-span-1 grid grid-cols-2 gap-1">
                   <button
                     onClick={() => setIsEditingReport(false)}
-                    className="flex items-center space-x-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold active:scale-95 transition cursor-pointer"
+                    className="flex justify-center items-center space-x-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold active:scale-95 transition cursor-pointer whitespace-nowrap"
                   >
                     <span>បោះបង់</span>
                   </button>
                   <button
                     disabled={loading}
                     onClick={handleSaveReport}
-                    className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition cursor-pointer disabled:opacity-50"
+                    className="flex justify-center items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition cursor-pointer disabled:opacity-50 whitespace-nowrap"
                   >
                     {loading ? (
                        <span>កំពុងរក្សាទុក...</span>
                     ) : (
                       <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                         </svg>
                         <span>រក្សាទុក</span>
                       </>
                     )}
                   </button>
-                </>
+                </div>
               )}
               <button
                 onClick={handleExportSelectedUserStockExcel}
-                className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition cursor-pointer"
+                className="flex-1 flex justify-center items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition cursor-pointer whitespace-nowrap"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
                 <span>នាំចេញ Excel</span>
               </button>
               <button
                 onClick={handleExportSelectedUserStockPDF}
-                className="flex items-center space-x-1.5 bg-rose-500 hover:bg-rose-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-rose-500/20 active:scale-95 transition cursor-pointer"
+                className="flex-1 flex justify-center items-center space-x-1.5 bg-rose-500 hover:bg-rose-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-rose-500/20 active:scale-95 transition cursor-pointer whitespace-nowrap"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                 </svg>
                 <span>នាំចេញ PDF</span>
@@ -4489,114 +4830,83 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         </div>
       )}
 
-      {activeTab === 'warehouse' && (
+            {activeTab === 'warehouse' && (
         <div className="bg-white rounded-3xl border shadow-sm border border-slate-100 overflow-hidden flex flex-col flex-1 min-h-0 w-full min-w-0 p-2 sm:p-4 animate-in fade-in duration-300">
           
           {/* Header */}
-          <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2 shrink-0">
-            <div>
-              <h3 className="text-sm sm:text-base font-black text-slate-800">ស្តុកឃ្លាំង </h3>
-              <p className="text-slate-500 text-[9px] sm:text-[10px] mt-0.5 font-medium">គ្រប់គ្រងចំនួនស្តុកប្រព័ន្ធ ផ្ទៀងផ្ទាត់ស្តុកជាក់ស្តែង និងបញ្ចូលស្តុកថ្មី</p>
+          <div className="mb-3 border-b border-slate-100 pb-2 shrink-0">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 w-full">
+              <button
+                type="button"
+                onClick={() => setIsStockInHistoryOpen(true)}
+                className="flex-1 flex justify-center items-center space-x-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] sm:text-xs font-black px-1 sm:px-3 py-2 rounded-xl shadow-sm active:scale-95 transition cursor-pointer whitespace-nowrap"
+              >
+                <span>ប្រវត្តិបញ្ចូល/រាប់</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStockInputType('count');
+                  setStockInDeliverer('Admin');
+                  setStockInItems([]);
+                  setIsStockInModalOpen(true);
+                }}
+                className="flex-1 flex justify-center items-center space-x-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] sm:text-xs font-black px-1 sm:px-3 py-2 rounded-xl shadow-md shadow-emerald-600/10 active:scale-95 transition cursor-pointer whitespace-nowrap"
+              >
+                <span>ស្តុករាប់</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStockInputType('in');
+                  setStockInDeliverer('Admin');
+                  setStockInItems([]);
+                  setIsStockInModalOpen(true);
+                }}
+                className="flex-1 flex justify-center items-center space-x-1 bg-sky-600 hover:bg-sky-700 text-white text-[10px] sm:text-xs font-black px-1 sm:px-3 py-2 rounded-xl shadow-md shadow-sky-600/10 active:scale-95 transition cursor-pointer whitespace-nowrap"
+              >
+                <span>ស្តុកចូល</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(true)}
+                className="flex-1 flex justify-center items-center space-x-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] sm:text-xs px-1 sm:px-3 py-2 rounded-xl font-bold shadow-md shadow-indigo-500/20 active:scale-95 transition cursor-pointer whitespace-nowrap"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>នាំចេញ</span>
+              </button>
             </div>
           </div>
 
-          {/* Metrics Dashboard Grid */}
-          <div className="flex overflow-x-auto custom-scroll gap-2 mb-3 shrink-0 pb-1">
-            <div className="bg-slate-50/50 border border-slate-100 p-2 rounded-xl flex items-center space-x-2 min-w-[140px] flex-1">
-              <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">មុខទំនិញសរុប</p>
-                <h4 className="text-xs sm:text-sm font-black text-slate-700">{products.length} មុខ</h4>
-              </div>
-            </div>
-
-            <div className="bg-slate-50/50 border border-slate-100 p-2 rounded-xl flex items-center space-x-2 min-w-[140px] flex-1">
-              <div className="p-1.5 rounded-lg bg-sky-50 text-sky-600">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2a4 4 0 00-4-4H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v8m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">ស្តុកប្រព័ន្ធសរុប</p>
-                <h4 className="text-xs sm:text-sm font-black text-sky-600">
-                  {products.reduce((acc, p) => acc + (p.warehouseStock || 0), 0).toLocaleString()} ឯកតា
-                </h4>
-              </div>
-            </div>
-
-            <div className="bg-slate-50/50 border border-slate-100 p-2 rounded-xl flex items-center space-x-2 min-w-[140px] flex-1">
-              <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">ស្តុកជាក់ស្តែងសរុប</p>
-                <h4 className="text-xs sm:text-sm font-black text-emerald-600">
-                  {products.reduce((acc, p) => acc + (p.actualStock !== undefined ? p.actualStock : 0), 0).toLocaleString()} ឯកតា
-                </h4>
-              </div>
-            </div>
-
-            <div className="bg-slate-50/50 border border-slate-100 p-2 rounded-xl flex items-center space-x-2 min-w-[140px] flex-1">
-              <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">ចំនួនលម្អៀង</p>
-                <h4 className="text-xs sm:text-sm font-black text-amber-600">
-                  {products.filter(p => p.actualStock !== undefined && p.actualStock !== (p.warehouseStock || 0)).length} មុខ
-                </h4>
-              </div>
-            </div>
-          </div>
-
-          {/* ស្វែងរក bar and Stock In Button */}
-          <div className="mb-2 flex gap-2 shrink-0 items-center">
-            <div className="relative flex-1">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </span>
+          {/* Filters */}
+          <div className="grid grid-cols-2 gap-1.5 md:gap-3 mb-3 bg-slate-50 p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shrink-0">
+            {/* Start Date Filter */}
+            <div className="flex flex-col space-y-0.5">
+              <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>ចាប់ផ្តើម
+              </label>
               <input
-                type="text"
-                placeholder="ស្វែងរកទំនិញក្នុងឃ្លាំង..."
-                value={warehouseSearchQuery}
-                onChange={(e) => setWarehouseSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                type="date"
+                value={filterTxStartDate}
+                onChange={(e) => setFilterTxStartDate(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => setIsStockInHistoryOpen(true)}
-              className="flex items-center space-x-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] sm:text-xs font-black px-3 py-2 rounded-xl shadow-sm active:scale-95 transition cursor-pointer shrink-0"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="hidden sm:inline">ប្រវត្តិស្តុកចូល</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setStockInDeliverer('Admin');
-                setStockInItems([]);
-                setIsStockInModalOpen(true);
-              }}
-              className="flex items-center space-x-1 bg-sky-600 hover:bg-sky-700 text-white text-[10px] sm:text-xs font-black px-3 py-2 rounded-xl shadow-md shadow-sky-600/10 active:scale-95 transition cursor-pointer shrink-0"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>ស្តុកចូល</span>
-            </button>
+            
+            {/* End Date Filter */}
+            <div className="flex flex-col space-y-0.5">
+              <label className="text-[10px] md:text-xs font-black text-slate-500 truncate">
+                <span className="hidden sm:inline">កាលបរិច្ឆេទ</span>បញ្ចប់
+              </label>
+              <input
+                type="date"
+                value={filterTxEndDate}
+                onChange={(e) => setFilterTxEndDate(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg px-1 py-1 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
+              />
+            </div>
           </div>
 
           {/* Table Container */}
@@ -4605,88 +4915,102 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] z-10">
                 <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-[11px] uppercase font-bold tracking-wider border-b border-slate-100">
                   <th className="px-1 md:px-3 py-2 text-left font-bold text-slate-500">ឈ្មោះទំនិញ</th>
-                  <th className="px-1 md:px-3 py-2 text-center font-bold text-sky-600 bg-sky-50/10">ស្តុកប្រព័ន្ធ </th>
-                  <th className="px-1 md:px-3 py-2 text-center font-bold text-emerald-600 bg-emerald-50/10">ស្តុកជាក់ស្តែង </th>
-                  <th className="px-1 md:px-3 py-2 text-center font-bold text-slate-500">កម្រិតលម្អៀង </th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-slate-500">ស្តុកដើមគ្រា</th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-sky-600 bg-sky-50/10">ស្តុកចូល</th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-rose-600 bg-rose-50/10">ស្តុកឡើងឡាន</th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-indigo-600 bg-indigo-50/10">ស្តុកត្រឡប់</th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-emerald-600 bg-emerald-50/10">ចំនួនលក់</th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-amber-600 bg-amber-50/10">ដូរក្រវិល</th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-orange-500 bg-orange-50/10">ចំនួនថែម</th>
+                  <th className="px-1 md:px-3 py-2 text-center font-bold text-slate-700 bg-slate-50/50">ស្តុកសល់</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-[10px] sm:text-[11px] md:text-xs">
-                {filteredWarehouseProducts.map(product => {
-                  const sysStock = product.warehouseStock || 0;
-                  const actStock = product.actualStock;
-                  const draftVal = actualStockDrafts[product.id];
-                  const currentActualVal = draftVal !== undefined ? (draftVal === '' ? undefined : parseInt(draftVal)) : actStock;
-                  const hasTake = currentActualVal !== undefined && !isNaN(currentActualVal);
-                  const variance = hasTake ? currentActualVal - sysStock : 0;
-                  const isDirty = draftVal !== undefined && draftVal !== String(actStock ?? '');
+                {products.map(product => {
+                  let rangeStockIn = 0;
+                  let rangeStockOut = 0;
+                  let rangeStockReturn = 0;
+                  let rangeStockSold = 0;
+                  let rangeStockExchanged = 0;
+                  let rangeStockPromo = 0;
+                  let rollbackStockIn = 0;
+                  let rollbackStockOut = 0;
+                  let rollbackStockReturn = 0;
+                  
+                  warehouseStockIns.forEach((record: any) => {
+                    const dateStr = record.date ? record.date.split('T')[0] : '';
+                    const item = record.items?.find((i: any) => i.productName === product.name);
+                    if (item && item.quantity) {
+                      const qty = Number(item.quantity);
+                      const matchStart = !filterTxStartDate || dateStr >= filterTxStartDate;
+                      const matchEnd = !filterTxEndDate || dateStr <= filterTxEndDate;
+                      if (matchStart && matchEnd) {
+                        rangeStockIn += qty;
+                      }
+                      if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                        rollbackStockIn += qty;
+                      } else if (!filterTxStartDate) {
+                        rollbackStockIn += qty;
+                      }
+                    }
+                  });
+                  
+                  managedTransactions.forEach(t => {
+                    let tName = t.productName;
+                    if (tName === 'WURKZ ICE') tName = 'WICE';
+                    if (tName === 'W ORD') tName = 'WURKZ ORD';
+                    if (tName === 'D ORD') tName = 'DAZZ ORD';
+                    
+                    if (tName === product.name) {
+                      const dateStr = t.date ? t.date.split('T')[0] : '';
+                      const matchStart = !filterTxStartDate || dateStr >= filterTxStartDate;
+                      const matchEnd = !filterTxEndDate || dateStr <= filterTxEndDate;
+                      
+                      if (matchStart && matchEnd) {
+                        if (t.type === 'Stock Out') rangeStockOut += t.quantity;
+                        if (t.type === 'Stock Return') rangeStockReturn += t.quantity;
+                        if (t.type === 'Stock Sold') { 
+                           const soldOnly = (t as any).soldQty !== undefined ? (t as any).soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
+                           rangeStockSold += soldOnly;
+                           rangeStockPromo += (t.promoQty || 0);
+                           rangeStockExchanged += (t.exchangedQty || 0);
+                        }
+                      }
+                      if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                        if (t.type === 'Stock Out') rollbackStockOut += t.quantity;
+                        if (t.type === 'Stock Return') rollbackStockReturn += t.quantity;
+                      } else if (!filterTxStartDate) {
+                        if (t.type === 'Stock Out') rollbackStockOut += t.quantity;
+                        if (t.type === 'Stock Return') rollbackStockReturn += t.quantity;
+                      }
+                    }
+                  });
+                  
+                  const currentStock = product.warehouseStock || 0;
+                  const originalStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
+                  const finalStock = originalStock + rangeStockIn - rangeStockOut + rangeStockReturn;
 
                   return (
                     <tr 
                       key={product.id} 
-                      onClick={() => {
-                        setProductToកែប្រែWarehouseStock(product);
-                        setកែប្រែWarehouseStockVal(String(sysStock));
-                        setIsកែប្រែWarehouseStockModalOpen(true);
-                      }}
-                      className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
+                      className="hover:bg-slate-50/50 transition-colors"
                     >
-                      <td className="px-1 md:px-3 py-1.5">
-                        <div className="font-bold text-slate-800">{product.name}</div>
-                      </td>
-                      <td className="px-1 md:px-3 py-1.5 text-center font-black text-sky-600 bg-sky-50/5">
-                        {sysStock.toLocaleString()}
-                      </td>
-                      <td className="px-1 md:px-3 py-1.5 bg-emerald-50/5" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center mx-auto">
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="បញ្ចូលចំនួន..."
-                            value={draftVal !== undefined ? draftVal : (actStock !== undefined ? String(actStock) : '')}
-                            onChange={(e) => setActualStockDrafts({
-                              ...actualStockDrafts,
-                              [product.id]: e.target.value
-                            })}
-                            onBlur={() => {
-                              if (isDirty) {
-                                handleរក្សាទុកActualStock(product);
-                              }
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && isDirty) {
-                                handleរក្សាទុកActualStock(product);
-                              }
-                            }}
-                            className="w-16 sm:w-20 text-center py-1 px-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs font-black text-slate-800"
-                          />
-                        </div>
-                      </td>
-                      <td className="px-1 md:px-3 py-1.5 text-center font-bold">
-                        {hasTake ? (
-                          variance === 0 ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
-                              ត្រូវគ្នា (0)
-                            </span>
-                          ) : variance < 0 ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-100">
-                              ខ្វះឃ្លាំង ({variance.toLocaleString()})
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-100">
-                              លើសឃ្លាំង (+{variance.toLocaleString()})
-                            </span>
-                          )
-                        ) : (
-                          <span className="text-slate-400 font-medium text-[10px] sm:text-xs">មិនទាន់ផ្ទៀងផ្ទាត់</span>
-                        )}
-                      </td>
+                      <td className="px-1 md:px-3 py-2 font-bold text-slate-800">{product.name}</td>
+                      <td className="px-1 md:px-3 py-2 text-center text-slate-600 font-medium">{originalStock.toLocaleString()}</td>
+                      <td className="px-1 md:px-3 py-2 text-center text-sky-600 font-bold bg-sky-50/5">{rangeStockIn > 0 ? rangeStockIn.toLocaleString() : '-'}</td>
+                      <td className="px-1 md:px-3 py-2 text-center text-rose-600 font-bold bg-rose-50/5">{rangeStockOut > 0 ? rangeStockOut.toLocaleString() : '-'}</td>
+                      <td className="px-1 md:px-3 py-2 text-center text-indigo-600 font-bold bg-indigo-50/5">{rangeStockReturn > 0 ? rangeStockReturn.toLocaleString() : '-'}</td>
+                      <td className="px-1 md:px-3 py-2 text-center text-emerald-600 font-bold bg-emerald-50/5">{rangeStockSold > 0 ? rangeStockSold.toLocaleString() : '-'}</td>
+                      <td className="px-1 md:px-3 py-2 text-center text-amber-600 font-bold bg-amber-50/5">{rangeStockExchanged > 0 ? rangeStockExchanged.toLocaleString() : '-'}</td>
+                      <td className="px-1 md:px-3 py-2 text-center text-orange-500 font-bold bg-orange-50/5">{rangeStockPromo > 0 ? rangeStockPromo.toLocaleString() : '-'}</td>
+                      <td className="px-1 md:px-3 py-2 text-center text-slate-800 font-black bg-slate-50/50">{finalStock.toLocaleString()}</td>
                     </tr>
                   );
                 })}
-                {filteredWarehouseProducts.length === 0 && (
+                {products.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-24 text-center text-slate-400 font-bold">
-                      {products.length === 0 ? "មិនទាន់មានទំនិញនៅក្នុងប្រព័ន្ធទេ" : "រកមិនឃើញទំនិញដែលស្វែងរកឡើយ"}
+                    <td colSpan={9} className="px-6 py-24 text-center text-slate-400 font-bold">
+                      មិនទាន់មានទំនិញនៅក្នុងប្រព័ន្ធទេ
                     </td>
                   </tr>
                 )}
@@ -4695,7 +5019,6 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           </div>
         </div>
       )}
-
       {/* Stock In Modal */}
       {isStockInModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-0">
@@ -4703,8 +5026,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center shrink-0">
               <div>
-                <h3 className="text-lg font-black text-slate-800">បញ្ចូលស្តុកចូល</h3>
-                <p className="text-xs text-slate-500 font-medium mt-1">សូមជ្រើសរើសទំនិញ និងបញ្ចូលចំនួនស្តុកបន្ថែម</p>
+                <h3 className="text-lg font-black text-slate-800">{stockInputType === 'count' ? 'បញ្ចូលទិន្នន័យស្តុករាប់' : 'បញ្ចូលស្តុកចូល'}</h3>
+                <p className="text-xs text-slate-500 font-medium mt-1">{stockInputType === 'count' ? 'សូមជ្រើសរើសទំនិញ និងបញ្ចូលចំនួនស្តុកជាក់ស្តែង' : 'សូមជ្រើសរើសទំនិញ និងបញ្ចូលចំនួនស្តុកបន្ថែម'}</p>
               </div>
               <button onClick={() => { setIsStockInModalOpen(false); setStockInItems([]); }} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -4726,7 +5049,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">អ្នកប្រគល់ស្តុក</label>
+                    <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">{stockInputType === 'count' ? 'អ្នករាប់ស្តុក' : 'អ្នកប្រគល់ស្តុក'}</label>
                     <input
                       type="text"
                       value={stockInDeliverer}
@@ -5094,6 +5417,72 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         document.body
       )}
 
+
+      
+      {/* Export Modal */}
+      {isExportModalOpen && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 sm:px-0">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsExportModalOpen(false)}></div>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 border-b border-slate-50 flex justify-between items-center shrink-0">
+              <h3 className="text-lg font-black text-slate-800">ការនាំចេញទិន្នន័យ</h3>
+              <button onClick={() => setIsExportModalOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-2">ប្រភេទឯកសារ (Type file)</label>
+                <div className="flex gap-3">
+                  <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${exportFileType === 'pdf' ? 'border-rose-500 bg-rose-50 text-rose-700' : 'border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
+                    <input type="radio" name="fileType" value="pdf" checked={exportFileType === 'pdf'} onChange={() => setExportFileType('pdf')} className="hidden" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                    <span className="font-bold">PDF</span>
+                  </label>
+                  <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${exportFileType === 'excel' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
+                    <input type="radio" name="fileType" value="excel" checked={exportFileType === 'excel'} onChange={() => setExportFileType('excel')} className="hidden" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <span className="font-bold">Excel</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-2">ប្រភេទឯកសារយោង</label>
+                <select 
+                  value={exportDocType} 
+                  onChange={(e) => setExportDocType(e.target.value)}
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 cursor-pointer transition"
+                >
+                  <option value="reports">របាយការណ៍</option>
+                  <option value="warehouse">ស្តុកឃ្លាំង</option>
+                  <option value="stock_in">ស្តុកចូល</option>
+                  <option value="stock_count">ស្តុករាប់</option>
+                  <option value="stock_out">ស្តុកឡើងឡាន</option>
+                  <option value="stock_sold">ស្តុកលក់</option>
+                  <option value="stock_return">ស្តុកត្រឡប់</option>
+                  <option value="stock_lost_excess">ស្តុកបាត់/លើស</option>
+                  
+                  
+                </select>
+              </div>
+
+              
+            </div>
+
+            <div className="p-6 pt-0">
+              <button
+                onClick={handleGeneralExport}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-xl shadow-lg shadow-indigo-600/20 active:scale-[0.98] transition"
+              >
+                នាំចេញឥឡូវនេះ
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Quick Add Modal */}
       {isQuickAddModalOpen && createPortal(
@@ -7761,8 +8150,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           <div className="bg-white w-full max-w-2xl max-h-[85vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
               <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">ប្រវត្តិស្តុកចូល </h3>
-                <p className="text-xs text-slate-500 font-medium">បញ្ជីរាយនាមនៃការបញ្ចូលស្តុកថ្មីចូលក្នុងឃ្លាំង</p>
+                <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">ប្រវត្តិស្តុកចូល និងស្តុករាប់</h3>
+                <p className="text-xs text-slate-500 font-medium mt-1">ទិន្នន័យនៃប្រវត្តិនៃការបញ្ចូលស្តុក និងការរាប់ស្តុកជាក់ស្តែង</p>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => setStockHistoryFilter('all')} className={`px-3 py-1 text-xs font-bold rounded-full transition ${stockHistoryFilter === 'all' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>ទាំងអស់</button>
+                  <button onClick={() => setStockHistoryFilter('in')} className={`px-3 py-1 text-xs font-bold rounded-full transition ${stockHistoryFilter === 'in' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>ស្តុកចូល</button>
+                  <button onClick={() => setStockHistoryFilter('count')} className={`px-3 py-1 text-xs font-bold rounded-full transition ${stockHistoryFilter === 'count' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>ស្តុករាប់</button>
+                </div>
               </div>
               <button 
                 onClick={() => setIsStockInHistoryOpen(false)} 
@@ -7786,19 +8180,27 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 text-[10px] sm:text-xs font-bold border-b border-slate-100">
                           <th className="px-4 py-3">កាលបរិច្ឆេទ</th>
-                          <th className="px-4 py-3">ឈ្មោះអ្នកប្រគល់</th>
+                          <th className="px-4 py-3">ប្រភេទ</th>
+                          <th className="px-4 py-3">ឈ្មោះអ្នកប្រគល់/រាប់</th>
                           <th className="px-4 py-3">ឈ្មោះទំនិញ</th>
                           <th className="px-4 py-3">បរិមាណ</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {warehouseStockIns.map((record: any) => (
+                        {warehouseStockIns.filter(record => stockHistoryFilter === 'all' || (stockHistoryFilter === 'in' ? record.type !== 'count' : record.type === 'count')).map((record: any) => (
                           <tr 
                             key={record.id} 
                             onClick={() => setSelectedStockInRecord(record)}
                             className="border-b border-slate-50 hover:bg-slate-50 transition cursor-pointer text-xs sm:text-sm font-bold text-slate-700"
                           >
                             <td className="px-4 py-3">{record.date}</td>
+                            <td className="px-4 py-3">
+                              {record.type === 'count' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700">ស្តុករាប់</span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-50 text-sky-700">ស្តុកចូល</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3">{record.deliverer}</td>
                             <td className="px-4 py-3">
                               {record.items.map((item: any, idx: number) => (
@@ -7807,7 +8209,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                             </td>
                             <td className="px-4 py-3">
                               {record.items.map((item: any, idx: number) => (
-                                <div key={idx} className="py-0.5 text-emerald-600">+{item.quantity}</div>
+                                <div key={idx} className="py-0.5 text-emerald-600">{record.type === 'count' ? '' : '+'}{item.quantity}</div>
                               ))}
                             </td>
                           </tr>
@@ -7837,7 +8239,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       {selectedStockInRecord && createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-black text-slate-800 mb-4">ព័ត៌មានលម្អិតស្តុកចូល</h3>
+            <h3 className="text-lg font-black text-slate-800 mb-4">{selectedStockInRecord.type === 'count' ? 'ព័ត៌មានលម្អិតស្តុករាប់' : 'ព័ត៌មានលម្អិតស្តុកចូល'}</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -7845,17 +8247,17 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
                   <div className="text-sm font-bold text-slate-700">{selectedStockInRecord.date}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-slate-400 font-bold mb-1">អ្នកប្រគល់</div>
+                  <div className="text-[10px] text-slate-400 font-bold mb-1">{selectedStockInRecord.type === 'count' ? 'អ្នករាប់' : 'អ្នកប្រគល់'}</div>
                   <div className="text-sm font-bold text-slate-700">{selectedStockInRecord.deliverer}</div>
                 </div>
               </div>
               <div>
-                <div className="text-[10px] text-slate-400 font-bold mb-2">ទំនិញដែលបានបញ្ចូល</div>
+                <div className="text-[10px] text-slate-400 font-bold mb-2">{selectedStockInRecord.type === 'count' ? 'ទំនិញដែលបានរាប់' : 'ទំនិញដែលបានបញ្ចូល'}</div>
                 <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
                   {selectedStockInRecord.items.map((item: any, idx: number) => (
                     <div key={idx} className="flex justify-between items-center">
                       <span className="text-sm font-bold text-slate-700">{item.productName}</span>
-                      <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">+{item.quantity}</span>
+                      <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{selectedStockInRecord.type === 'count' ? '' : '+'}{item.quantity}</span>
                     </div>
                   ))}
                 </div>
