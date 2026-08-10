@@ -2773,7 +2773,428 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       saveAs(new Blob([buffer]), `ទិន្នន័យស្តុកសរុប.xlsx`);
     }
   };
+
+const handleExportLostExcessExcel = async () => {
+    let dateRangeText = "ទាំងអស់";
+    if (filterTxStartDate) {
+      const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
+      dateRangeText = `${formatDate(filterTxStartDate)}`;
+    } else if (filterTxEndDate) {
+      const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+      };
+      dateRangeText = `${formatDate(filterTxEndDate)}`;
+    }
+
+    const exportProductsList = [
+      { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
+      { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
+      { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
+      { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
+      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
+      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
+      { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
+      { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
+      { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
+      { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
+      { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
+      { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
+      { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
+      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
+      { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
+      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
+      { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
+      { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
+      { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
+      { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
+      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
+    ];
+
+    const workbook = new ExcelJS.Workbook();
+    let hasData = false;
+
+    users.forEach(user => {
+      const userTxs = transactions.filter(t => {
+        const matchUser = t.userId === user.id;
+        const txDateStr = t.date ? t.date.split('T')[0] : '';
+        const matchStart = !filterTxStartDate || txDateStr >= filterTxStartDate;
+        const matchEnd = !filterTxEndDate || txDateStr <= filterTxEndDate;
+        return matchUser && matchStart && matchEnd;
+      });
+
+      if (userTxs.length === 0) return;
+
+      const datesMap: Record<string, any> = {};
+
+      userTxs.forEach(t => {
+        let pName = t.productName;
+        if (pName === 'WURKZ ICE') pName = 'WICE';
+        if (pName === 'W ORD') pName = 'WURKZ ORD';
+        if (pName === 'D ORD') pName = 'DAZZ ORD';
+        if (pName === 'CBC ORD') pName = 'CED ORD';
+
+        const txDate = t.date ? t.date.split('T')[0] : 'Unknown Date';
+        if (!datesMap[txDate]) datesMap[txDate] = {};
+
+        if (!datesMap[txDate][pName]) {
+          datesMap[txDate][pName] = { stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0 };
+        }
+        const group = datesMap[txDate][pName];
+        if (t.type === 'Stock Out') group.stockOut += t.quantity;
+        else if (t.type === 'Stock Sold') { 
+          const soldOnly = (t as any).soldQty !== undefined ? (t as any).soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
+          group.stockSold += soldOnly;
+          group.stockPromo += (t.promoQty || 0); 
+          group.stockExchanged += ((t as any).exchangedQty || 0);
+        }
+        else if (t.type === 'Stock Return') group.stockReturn += t.quantity;
+      });
+
+      const finalRows: any[] = [];
+      Object.keys(datesMap).sort().forEach(date => {
+        const dMap = datesMap[date];
+        exportProductsList.forEach(item => {
+           const pData = dMap[item.code];
+           if (pData) {
+              const diff = pData.stockOut - (pData.stockSold + pData.stockExchanged + pData.stockPromo + pData.stockReturn);
+              if (diff !== 0) {
+                 finalRows.push({
+                    date: date,
+                    khmerName: item.khmerName,
+                    code: item.code,
+                    diff: diff
+                 });
+              }
+           }
+        });
+      });
+
+      if (finalRows.length === 0) return;
+
+      const khmerNumerals = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+      const toKhmerNumeral = (num: number) => {
+        return num.toString().split('').map(digit => khmerNumerals[parseInt(digit)]).join('');
+      };
+
+      let sheetName = (user.username || "User").substring(0, 31);
+      
+      let dupCount = 1;
+      let finalSheetName = sheetName;
+      while (workbook.getWorksheet(finalSheetName)) {
+        const suffix = `_${dupCount}`;
+        finalSheetName = sheetName.substring(0, 31 - suffix.length) + suffix;
+        dupCount++;
+      }
+      
+      const ws = workbook.addWorksheet(finalSheetName, {
+        pageSetup: {
+          paperSize: 9, 
+          orientation: 'portrait',
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 1,
+          margins: { left: 0.39, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 }
+        }
+      });
+      
+      delete ws.pageSetup.scale;
+      ws.pageSetup.fitToPage = true;
+      ws.pageSetup.fitToWidth = 1;
+      ws.pageSetup.fitToHeight = 1;
+      
+      hasData = true;
+
+      ws.addRow([`របាយការណ៍បាត់/លើស ( ${user.username || ''} )`, null, null, null, null]);
+      ws.addRow([
+        `ឈ្មោះអ្នកលក់៖ ${user.username || ""}`,
+        null,
+        null,
+        `កាលបរិច្ឆេទ៖ ${dateRangeText}`,
+        null
+      ]);
+      ws.addRow([
+        "ល.រ",
+        "កាលបរិច្ឆេទ",
+        "ឈ្មោះទំនិញ",
+        "ចំនួនបាត់",
+        "ចំនួនលើស"
+      ]);
+
+      let rowIndex = 1;
+      finalRows.forEach((row) => {
+        let lost = null;
+        let excess = null;
+        if (row.diff > 0) {
+          lost = row.diff;
+        } else if (row.diff < 0) {
+          excess = Math.abs(row.diff);
+        }
+
+        let displayDate = row.date;
+        const p = row.date.split('-');
+        if (p.length === 3) displayDate = `${p[2]}/${p[1]}/${p[0]}`;
+
+        ws.addRow([
+          toKhmerNumeral(rowIndex++),
+          displayDate,
+          row.khmerName,
+          lost || null,
+          excess || null
+        ]);
+      });
+
+      let mIdx = 0;
+      while (mIdx < finalRows.length) {
+        let nextIdx = mIdx;
+        while (nextIdx < finalRows.length && finalRows[nextIdx].date === finalRows[mIdx].date) {
+           nextIdx++;
+        }
+        if (nextIdx - mIdx > 1) {
+           ws.mergeCells(4 + mIdx, 2, 4 + nextIdx - 1, 2);
+        }
+        mIdx = nextIdx;
+      }
+
+      ws.mergeCells('A1:E1');
+      ws.mergeCells('A2:C2');
+      ws.mergeCells('D2:E2');
+
+      ws.getRow(1).height = 35;
+      ws.getRow(2).height = 25;
+      ws.getRow(3).height = 30;
+
+      for (let i = 4; i <= ws.rowCount; i++) {
+        ws.getRow(i).height = 20;
+      }
+
+      ws.columns = [
+        { width: 10 }, 
+        { width: 41 }, 
+        { width: 17 }, 
+        { width: 16 }, 
+        { width: 16 }
+      ];
+
+      ws.getRow(1).getCell(1).font = { name: 'Khmer OS Muol Light', size: 16, bold: true };
+      ws.getRow(1).getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+      
+      ws.getRow(2).font = { name: 'Khmer OS Siemreap', size: 12, bold: true };
+      ws.getRow(2).alignment = { vertical: 'middle' };
+      
+      const headerRow = ws.getRow(3);
+      headerRow.font = { name: 'Khmer OS Muol Light', size: 11, bold: true };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+      headerRow.eachCell((cell) => {
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+      });
+
+      for (let i = 4; i <= ws.rowCount; i++) {
+        const row = ws.getRow(i);
+        row.font = { name: 'Khmer OS Siemreap', size: 11 };
+        row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
+        row.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+        
+        row.getCell(4).font = { name: 'Khmer OS Siemreap', size: 11, color: { argb: 'FFFF0000' }, bold: true };
+        row.getCell(5).font = { name: 'Khmer OS Siemreap', size: 11, color: { argb: 'FFD97706' }, bold: true };
+
+        row.eachCell((cell) => {
+          cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        });
+      }
+    });
+
+    if (hasData) {
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), `របាយការណ៍ស្តុកបាត់និងលើស.xlsx`);
+    }
+    setIsExportModalOpen(false);
+  };
+
+  const handleExportLostExcessPDF = async () => {
+    let dateRangeText = "ទាំងអស់";
+    if (filterTxStartDate && filterTxEndDate) {
+      dateRangeText = `${filterTxStartDate} ដល់ ${filterTxEndDate}`;
+    }
+
+    let printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    let allPagesHtml = '';
+
+    users.forEach(user => {
+      const userTxs = transactions.filter(t => {
+        const matchUser = t.userId === user.id;
+        const txDateStr = t.date ? t.date.split('T')[0] : '';
+        const matchStart = !filterTxStartDate || txDateStr >= filterTxStartDate;
+        const matchEnd = !filterTxEndDate || txDateStr <= filterTxEndDate;
+        return matchUser && matchStart && matchEnd;
+      });
+
+      if (userTxs.length === 0) return;
+
+      const datesMap: Record<string, any> = {};
+
+      userTxs.forEach(t => {
+        const txDate = t.date ? t.date.split('T')[0] : 'Unknown Date';
+        if (!datesMap[txDate]) datesMap[txDate] = {};
+
+        if (!datesMap[txDate][t.productName]) {
+          datesMap[txDate][t.productName] = { stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0 };
+        }
+        const group = datesMap[txDate][t.productName];
+        if (t.type === 'Stock Out') group.stockOut += t.quantity;
+        else if (t.type === 'Stock Sold') { 
+          const soldOnly = (t as any).soldQty !== undefined ? (t as any).soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
+          group.stockSold += soldOnly;
+          group.stockPromo += (t.promoQty || 0); 
+          group.stockExchanged += ((t as any).exchangedQty || 0);
+        }
+        else if (t.type === 'Stock Return') group.stockReturn += t.quantity;
+      });
+
+      const userGrouped: any[] = [];
+      Object.keys(datesMap).sort().forEach(date => {
+        const dMap = datesMap[date];
+        Object.keys(dMap).sort((a, b) => a.localeCompare(b)).forEach(pName => {
+           const pData = dMap[pName];
+           const diff = pData.stockOut - (pData.stockSold + pData.stockExchanged + pData.stockPromo + pData.stockReturn);
+           if (diff !== 0) {
+              let displayDate = date;
+              const p = date.split('-');
+              if (p.length === 3) displayDate = `${p[2]}/${p[1]}/${p[0]}`;
+              userGrouped.push({
+                 productName: pName,
+                 diff: diff,
+                 specificDates: displayDate
+              });
+           }
+        });
+      });
+
+      if (userGrouped.length === 0) return;
+
+      let rowsHtml = '';
+      let mIdxPdf = 0;
+      while (mIdxPdf < userGrouped.length) {
+        let nextIdx = mIdxPdf;
+        while (nextIdx < userGrouped.length && userGrouped[nextIdx].specificDates === userGrouped[mIdxPdf].specificDates) {
+          nextIdx++;
+        }
+        const span = nextIdx - mIdxPdf;
+        
+        for (let k = mIdxPdf; k < nextIdx; k++) {
+          const p = userGrouped[k];
+          let lost = '';
+          let excess = '';
+          if (p.diff > 0) lost = p.diff.toString();
+          else if (p.diff < 0) excess = Math.abs(p.diff).toString();
+
+          let dateTd = '';
+          if (k === mIdxPdf) {
+             dateTd = `<td rowspan="${span}" style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: center; vertical-align: middle;">${p.specificDates}</td>`;
+          }
+
+          rowsHtml += `
+          <tr style="border-bottom: 1px solid #000;">
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: center;">${k + 1}</td>
+            ${dateTd}
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${p.productName}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #e11d48; text-align: center;">${lost}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #d97706; text-align: center;">${excess}</td>
+          </tr>
+        `;
+        }
+        mIdxPdf = nextIdx;
+      }
+
+      allPagesHtml += `
+        <div class="page-break">
+          <h2>របាយការណ៍បាត់/លើស</h2>
+          <p>ឈ្មោះអ្នកប្រើប្រាស់៖ ${user.username || user.id}</p>
+          <p>កាលបរិច្ឆេទ៖ ${dateRangeText}</p>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 50px;">ល.រ</th>
+                <th>កាលបរិច្ឆេទ</th>
+                <th>ឈ្មោះទំនិញ</th>
+                <th style="width: 80px;">ចំនួនបាត់</th>
+                <th style="width: 80px;">ចំនួនលើស</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+    });
+
+    if (!allPagesHtml) {
+      printWindow.close();
+      setIsExportModalOpen(false);
+      return;
+    }
+
+    const html = `
+      <html>
+        <head>
+          <title>របាយការណ៍ស្តុកបាត់និងលើស</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Moul&family=Inter:wght@400;500;700;900&family=Kantumruy+Pro:wght@400;500;700;900&display=swap');
+            body { font-family: 'Kantumruy Pro', sans-serif; padding: 20px; }
+            .page-break { page-break-after: always; margin-bottom: 30px; }
+            .page-break:last-child { page-break-after: auto; }
+            h2 { font-family: 'Moul', serif; text-align: center; font-size: 24px; margin-bottom: 5px; }
+            p { text-align: center; margin-bottom: 10px; font-size: 14px; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #000; padding: 8px; font-size: 13px; }
+            th { background-color: #f8fafc; font-family: 'Moul', serif; }
+          </style>
+        </head>
+        <body>
+          ${allPagesHtml}
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    
+    // Add small delay to ensure styles are loaded before printing
+    setTimeout(() => {
+      if (printWindow) {
+        printWindow.print();
+      }
+    }, 500);
+
+    setIsExportModalOpen(false);
+  };
 const handleGeneralExport = async () => {
+
     if (exportDocType === 'reports') {
       if (exportFileType === 'pdf') {
         handleExportSelectedUserStockPDF();
@@ -2781,6 +3202,13 @@ const handleGeneralExport = async () => {
         handleExportSelectedUserStockExcel();
       }
       setIsExportModalOpen(false);
+      return;
+    } else if (exportDocType === 'stock_lost_excess') {
+      if (exportFileType === 'pdf') {
+        handleExportLostExcessPDF();
+      } else {
+        handleExportLostExcessExcel();
+      }
       return;
     }
 
@@ -2853,14 +3281,6 @@ const handleGeneralExport = async () => {
           tx.productName,
           tx.quantity
         ]);
-      } else if (exportDocType === 'stock_lost_excess') {
-        title = 'របាយការណ៍ស្តុកបាត់/លើស';
-        headers = ['ល.រ', 'ឈ្មោះទំនិញ', 'ស្តុកឃ្លាំង', 'ស្តុករាប់', 'បាត់/លើស'];
-        rows = filteredWarehouseProducts.map((p, idx) => {
-          const wStock = p.warehouseStock || 0;
-          const aStock = p.actualStock || 0;
-          return [idx + 1, p.name, wStock, aStock, aStock - wStock];
-        });
       }
 
       let dateRangeText = "ទាំងអស់";
@@ -2973,14 +3393,6 @@ const handleGeneralExport = async () => {
           tx.productName,
           tx.quantity
         ]);
-      } else if (exportDocType === 'stock_lost_excess') {
-        title = 'របាយការណ៍ស្តុកបាត់/លើស';
-        headers = ['ល.រ', 'ឈ្មោះទំនិញ', 'ស្តុកឃ្លាំង', 'ស្តុករាប់', 'បាត់/លើស'];
-        rows = filteredWarehouseProducts.map((p, idx) => {
-          const wStock = p.warehouseStock || 0;
-          const aStock = p.actualStock || 0;
-          return [idx + 1, p.name, wStock, aStock, aStock - wStock];
-        });
       }
 
       ws.addRow([title]);
@@ -3094,10 +3506,10 @@ const handleExportSelectedUserStockExcel = async () => {
         const group = groupedMap[pName];
         if (t.type === 'Stock Out') group.stockOut += t.quantity;
         else if (t.type === 'Stock Sold') { 
-          const soldOnly = t.soldQty !== undefined ? t.soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - (t.exchangedQty || 0));
+          const soldOnly = (t as any).soldQty !== undefined ? (t as any).soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - ((t as any).exchangedQty || 0));
           group.stockSold += soldOnly; 
           group.stockPromo += (t.promoQty || 0); 
-          group.stockExchanged += (t.exchangedQty || 0);
+          group.stockExchanged += ((t as any).exchangedQty || 0);
         }
         else if (t.type === 'Stock Return') group.stockReturn += t.quantity;
       });
@@ -3407,7 +3819,7 @@ const handleExportSelectedUserStockExcel = async () => {
           // Fallback if soldQty is not recorded, we assume total quantity minus promoQty
           group.stockSold += Math.max(0, t.quantity - (t.promoQty || 0) - (t.exchangedQty || 0));
         }
-        group.stockExchanged += (t.exchangedQty || 0);
+        group.stockExchanged += ((t as any).exchangedQty || 0);
         group.stockPromo += (t.promoQty || 0);
       } else if (t.type === 'Stock Return') {
         group.stockReturn += t.quantity;
@@ -5463,9 +5875,30 @@ const handleExportSelectedUserStockExcel = async () => {
                   <option value="stock_sold">ស្តុកលក់</option>
                   <option value="stock_return">ស្តុកត្រឡប់</option>
                   <option value="stock_lost_excess">ស្តុកបាត់/លើស</option>
-                  
-                  
                 </select>
+              </div>
+
+
+
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-slate-500 mb-2">ចាប់ផ្តើម</label>
+                  <input
+                    type="date"
+                    value={filterTxStartDate}
+                    onChange={(e) => setFilterTxStartDate(e.target.value)}
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 cursor-pointer transition"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-slate-500 mb-2">បញ្ចប់</label>
+                  <input
+                    type="date"
+                    value={filterTxEndDate}
+                    onChange={(e) => setFilterTxEndDate(e.target.value)}
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 cursor-pointer transition"
+                  />
+                </div>
               </div>
 
               

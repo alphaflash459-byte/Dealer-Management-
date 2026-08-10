@@ -1274,7 +1274,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   const sortedTransactions = [...userTransactions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const isStockOrderTab = activeTab === 'Stock Order';
-  const isTransactionTab = activeTab === 'Stock Sold' || activeTab === 'Stock Out' || activeTab === 'Stock Return';
+  const isTransactionTab = activeTab === 'Stock Sold' || activeTab === 'Stock Out' || activeTab === 'Stock Return' || activeTab === 'Stock Lost/Excess';
 
   const totalItems = isTransactionTab ? sortedInvoices.length : sortedTransactions.length;
   const totalPages = Math.ceil(totalItems / pageSize);
@@ -2237,18 +2237,18 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider border-b border-slate-100">
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">
-                      {activeTab === 'Stock Sold' ? 'អតិថិជន' : activeTab === 'Stock Out' ? 'អ្នកប្រគល់' : 'អ្នកទទួល'}
+                      {activeTab === 'Stock Sold' ? 'អតិថិជន' : activeTab === 'Stock Out' ? 'អ្នកប្រគល់' : activeTab === 'Stock Lost/Excess' ? 'អ្នកកត់ត្រា' : 'អ្នកទទួល'}
                     </th>
                     <th className="px-1.5 md:px-3 py-2.5 text-left font-bold text-slate-500">ទីតាំង</th>
                     <th className="px-1.5 md:px-3 py-2.5 text-center font-bold text-slate-500">កាលបរិច្ឆេទ</th>
-                    <th className={`px-1.5 md:px-3 py-2.5 text-left font-bold ${activeTab === 'Stock Sold' ? 'text-emerald-600' : activeTab === 'Stock Out' ? 'text-rose-600' : 'text-amber-600'}`}>ទំនិញ</th>
-                    <th className={`px-1.5 md:px-3 py-2.5 text-center font-bold ${activeTab === 'Stock Sold' ? 'text-emerald-600' : activeTab === 'Stock Out' ? 'text-rose-600' : 'text-amber-600'}`}>បរិមាណ</th>
+                    <th className={`px-1.5 md:px-3 py-2.5 text-left font-bold ${activeTab === 'Stock Sold' ? 'text-emerald-600' : activeTab === 'Stock Out' ? 'text-rose-600' : activeTab === 'Stock Return' ? 'text-amber-600' : 'text-purple-600'}`}>ទំនិញ</th>
+                    <th className={`px-1.5 md:px-3 py-2.5 text-center font-bold ${activeTab === 'Stock Sold' ? 'text-emerald-600' : activeTab === 'Stock Out' ? 'text-rose-600' : activeTab === 'Stock Return' ? 'text-amber-600' : 'text-purple-600'}`}>បរិមាណ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
                   {sortedInvoices.map(inv => {
-                    const colorClass = activeTab === 'Stock Sold' ? 'text-emerald-600' : activeTab === 'Stock Out' ? 'text-rose-600' : 'text-amber-600';
-                    const bgClass = activeTab === 'Stock Sold' ? 'bg-emerald-50' : activeTab === 'Stock Out' ? 'bg-rose-50' : 'bg-amber-50';
+                    const colorClass = activeTab === 'Stock Sold' ? 'text-emerald-600' : activeTab === 'Stock Out' ? 'text-rose-600' : activeTab === 'Stock Return' ? 'text-amber-600' : 'text-purple-600';
+                    const bgClass = activeTab === 'Stock Sold' ? 'bg-emerald-50' : activeTab === 'Stock Out' ? 'bg-rose-50' : activeTab === 'Stock Return' ? 'bg-amber-50' : 'bg-purple-50';
                     return (
                       <tr 
                         key={inv.id} 
@@ -2322,7 +2322,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-lg font-black text-slate-800">
-                  បញ្ចូលទិន្នន័យ {activeTab === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : activeTab === 'Stock Out' ? 'ស្តុកឡើងឡាន' : activeTab === 'Stock Return' ? 'ស្តុកត្រឡប់' : ' '}
+                  បញ្ចូលទិន្នន័យ {activeTab === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : activeTab === 'Stock Out' ? 'ស្តុកឡើងឡាន' : activeTab === 'Stock Return' ? 'ស្តុកត្រឡប់' : activeTab === 'Stock Lost/Excess' ? 'ស្តុកបាត់/លើស' : ' '}
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">បំពេញព័ត៌មានខាងក្រោមដើម្បីរក្សាទុក</p>
               </div>
@@ -2378,7 +2378,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                   ) : (
                     <div className="space-y-1.5">
                       <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">
-                        {activeTab === 'Stock Out' ? 'អ្នកប្រគល់ស្តុក' : 'អ្នកទទួលស្តុក'}
+                        {activeTab === 'Stock Out' ? 'អ្នកប្រគល់ស្តុក' : activeTab === 'Stock Lost/Excess' ? 'អ្នកកត់ត្រា' : 'អ្នកទទួលស្តុក'}
                       </label>
                       <input
                         type="text"
@@ -2625,7 +2625,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-lg font-black text-slate-800">
-                  កែប្រែប្រតិបត្តិការ {editingTransaction.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : editingTransaction.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : 'ស្តុកត្រឡប់'}
+                  កែប្រែប្រតិបត្តិការ {editingTransaction.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : editingTransaction.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : editingTransaction.type === 'Stock Return' ? 'ស្តុកត្រឡប់' : 'ស្តុកបាត់/លើស'}
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">កែប្រែព័ត៌មានខាងក្រោមដើម្បីរក្សាទុក</p>
               </div>
@@ -3194,7 +3194,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
             <div className="flex justify-between items-center p-5 sm:p-6 pb-4 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-base sm:text-lg font-black text-slate-800">
-                  កែប្រែវិក្កយបត្រទាំងមូល ({editingFullInvoice.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : editingFullInvoice.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : 'ស្តុកត្រឡប់'})
+                  កែប្រែវិក្កយបត្រទាំងមូល ({editingFullInvoice.type === 'Stock Sold' ? 'ស្តុកលក់ចេញ' : editingFullInvoice.type === 'Stock Out' ? 'ស្តុកឡើងឡាន' : editingFullInvoice.type === 'Stock Return' ? 'ស្តុកត្រឡប់' : 'ស្តុកបាត់/លើស'})
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">
                   កែប្រែព័ត៌មានអតិថិជន កាលបរិច្ឆេទ និងទំនិញទាំងអស់ក្នុងវិក្កយបត្រនេះ

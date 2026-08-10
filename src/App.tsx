@@ -16,7 +16,7 @@ export default function App() {
   const [stockOrders, setStockOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeAdminView, setActiveAdminView] = useState<'users' | 'products' | 'transactions' | 'stockOrders' | 'stockOut' | 'stockSold' | 'stockReturn' | 'warehouse' | 'dashboard'>('stockOut');
-  const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return' | 'Report' | 'Stock Order'>('Stock Out');
+  const [activeUserView, setActiveUserView] = useState<'Stock Sold' | 'Stock Out' | 'Stock Return' | 'Stock Lost/Excess' | 'Report' | 'Stock Order'>('Stock Out');
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isAIScannerModalOpen, setIsAIScannerModalOpen] = useState(false);
@@ -212,6 +212,14 @@ export default function App() {
                         </svg>
                     </div>
                     <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">ស្តុកកម្មង់</span>
+                </button>
+                <button onClick={() => setActiveUserView('Stock Lost/Excess')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeUserView === 'Stock Lost/Excess' ? 'text-purple-600 md:bg-purple-50' : 'text-slate-400 hover:bg-slate-50'}`}>
+                    <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeUserView === 'Stock Lost/Excess' ? 'bg-purple-100 text-purple-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <span className="text-[10px] md:text-sm font-bold whitespace-nowrap">ស្តុកបាត់/លើស</span>
                 </button>
                 <button onClick={() => setActiveUserView('Report')} className={`group flex flex-col md:flex-row items-center justify-center md:justify-start w-16 md:w-full h-full md:h-auto md:p-3 md:rounded-2xl transition-all ${activeUserView === 'Report' ? 'text-emerald-600 md:bg-emerald-50' : 'text-slate-400 hover:bg-slate-50'}`}>
                     <div className={`nav-icon p-1.5 md:p-2 rounded-2xl transition transform mb-1 md:mb-0 md:mr-4 shrink-0 ${activeUserView === 'Report' ? 'bg-emerald-100 text-emerald-700 scale-110 md:scale-100' : 'md:scale-100 md:group-hover:scale-110'}`}>

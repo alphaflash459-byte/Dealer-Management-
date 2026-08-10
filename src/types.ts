@@ -12,7 +12,7 @@ export interface User {
   createdBy?: string;
 }
 
-export type TransactionType = 'Stock Out' | 'Stock Sold' | 'Stock Return';
+export type TransactionType = 'Stock Out' | 'Stock Sold' | 'Stock Return' | 'Stock Lost/Excess';
 
 export interface PromotionTier {
   buyQty: number;
