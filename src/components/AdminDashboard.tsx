@@ -120,7 +120,7 @@ interface AdminDashboardProps {
 export default function AdminDashboard({ currentUser, users, setUsers, transactions, products, stockOrders, activeTab, isAIScannerModalOpen, setIsAIScannerModalOpen }: AdminDashboardProps) {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFileType, setExportFileType] = useState<'pdf' | 'excel'>('excel');
-  const [exportDocType, setExportDocType] = useState<string>('reports');
+  const [exportDocType, setExportDocType] = useState<string>('warehouse');
   const [exportUserId, setExportUserId] = useState<string>('all');
   const ttyUser = users.find(u => u.username.toUpperCase() === 'TTY');
   const managedUsers = currentUser.role === 'Server'
@@ -2449,8 +2449,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       }
     }
     
-    ws.addRow([`របាយការណ៍ស្តុករាប់បញ្ជាក់ ( ${dateRangeText} )`, null, null, null, null, null, null, null, null]);
-    ws.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកក្នុងឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកឡើងឡាន", "ស្តុកសល់", "ផ្សេងៗ"]);
+    ws.addRow([`របាយការណ៍ស្តុករាប់បញ្ជាក់ ( ${dateRangeText} )`, null, null, null, null, null, null, null]);
+    ws.addRow(["ល.រ", "មុខទំនិញ", "ស្តុកក្នុងឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកឡើងឡាន", "ស្តុកសល់", "ផ្សេងៗ"]);
     
     let previousDayStr = '';
     if (filterTxStartDate) {
@@ -2463,52 +2463,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     }
     
     let rowIndex = 1;
-    const localKhmerNumerals = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
-    const toKhmerNumeralLocal = (num: number) => {
-      return num.toString().split('').map(digit => localKhmerNumerals[parseInt(digit)]).join('');
-    };
     
-    const exportProductsList = [
-      { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
-      { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
-      { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
-      { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
-      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
-      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
-      { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
-      { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
-      { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
-      { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
-      { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
-      { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
-      { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
-    ];
-    
-    exportProductsList.forEach(p => {
-      let dbName = p.code;
-      if (dbName === 'WICE') dbName = 'WURKZ ICE';
-      if (dbName === 'WURKZ ORD') dbName = 'W ORD';
-      if (dbName === 'DAZZ ORD') dbName = 'D ORD';
-      if (dbName === 'CED ORD') dbName = 'CBC ORD';
-      
-      const actualProduct = products.find(prod => prod.name === dbName || prod.name === p.code);
-      const currentStock = actualProduct?.warehouseStock || 0;
+    products.forEach(p => {
+      const currentStock = p.warehouseStock || 0;
       
       let rangeStockIn = 0;
       let rangeStockOut = 0;
@@ -2519,7 +2476,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       
       const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
       productStockIns.forEach(r => {
-        const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName);
+        const item = r.items.find((i: any) => i.productName === p.name);
         if (item) {
           const dateStr = r.date ? r.date.split('T')[0] : '';
           if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
@@ -2529,7 +2486,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         }
       });
       
-      const productTxs = transactions.filter(t => t.productName === p.code || t.productName === dbName);
+      const productTxs = transactions.filter(t => t.productName === p.name);
       productTxs.forEach(t => {
         const dateStr = t.date ? t.date.split('T')[0] : '';
         if (t.type === 'Stock Out') {
@@ -2552,9 +2509,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
       
       ws.addRow([
-        toKhmerNumeralLocal(rowIndex++),
-        p.khmerName,
-        p.code,
+        rowIndex++,
+        p.name,
         verifyOpeningStock || null,
         rangeStockIn || null,
         stockReturnPreviousDay || null,
@@ -2564,7 +2520,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       ]);
     });
     
-    ws.mergeCells('A1:I1');
+    ws.mergeCells('A1:H1');
     ws.getRow(1).height = 35;
     ws.getRow(2).height = 35;
     for (let i = 3; i <= ws.rowCount; i++) {
@@ -2572,21 +2528,21 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     }
     
     ws.columns = [
-      { width: 10 }, { width: 41 }, { width: 17 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }
+      { width: 10 }, { width: 41 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }
     ];
     
     ws.eachRow((row, rowNumber) => {
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        if (colNumber > 9) return;
+        if (colNumber > 8) return;
         let borderStyle: any = { top: { style: 'thin', color: { argb: 'FF002060' } }, bottom: { style: 'thin', color: { argb: 'FF002060' } }, left: { style: 'thin', color: { argb: 'FF002060' } }, right: { style: 'thin', color: { argb: 'FF002060' } } };
         if (rowNumber === 1) {
           borderStyle = {}; cell.font = { name: 'Khmer OS Muol Light', size: 16, color: { argb: 'FF002060' } }; cell.alignment = { vertical: 'middle', horizontal: 'center' };
         } else if (rowNumber === 2) {
           cell.border = borderStyle; cell.font = { name: 'Khmer OS Muol Light', size: 10, color: { argb: 'FF002060' } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         } else {
-          cell.border = borderStyle; cell.alignment = { vertical: 'middle', horizontal: (colNumber === 2 || colNumber === 3) ? 'left' : 'center' };
+          cell.border = borderStyle; cell.alignment = { vertical: 'middle', horizontal: (colNumber === 2) ? 'left' : 'center' };
           const fontStyle = { size: 12, color: { argb: 'FF002060' }, bold: true };
-          if (colNumber === 2 || colNumber === 3) {
+          if (colNumber === 2) {
             cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
           } else {
             if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
@@ -2604,7 +2560,6 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       saveAs(new Blob([buffer]), `របាយការណ៍ស្តុករាប់បញ្ជាក់.xlsx`);
     }
   };
-
   const handleExportTotalStockExcel = async (existingWorkbook?: ExcelJS.Workbook) => {
     const workbook = existingWorkbook || new ExcelJS.Workbook();
     const ws = workbook.addWorksheet('ទិន្នន័យស្តុកសរុប', {
@@ -3235,10 +3190,92 @@ const handleGeneralExport = async () => {
       let headers: string[] = [];
       let rows: any[][] = [];
 
+      const exportProductsList = [
+        { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
+        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
+        { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
+        { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
+        { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
+        { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
+        { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
+        { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
+        { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
+        { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
+        { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
+        { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
+        { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
+        { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
+        { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
+        { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
+        { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
+        { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
+        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
+        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
+        { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
+        { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
+        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
+        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
+        { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
+        { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
+        { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
+        { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
+        { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
+      ];
+      
       if (exportDocType === 'warehouse') {
         title = 'របាយការណ៍ស្តុកឃ្លាំង';
-        headers = ['ល.រ', 'ឈ្មោះទំនិញ', 'ស្តុកឃ្លាំង'];
-        rows = filteredWarehouseProducts.map((p, idx) => [idx + 1, p.name, p.warehouseStock || 0]);
+        headers = ['ល.រ', 'មុខទំនិញ', 'ស្តុកដើមគ្រា', 'ស្តុកចូល', 'ស្តុកឡើងឡាន', 'ស្តុកត្រឡប់', 'ចំនួនលក់', 'ដូរក្រវិល', 'ចំនួនថែម', 'ស្តុកសល់'];
+        rows = products.map((p, idx) => {
+          const currentStock = p.warehouseStock || 0;
+          let rangeStockIn = 0, rangeStockOut = 0, rangeStockReturn = 0, rangeStockSold = 0, rangeStockExchanged = 0, rangeStockPromo = 0;
+          let rollbackStockIn = 0, rollbackStockOut = 0, rollbackStockReturn = 0;
+          
+          const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
+          productStockIns.forEach(r => {
+            const item = r.items.find((i) => i.productName === p.name);
+            if (item) {
+              const dateStr = r.date ? r.date.split('T')[0] : '';
+              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) rangeStockIn += item.quantity;
+              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockIn += item.quantity;
+            }
+          });
+
+          const productTxs = transactions.filter(t => t.productName === p.name);
+          productTxs.forEach(t => {
+            const dateStr = t.date ? t.date.split('T')[0] : '';
+            const inRange = (!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate);
+              
+            if (t.type === 'Stock Out') {
+              if (inRange) rangeStockOut += t.quantity;
+              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockOut += t.quantity;
+            } else if (t.type === 'Stock Return') {
+              if (inRange) rangeStockReturn += t.quantity;
+              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockReturn += t.quantity;
+            } else if (t.type === 'Stock Sold') {
+              if (inRange) {
+                rangeStockSold += t.soldQty || t.quantity;
+                rangeStockExchanged += t.exchangedQty || 0;
+                rangeStockPromo += t.promoQty || 0;
+              }
+            }
+          });
+
+          const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
+          const closingStock = openingStock + rangeStockIn - rangeStockOut + rangeStockReturn;
+
+          return [
+            idx + 1,
+            p.name,
+            openingStock || null,
+            rangeStockIn || null,
+            rangeStockOut || null,
+            rangeStockReturn || null,
+            rangeStockSold || null,
+            rangeStockExchanged || null,
+            rangeStockPromo || null,
+            closingStock || null
+          ];
+        });
       } else if (exportDocType === 'stock_in') {
         title = 'របាយការណ៍ស្តុកចូល';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រគល់', 'ទំនិញ', 'បរិមាណ'];
@@ -3251,16 +3288,74 @@ const handleGeneralExport = async () => {
           r.items.map((i: any) => i.quantity).join(', ')
         ]);
       } else if (exportDocType === 'stock_count') {
-        title = 'របាយការណ៍ស្តុករាប់';
-        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នករាប់', 'ទំនិញ', 'បរិមាណ'];
-        const counts = warehouseStockIns.filter(r => r.type === 'count');
-        rows = counts.map((r, idx) => [
-          idx + 1,
-          r.date,
-          r.deliverer,
-          r.items.map((i: any) => i.productName).join(', '),
-          r.items.map((i: any) => i.quantity).join(', ')
-        ]);
+        title = 'របាយការណ៍ស្តុករាប់បញ្ជាក់';
+        headers = ["ល.រ", "មុខទំនិញ", "ស្តុកក្នុងឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកឡើងឡាន", "ស្តុកសល់", "ផ្សេងៗ"];
+        
+        let previousDayStr = '';
+        if (filterTxStartDate) {
+          const d = new Date(filterTxStartDate + 'T00:00:00');
+          d.setDate(d.getDate() - 1);
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          previousDayStr = `${year}-${month}-${day}`;
+        }
+        
+        rows = products.map((p, idx) => {
+          const currentStock = p.warehouseStock || 0;
+          
+          let rangeStockIn = 0;
+          let rangeStockOut = 0;
+          let rollbackStockIn = 0;
+          let rollbackStockOut = 0;
+          let rollbackStockReturn = 0;
+          let stockReturnPreviousDay = 0;
+          
+          const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
+          productStockIns.forEach(r => {
+            const item = r.items.find((i: any) => i.productName === p.name);
+            if (item) {
+              const dateStr = r.date ? r.date.split('T')[0] : '';
+              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
+              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                rollbackStockIn += item.quantity;
+              }
+            }
+          });
+          
+          const productTxs = transactions.filter(t => t.productName === p.name);
+          productTxs.forEach(t => {
+            const dateStr = t.date ? t.date.split('T')[0] : '';
+            if (t.type === 'Stock Out') {
+              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockOut += t.quantity; }
+              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                rollbackStockOut += t.quantity;
+              }
+            } else if (t.type === 'Stock Return') {
+              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                rollbackStockReturn += t.quantity;
+              }
+              if (previousDayStr && dateStr === previousDayStr) {
+                stockReturnPreviousDay += t.quantity;
+              }
+            }
+          });
+          
+          const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
+          let verifyOpeningStock = openingStock - stockReturnPreviousDay;
+          const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
+          
+          return [
+            idx + 1,
+            p.name,
+            verifyOpeningStock || null,
+            rangeStockIn || null,
+            stockReturnPreviousDay || null,
+            rangeStockOut || null,
+            verifyClosingStock || null,
+            null
+          ];
+        });
       } else if (exportDocType === 'stock_out') {
         title = 'របាយការណ៍ស្តុកឡើងឡាន';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណ'];
@@ -3316,6 +3411,7 @@ const handleGeneralExport = async () => {
               th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
               th { background-color: #f8fafc; font-weight: bold; }
               td { text-align: center; }
+              td:nth-child(2) { text-align: left; }
             </style>
           </head>
           <body>
@@ -3326,7 +3422,7 @@ const handleGeneralExport = async () => {
                 <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
               </thead>
               <tbody>
-                ${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+                ${rows.map(row => `<tr>${row.map(cell => `<td>${(cell !== null && cell !== undefined && cell !== 'null' && cell !== 0 && cell !== '0') ? cell : ''}</td>`).join('')}</tr>`).join('')}
               </tbody>
             </table>
           </body>
@@ -3347,10 +3443,92 @@ const handleGeneralExport = async () => {
       let headers: string[] = [];
       let rows: any[][] = [];
 
+      const exportProductsList = [
+        { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
+        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
+        { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
+        { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
+        { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
+        { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
+        { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
+        { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
+        { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
+        { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
+        { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
+        { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
+        { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
+        { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
+        { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
+        { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
+        { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
+        { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
+        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
+        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
+        { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
+        { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
+        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
+        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
+        { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
+        { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
+        { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
+        { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
+        { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
+      ];
+      
       if (exportDocType === 'warehouse') {
         title = 'របាយការណ៍ស្តុកឃ្លាំង';
-        headers = ['ល.រ', 'ឈ្មោះទំនិញ', 'ស្តុកឃ្លាំង'];
-        rows = filteredWarehouseProducts.map((p, idx) => [idx + 1, p.name, p.warehouseStock || 0]);
+        headers = ['ល.រ', 'មុខទំនិញ', 'ស្តុកដើមគ្រា', 'ស្តុកចូល', 'ស្តុកឡើងឡាន', 'ស្តុកត្រឡប់', 'ចំនួនលក់', 'ដូរក្រវិល', 'ចំនួនថែម', 'ស្តុកសល់'];
+        rows = products.map((p, idx) => {
+          const currentStock = p.warehouseStock || 0;
+          let rangeStockIn = 0, rangeStockOut = 0, rangeStockReturn = 0, rangeStockSold = 0, rangeStockExchanged = 0, rangeStockPromo = 0;
+          let rollbackStockIn = 0, rollbackStockOut = 0, rollbackStockReturn = 0;
+          
+          const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
+          productStockIns.forEach(r => {
+            const item = r.items.find((i) => i.productName === p.name);
+            if (item) {
+              const dateStr = r.date ? r.date.split('T')[0] : '';
+              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) rangeStockIn += item.quantity;
+              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockIn += item.quantity;
+            }
+          });
+
+          const productTxs = transactions.filter(t => t.productName === p.name);
+          productTxs.forEach(t => {
+            const dateStr = t.date ? t.date.split('T')[0] : '';
+            const inRange = (!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate);
+              
+            if (t.type === 'Stock Out') {
+              if (inRange) rangeStockOut += t.quantity;
+              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockOut += t.quantity;
+            } else if (t.type === 'Stock Return') {
+              if (inRange) rangeStockReturn += t.quantity;
+              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockReturn += t.quantity;
+            } else if (t.type === 'Stock Sold') {
+              if (inRange) {
+                rangeStockSold += t.soldQty || t.quantity;
+                rangeStockExchanged += t.exchangedQty || 0;
+                rangeStockPromo += t.promoQty || 0;
+              }
+            }
+          });
+
+          const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
+          const closingStock = openingStock + rangeStockIn - rangeStockOut + rangeStockReturn;
+
+          return [
+            idx + 1,
+            p.name,
+            openingStock || null,
+            rangeStockIn || null,
+            rangeStockOut || null,
+            rangeStockReturn || null,
+            rangeStockSold || null,
+            rangeStockExchanged || null,
+            rangeStockPromo || null,
+            closingStock || null
+          ];
+        });
       } else if (exportDocType === 'stock_in') {
         title = 'របាយការណ៍ស្តុកចូល';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រគល់', 'ទំនិញ', 'បរិមាណ'];
@@ -3363,16 +3541,74 @@ const handleGeneralExport = async () => {
           r.items.map((i: any) => i.quantity).join(', ')
         ]);
       } else if (exportDocType === 'stock_count') {
-        title = 'របាយការណ៍ស្តុករាប់';
-        headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នករាប់', 'ទំនិញ', 'បរិមាណ'];
-        const counts = warehouseStockIns.filter(r => r.type === 'count');
-        rows = counts.map((r, idx) => [
-          idx + 1,
-          r.date,
-          r.deliverer,
-          r.items.map((i: any) => i.productName).join(', '),
-          r.items.map((i: any) => i.quantity).join(', ')
-        ]);
+        title = 'របាយការណ៍ស្តុករាប់បញ្ជាក់';
+        headers = ["ល.រ", "មុខទំនិញ", "ស្តុកក្នុងឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកឡើងឡាន", "ស្តុកសល់", "ផ្សេងៗ"];
+        
+        let previousDayStr = '';
+        if (filterTxStartDate) {
+          const d = new Date(filterTxStartDate + 'T00:00:00');
+          d.setDate(d.getDate() - 1);
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          previousDayStr = `${year}-${month}-${day}`;
+        }
+        
+        rows = products.map((p, idx) => {
+          const currentStock = p.warehouseStock || 0;
+          
+          let rangeStockIn = 0;
+          let rangeStockOut = 0;
+          let rollbackStockIn = 0;
+          let rollbackStockOut = 0;
+          let rollbackStockReturn = 0;
+          let stockReturnPreviousDay = 0;
+          
+          const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
+          productStockIns.forEach(r => {
+            const item = r.items.find((i: any) => i.productName === p.name);
+            if (item) {
+              const dateStr = r.date ? r.date.split('T')[0] : '';
+              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
+              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                rollbackStockIn += item.quantity;
+              }
+            }
+          });
+          
+          const productTxs = transactions.filter(t => t.productName === p.name);
+          productTxs.forEach(t => {
+            const dateStr = t.date ? t.date.split('T')[0] : '';
+            if (t.type === 'Stock Out') {
+              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockOut += t.quantity; }
+              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                rollbackStockOut += t.quantity;
+              }
+            } else if (t.type === 'Stock Return') {
+              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                rollbackStockReturn += t.quantity;
+              }
+              if (previousDayStr && dateStr === previousDayStr) {
+                stockReturnPreviousDay += t.quantity;
+              }
+            }
+          });
+          
+          const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
+          let verifyOpeningStock = openingStock - stockReturnPreviousDay;
+          const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
+          
+          return [
+            idx + 1,
+            p.name,
+            verifyOpeningStock || null,
+            rangeStockIn || null,
+            stockReturnPreviousDay || null,
+            rangeStockOut || null,
+            verifyClosingStock || null,
+            null
+          ];
+        });
       } else if (exportDocType === 'stock_out') {
         title = 'របាយការណ៍ស្តុកឡើងឡាន';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណ'];
@@ -3412,11 +3648,43 @@ const handleGeneralExport = async () => {
 
       ws.addRow([title]);
       ws.addRow(headers);
-      rows.forEach(r => ws.addRow(r));
+      rows.forEach(r => {
+        const processedRow = r.map(c => (c !== null && c !== undefined && c !== 'null' && c !== 0 && c !== '0') ? c : '');
+        ws.addRow(processedRow);
+      });
 
-      // Style header
-      ws.getRow(1).font = { bold: true, size: 16 };
+      // Format Columns nicely
+      ws.columns.forEach((col) => {
+        col.width = 15;
+        col.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+      ws.getColumn(2).width = 30; // មុខទំនិញ
+      ws.getColumn(2).alignment = { vertical: 'middle', horizontal: 'left' };
+
+      // Style Table
+      ws.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: {style:'thin'},
+            left: {style:'thin'},
+            bottom: {style:'thin'},
+            right: {style:'thin'}
+          };
+        });
+      });
+
+      // Style header rows
+      ws.getRow(1).font = { bold: true, size: 16, name: 'Khmer OS Muol Light' };
+      ws.getRow(1).getCell(1).border = undefined;
+      ws.mergeCells(1, 1, 1, headers.length);
+      ws.getRow(1).getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
       ws.getRow(2).font = { bold: true };
+      ws.getRow(2).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF8FAFC' }
+      };
       
       const buffer = await workbook.xlsx.writeBuffer();
       saveAs(new Blob([buffer]), `${title}.xlsx`);
@@ -5882,13 +6150,8 @@ const handleExportSelectedUserStockExcel = async () => {
                   onChange={(e) => setExportDocType(e.target.value)}
                   className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 cursor-pointer transition"
                 >
-                  <option value="reports">របាយការណ៍</option>
                   <option value="warehouse">ស្តុកឃ្លាំង</option>
-                  <option value="stock_in">ស្តុកចូល</option>
-                  <option value="stock_count">ស្តុករាប់</option>
-                  <option value="stock_out">ស្តុកឡើងឡាន</option>
-                  <option value="stock_sold">ស្តុកលក់</option>
-                  <option value="stock_return">ស្តុកត្រឡប់</option>
+                  <option value="stock_count">ស្តុករាប់បញ្ជាក់</option>
                   <option value="stock_lost_excess">ស្តុកបាត់/លើស</option>
                 </select>
               </div>
