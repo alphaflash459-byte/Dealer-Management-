@@ -1,0 +1,70 @@
+      } else if (exportDocType === 'stock_count') {
+        title = 'របាយការណ៍ស្តុករាប់បញ្ជាក់';
+        headers = ["ល.រ", "មុខទំនិញ", "ស្តុកក្នុងឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកឡើងឡាន", "ស្តុកសល់", "ផ្សេងៗ"];
+        
+        let previousDayStr = '';
+        if (filterTxStartDate) {
+          const d = new Date(filterTxStartDate + 'T00:00:00');
+          d.setDate(d.getDate() - 1);
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          previousDayStr = `${year}-${month}-${day}`;
+        }
+        
+        rows = products.map((p, idx) => {
+          const currentStock = p.warehouseStock || 0;
+          
+          let rangeStockIn = 0;
+          let rangeStockOut = 0;
+          let rollbackStockIn = 0;
+          let rollbackStockOut = 0;
+          let rollbackStockReturn = 0;
+          let stockReturnPreviousDay = 0;
+          
+          const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
+          productStockIns.forEach(r => {
+            const item = r.items.find((i: any) => i.productName === p.name);
+            if (item) {
+              const dateStr = r.date ? r.date.split('T')[0] : '';
+              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
+              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                rollbackStockIn += item.quantity;
+              }
+            }
+          });
+          
+          const productTxs = transactions.filter(t => t.productName === p.name);
+          productTxs.forEach(t => {
+            const dateStr = t.date ? t.date.split('T')[0] : '';
+            if (t.type === 'Stock Out') {
+              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockOut += t.quantity; }
+              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                rollbackStockOut += t.quantity;
+              }
+            } else if (t.type === 'Stock Return') {
+              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+                rollbackStockReturn += t.quantity;
+              }
+              if (previousDayStr && dateStr === previousDayStr) {
+                stockReturnPreviousDay += t.quantity;
+              }
+            }
+          });
+          
+          const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
+          let verifyOpeningStock = openingStock - stockReturnPreviousDay;
+          const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
+          
+          return [
+            idx + 1,
+            p.name,
+            verifyOpeningStock || null,
+            rangeStockIn || null,
+            stockReturnPreviousDay || null,
+            rangeStockOut || null,
+            verifyClosingStock || null,
+            null
+          ];
+        });
+      } else if (exportDocType === 'stock_out') {
