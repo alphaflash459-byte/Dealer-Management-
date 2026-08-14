@@ -102,7 +102,7 @@ Extract the data into a structured JSON array. Each item MUST have ALL of the fo
 
 Ensure the output is ONLY a valid JSON array matching the structure. Do not wrap the JSON in markdown codeblocks like \`\`\`json. Return raw JSON.`;
 
-      const modelsToTry = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-pro-latest"];
+      const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
       let response;
       let lastError: any = null;
 
@@ -152,7 +152,7 @@ Ensure the output is ONLY a valid JSON array matching the structure. Do not wrap
             console.warn(`Gemini API Warning on ${modelName} (retries left: ${retries}):`, e.message || e);
             
             const isRateLimit = e.status === 429 || e.status === "RESOURCE_EXHAUSTED" || errStr.includes("429") || errStr.includes("Quota") || errStr.includes("RESOURCE_EXHAUSTED");
-            const isUnavailable = e.status === "UNAVAILABLE" || errStr.includes("503");
+            const isUnavailable = e.status === "UNAVAILABLE" || errStr.includes("503") || errStr.includes("fetch failed") || errStr.includes("ETIMEDOUT") || errStr.includes("ECONNRESET");
 
             if (isRateLimit) {
               console.log(`Rate limit / Quota reached for ${modelName}. Moving to next model if limit is 0, or waiting if it's transient...`);

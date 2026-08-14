@@ -117,6 +117,54 @@ interface AdminDashboardProps {
   setIsAIScannerModalOpen: (val: boolean) => void;
 }
 
+
+export const formatExcelCellFont = (cell: any, defaultSize: number = 10, fontStyle: any = {}) => {
+  const existingFont = cell.font || {};
+  const finalFontStyle = { ...existingFont, ...fontStyle };
+  if (cell.value != null && typeof cell.value !== 'object') {
+    const str = cell.value.toString();
+    const hasKhmer = /[\u1780-\u17FF\u19E0-\u19FF]/.test(str);
+    const hasNonKhmer = /[^\u1780-\u17FF\u19E0-\u19FF\u200B\s]/.test(str);
+    
+    let khSize = 10;
+    let enSize = 12;
+    
+    if (hasKhmer && hasNonKhmer) {
+      const parts = str.split(/([\u1780-\u17FF\u19E0-\u19FF\u200B]+)/g);
+      const segments = [];
+      for (const part of parts) {
+        if (!part) continue;
+        if (/^[\u1780-\u17FF\u19E0-\u19FF\u200B]+$/.test(part)) {
+          segments.push({ font: { ...finalFontStyle, name: 'Khmer OS Muol Light', size: khSize }, text: part });
+        } else {
+          segments.push({ font: { ...finalFontStyle, name: 'Times New Roman', size: enSize }, text: part });
+        }
+      }
+      cell.value = { richText: segments };
+    } else if (hasKhmer) {
+      cell.font = { ...finalFontStyle, name: 'Khmer OS Muol Light', size: khSize };
+    } else {
+      cell.font = { ...finalFontStyle, name: 'Times New Roman', size: enSize };
+    }
+  } else {
+    cell.font = { ...finalFontStyle, name: 'Times New Roman', size: 12 };
+  }
+};
+
+export const formatHtmlText = (str: string | number) => {
+  if (str == null) return '';
+  const text = str.toString();
+  const parts = text.split(/([\u1780-\u17FF\u19E0-\u19FF\u200B]+)/g);
+  return parts.map(part => {
+    if (!part) return '';
+    if (/^[\u1780-\u17FF\u19E0-\u19FF\u200B]+$/.test(part)) {
+      return `<span style="font-family: 'Khmer OS Muol Light'; font-size: 10px;">${part}</span>`;
+    } else {
+      return `<span style="font-family: 'Times New Roman'; font-size: 12px;">${part}</span>`;
+    }
+  }).join('');
+};
+
 export default function AdminDashboard({ currentUser, users, setUsers, transactions, products, stockOrders, activeTab, isAIScannerModalOpen, setIsAIScannerModalOpen }: AdminDashboardProps) {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFileType, setExportFileType] = useState<'pdf' | 'excel'>('excel');
@@ -352,7 +400,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       }
       const qty = parseInt(item.quantity);
       if (isNaN(qty) || qty <= 0) {
-        alert(`ចំនួនសម្រាប់ទំនិញ "${item.productName}" ត្រូវតែជាលេខវិជ្ជមាន!`);
+        alert(`ចំនួនសម្រាប់ទំនិញ "${formatHtmlText(item.productName)}" ត្រូវតែជាលេខវិជ្ជមាន!`);
         return;
       }
     }
@@ -608,7 +656,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       }
       const qty = parseInt(item.quantity);
       if (isNaN(qty) || qty <= 0) {
-        alert(`ចំនួនសម្រាប់ទំនិញ "${item.productName}" ត្រូវតែជាលេខវិជ្ជមាន!`);
+        alert(`ចំនួនសម្រាប់ទំនិញ "${formatHtmlText(item.productName)}" ត្រូវតែជាលេខវិជ្ជមាន!`);
         return;
       }
     }
@@ -744,7 +792,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       }
       const qty = parseInt(item.quantity);
       if (isNaN(qty) || qty <= 0) {
-        alert(`ចំនួនសម្រាប់ទំនិញ "${item.productName}" ត្រូវតែជាលេខវិជ្ជមាន!`);
+        alert(`ចំនួនសម្រាប់ទំនិញ "${formatHtmlText(item.productName)}" ត្រូវតែជាលេខវិជ្ជមាន!`);
         return;
       }
     }
@@ -1885,7 +1933,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       return `
         <tr style="border-bottom: 1px solid #000;">
           <td style="padding: 4px 8px; text-align: left;">
-            <div style="font-weight: 700; color: #1e293b; font-size: 13px;">${item.productName}</div>
+            <div style="font-weight: 700; color: #1e293b; font-size: 13px;">${formatHtmlText(item.productName)}</div>
             ${promoInfo}
           </td>
           <td style="padding: 4px 8px; text-align: center; font-weight: 800; color: #059669; font-size: 13px;">${item.quantity}</td>
@@ -1898,11 +1946,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     printWindow.document.write(`
       <html>
         <head>
-          <title>វិក្កយបត្រ - ${invoice.customerName}</title>
+          <title>វិក្កយបត្រ - ${formatHtmlText(invoice.customerName)}</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Moul&family=Inter:wght@400;500;700;900&family=Kantumruy+Pro:wght@400;500;700;900&display=swap');
             body {
-              font-family: 'Khmer OS Muol Light', 'Moul', 'Kantumruy Pro', 'Inter', sans-serif;
+              font-family: 'Khmer OS Muol Light', 'Times New Roman', serif;
               color: #1e293b;
               margin: 0;
               padding: 40px;
@@ -2043,12 +2091,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             <div class="info-grid">
               <div class="info-row">
                 <span class="info-label">អតិថិជន:</span>
-                <span class="info-value" style="font-size: 15px;">${invoice.customerName}</span>
+                <span class="info-value" style="font-size: 15px;">${formatHtmlText(invoice.customerName)}</span>
               </div>
               ${invoice.location ? `
                 <div class="info-row" style="margin-top: 12px;">
                   <span class="info-label">ទីតាំង:</span>
-                  <span class="info-value">${invoice.location}</span>
+                  <span class="info-value">${formatHtmlText(invoice.location)}</span>
                 </div>
               ` : ''}
             </div>
@@ -2192,13 +2240,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
         return `
           <tr style="border-bottom: 1px solid #000;">
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${p.productName}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${formatHtmlText(p.productName)}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #e11d48; text-align: center;">${p.stockOut || ''}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #059669; text-align: center;">${p.stockSold || ''}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #8b5cf6; text-align: center;">${p.stockExchanged || ''}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #f59e0b; text-align: center;">${p.stockPromo || ''}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #4f46e5; text-align: center;">${p.stockReturn || ''}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: right;"><span style="${statusColor}">${statusText}</span></td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: right;"><span style="${statusColor}">${formatHtmlText(statusText)}</span></td>
           </tr>
         `;
       }).join('');
@@ -2229,7 +2277,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
           <div class="meta-info">
             <div class="meta-item"><span class="label">ឈ្មោះអ្នកលក់៖</span> <span class="value" style="color:#e11d48;">${user.username}</span></div>
-            <div class="meta-item"><span class="label">កាលបរិច្ឆេទ៖</span> <span class="value">${dateRangeText}</span></div>
+            <div class="meta-item"><span class="label">កាលបរិច្ឆេទ៖</span> <span class="value">${formatHtmlText(dateRangeText)}</span></div>
             <div class="meta-item"><span class="label">លេខទូរសព្ទ៖</span> <span class="value">${user.phone || '...............'}</span></div>
             <div class="meta-item"><span class="label">ផ្លាកលេខឡាន៖</span> <span class="value">${user.carPlate || '...............'}</span></div>
             <div class="meta-item"><span class="label">តំបន់លក់៖</span> <span class="value">${user.salesArea || '...............'}</span></div>
@@ -2291,7 +2339,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Moul&family=Inter:wght@400;500;700;900&family=Kantumruy+Pro:wght@400;500;700;900&display=swap');
             body {
-              font-family: 'Khmer OS Muol Light', 'Moul', 'Kantumruy Pro', 'Inter', sans-serif;
+              font-family: 'Khmer OS Muol Light', 'Times New Roman', serif;
               color: #334155;
               padding: 40px;
               line-height: 1.5;
@@ -2310,7 +2358,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               font-size: 11px;
               color: #64748b;
               margin-bottom: 20px;
-              font-family: 'Inter', sans-serif;
+              font-family: 'Times New Roman', 'Khmer OS Muol Light', serif;
             }
             .header {
               text-align: center;
@@ -2505,9 +2553,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       if (dbName === 'WICE') dbName = 'WURKZ ICE';
       if (dbName === 'WURKZ ORD') dbName = 'W ORD';
       if (dbName === 'DAZZ ORD') dbName = 'D ORD';
-      if (dbName === 'CED ORD') dbName = 'CBC ORD';
+      if (dbName === 'EXP330 ORD') dbName = 'EXP ORD';
+      if (dbName === 'EXP300') dbName = 'EXP 300';
+      if (dbName === 'EXP330') dbName = 'EXP 330';
       
-      const actualProduct = products.find(prod => prod.name === dbName || prod.name === p.code);
+      
+      const actualProduct = products.find(prod => prod.name === dbName || prod.name === p.code || prod.name.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
       const currentStock = actualProduct?.warehouseStock || 0;
       
       let rangeStockIn = 0;
@@ -2517,10 +2568,10 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       let rollbackStockReturn = 0;
       let stockReturnPreviousDay = 0;
       
-      let rangeStockCount = 0;
+      let rangeStockCount: number | null = null;
       const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
       productStockIns.forEach(r => {
-        const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName);
+        const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName || i.productName.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
         if (item) {
           const dateStr = r.date ? r.date.split('T')[0] : '';
           if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
@@ -2532,14 +2583,14 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       
       const stockCounts = warehouseStockIns.filter(r => r.type === 'count');
       stockCounts.forEach(r => {
-        const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName);
+        const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName || i.productName.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
         if (item) {
           const dateStr = r.date ? r.date.split('T')[0] : '';
-          if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockCount += item.quantity; }
+          if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockCount = (rangeStockCount || 0) + item.quantity; }
         }
       });
       
-      const productTxs = transactions.filter(t => t.productName === p.code || t.productName === dbName);
+      const productTxs = transactions.filter(t => t.productName === p.code || t.productName === dbName || t.productName.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
       productTxs.forEach(t => {
         const dateStr = t.date ? t.date.split('T')[0] : '';
         if (t.type === 'Stock Out') {
@@ -2561,6 +2612,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       let verifyOpeningStock = openingStock - stockReturnPreviousDay;
       const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
       
+      const verifyDiff = (rangeStockCount || 0) - (verifyClosingStock || 0);
+
       const addedRow = ws.addRow([
         toKhmerNumeralLocal(rowIndex++),
         p.khmerName,
@@ -2570,11 +2623,23 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         stockReturnPreviousDay || null,
         rangeStockOut || null,
         verifyClosingStock || null,
-        rangeStockCount || null,
-        null
+        rangeStockCount,
+        verifyDiff
       ]);
-      const rNum = addedRow.number;
-      addedRow.getCell(10).value = { formula: `H${rNum}-I${rNum}` };
+      
+      const diffCell = addedRow.getCell(10);
+      if (verifyDiff !== null) {
+        if (verifyDiff === 0) {
+          diffCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } };
+          diffCell.font = { color: { argb: 'FF006100' }, bold: true };
+        } else if (verifyDiff < 0) {
+          diffCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } };
+          diffCell.font = { color: { argb: 'FF9C0006' }, bold: true };
+        } else {
+          diffCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEB9C' } };
+          diffCell.font = { color: { argb: 'FF9C5700' }, bold: true };
+        }
+      }
     });
     
     ws.mergeCells('A1:J1');
@@ -2587,15 +2652,6 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     ws.columns = [
       { width: 10 }, { width: 41 }, { width: 17 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }
     ];
-
-    ws.addConditionalFormatting({
-      ref: `J3:J${ws.rowCount}`,
-      rules: [
-        { type: 'cellIs', operator: 'equal', formulae: ['0'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFC6EFCE' } }, font: { color: { argb: 'FF006100' } } } },
-        { type: 'cellIs', operator: 'greaterThan', formulae: ['0'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFFC7CE' } }, font: { color: { argb: 'FF9C0006' } } } },
-        { type: 'cellIs', operator: 'lessThan', formulae: ['0'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFFEB9C' } }, font: { color: { argb: 'FF9C5700' } } } }
-      ]
-    });
     
     ws.eachRow((row, rowNumber) => {
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -2612,7 +2668,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
           } else {
             if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
-              cell.font = { ...fontStyle, name: 'Khmer OS Siemreap', size: 11 };
+              cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
             } else {
               cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
             }
@@ -2700,9 +2756,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       if (dbName === 'WICE') dbName = 'WURKZ ICE';
       if (dbName === 'WURKZ ORD') dbName = 'W ORD';
       if (dbName === 'DAZZ ORD') dbName = 'D ORD';
-      if (dbName === 'CED ORD') dbName = 'CBC ORD';
+      if (dbName === 'EXP330 ORD') dbName = 'EXP ORD';
+      if (dbName === 'EXP300') dbName = 'EXP 300';
+      if (dbName === 'EXP330') dbName = 'EXP 330';
       
-      const actualProduct = products.find(prod => prod.name === dbName || prod.name === p.code);
+      
+      const actualProduct = products.find(prod => prod.name === dbName || prod.name === p.code || prod.name.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
       const currentStock = actualProduct?.warehouseStock || 0;
       
       let rangeStockIn = 0, rangeStockOut = 0, rangeStockReturn = 0, rangeStockSold = 0, rangeStockExchanged = 0, rangeStockPromo = 0;
@@ -2710,7 +2769,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       
       const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
       productStockIns.forEach(r => {
-        const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName);
+        const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName || i.productName.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
         if (item) {
           const dateStr = r.date ? r.date.split('T')[0] : '';
           if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) rangeStockIn += item.quantity;
@@ -2718,7 +2777,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         }
       });
       
-      const productTxs = transactions.filter(t => t.productName === p.code || t.productName === dbName);
+      const productTxs = transactions.filter(t => t.productName === p.code || t.productName === dbName || t.productName.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
       productTxs.forEach(t => {
         const dateStr = t.date ? t.date.split('T')[0] : '';
         const inRange = (!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate);
@@ -2778,7 +2837,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
           } else {
             if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
-              cell.font = { ...fontStyle, name: 'Khmer OS Siemreap', size: 11 };
+              cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
             } else {
               cell.font = { ...fontStyle, name: 'Times New Roman', size: 14 };
             }
@@ -2879,7 +2938,7 @@ const handleExportLostExcessExcel = async () => {
         if (pName === 'WURKZ ICE') pName = 'WICE';
         if (pName === 'W ORD') pName = 'WURKZ ORD';
         if (pName === 'D ORD') pName = 'DAZZ ORD';
-        if (pName === 'CBC ORD') pName = 'CED ORD';
+        
 
         const txDate = t.date ? t.date.split('T')[0] : 'Unknown Date';
         if (!datesMap[txDate]) datesMap[txDate] = {};
@@ -3026,7 +3085,7 @@ const handleExportLostExcessExcel = async () => {
       ws.getRow(1).getCell(1).font = { name: 'Khmer OS Muol Light', size: 16, bold: true };
       ws.getRow(1).getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
       
-      ws.getRow(2).font = { name: 'Khmer OS Siemreap', size: 12, bold: true };
+      ws.getRow(2).font = { name: 'Khmer OS Muol Light', size: 12, bold: true };
       ws.getRow(2).alignment = { vertical: 'middle' };
       
       const headerRow = ws.getRow(3);
@@ -3039,17 +3098,18 @@ const handleExportLostExcessExcel = async () => {
 
       for (let i = 4; i <= ws.rowCount; i++) {
         const row = ws.getRow(i);
-        row.font = { name: 'Khmer OS Siemreap', size: 11 };
+        row.font = { name: 'Khmer OS Muol Light', size: 11 };
         row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
         row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
         row.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
         row.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
         row.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
         
-        row.getCell(4).font = { name: 'Khmer OS Siemreap', size: 11, color: { argb: 'FFFF0000' }, bold: true };
-        row.getCell(5).font = { name: 'Khmer OS Siemreap', size: 11, color: { argb: 'FFD97706' }, bold: true };
+        row.getCell(4).font = { name: 'Khmer OS Muol Light', size: 11, color: { argb: 'FFFF0000' }, bold: true };
+        row.getCell(5).font = { name: 'Khmer OS Muol Light', size: 11, color: { argb: 'FFD97706' }, bold: true };
 
         row.eachCell((cell) => {
+          formatExcelCellFont(cell, 10);
           cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
         });
       }
@@ -3157,7 +3217,7 @@ const handleExportLostExcessExcel = async () => {
           <tr style="border-bottom: 1px solid #000;">
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: center;">${k + 1}</td>
             ${dateTd}
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${p.productName}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${formatHtmlText(p.productName)}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #e11d48; text-align: center;">${lost}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #d97706; text-align: center;">${excess}</td>
           </tr>
@@ -3170,7 +3230,7 @@ const handleExportLostExcessExcel = async () => {
         <div class="page-break">
           <h2>របាយការណ៍បាត់/លើស</h2>
           <p>ឈ្មោះអ្នកប្រើប្រាស់៖ ${user.username || user.id}</p>
-          <p>កាលបរិច្ឆេទ៖ ${dateRangeText}</p>
+          <p>កាលបរិច្ឆេទ៖ ${formatHtmlText(dateRangeText)}</p>
           <table>
             <thead>
               <tr>
@@ -3201,14 +3261,14 @@ const handleExportLostExcessExcel = async () => {
           <title>របាយការណ៍ស្តុកបាត់និងលើស</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Moul&family=Inter:wght@400;500;700;900&family=Kantumruy+Pro:wght@400;500;700;900&display=swap');
-            body { font-family: 'Kantumruy Pro', sans-serif; padding: 20px; }
+            body { font-family: 'Khmer OS Muol Light', 'Times New Roman', serif; padding: 20px; }
             .page-break { page-break-after: always; margin-bottom: 30px; }
             .page-break:last-child { page-break-after: auto; }
-            h2 { font-family: 'Moul', serif; text-align: center; font-size: 24px; margin-bottom: 5px; }
+            h2 { font-family: 'Khmer OS Muol Light', 'Times New Roman', serif; text-align: center; font-size: 24px; margin-bottom: 5px; }
             p { text-align: center; margin-bottom: 10px; font-size: 14px; font-weight: bold; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #000; padding: 8px; font-size: 13px; }
-            th { background-color: #f8fafc; font-family: 'Moul', serif; }
+            th { background-color: #f8fafc; font-family: 'Khmer OS Muol Light', 'Times New Roman', serif; }
           </style>
         </head>
         <body>
@@ -3231,6 +3291,26 @@ const handleExportLostExcessExcel = async () => {
     setIsExportModalOpen(false);
   };
 const handleGeneralExport = async () => {
+
+      const isSameProduct = (n1: string, n2: string) => {
+        let a = n1; let b = n2;
+        if (a === 'WURKZ ICE') a = 'WICE';
+        if (a === 'W ORD') a = 'WURKZ ORD';
+        if (a === 'D ORD') a = 'DAZZ ORD';
+        if (a === 'EXP ORD' || a === 'EXP 330 ORD') a = 'EXP330 ORD';
+        if (a === 'EXP 300') a = 'EXP300';
+        if (a === 'EXP 330') a = 'EXP330';
+        
+        if (b === 'WURKZ ICE') b = 'WICE';
+        if (b === 'W ORD') b = 'WURKZ ORD';
+        if (b === 'D ORD') b = 'DAZZ ORD';
+        if (b === 'EXP ORD' || b === 'EXP 330 ORD') b = 'EXP330 ORD';
+        if (b === 'EXP 300') b = 'EXP300';
+        if (b === 'EXP 330') b = 'EXP330';
+        
+        if (a === b) return true;
+        return a.replace(/\s+/g, '') === b.replace(/\s+/g, '');
+      };
 
     if (exportDocType === 'reports') {
       if (exportFileType === 'pdf') {
@@ -3299,7 +3379,7 @@ const handleGeneralExport = async () => {
           
           const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
           productStockIns.forEach(r => {
-            const item = r.items.find((i) => i.productName === p.name);
+            const item = r.items.find((i) => isSameProduct(i.productName, p.name));
             if (item) {
               const dateStr = r.date ? r.date.split('T')[0] : '';
               if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) rangeStockIn += item.quantity;
@@ -3307,7 +3387,7 @@ const handleGeneralExport = async () => {
             }
           });
 
-          const productTxs = transactions.filter(t => t.productName === p.name);
+          const productTxs = transactions.filter(t => isSameProduct(t.productName, p.name));
           productTxs.forEach(t => {
             const dateStr = t.date ? t.date.split('T')[0] : '';
             const inRange = (!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate);
@@ -3375,13 +3455,13 @@ const handleGeneralExport = async () => {
           let rangeStockOut = 0;
           let rollbackStockIn = 0;
           let rollbackStockOut = 0;
-          let rollbackStockReturn = 0;
           let stockReturnPreviousDay = 0;
-          
-          let rangeStockCount = 0;
+          let rollbackStockReturn = 0;
+          let rangeStockCount: number | null = null;
+
           const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
           productStockIns.forEach(r => {
-            const item = r.items.find((i: any) => i.productName === p.name);
+            const item = r.items.find((i: any) => isSameProduct(i.productName, p.name));
             if (item) {
               const dateStr = r.date ? r.date.split('T')[0] : '';
               if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
@@ -3390,16 +3470,17 @@ const handleGeneralExport = async () => {
               }
             }
           });
+          
           const stockCounts = warehouseStockIns.filter(r => r.type === 'count');
           stockCounts.forEach(r => {
-            const item = r.items.find((i: any) => i.productName === p.name);
+            const item = r.items.find((i: any) => isSameProduct(i.productName, p.name));
             if (item) {
               const dateStr = r.date ? r.date.split('T')[0] : '';
-              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockCount += item.quantity; }
+              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockCount = (rangeStockCount || 0) + item.quantity; }
             }
           });
           
-          const productTxs = transactions.filter(t => t.productName === p.name);
+          const productTxs = transactions.filter(t => isSameProduct(t.productName, p.name));
           productTxs.forEach(t => {
             const dateStr = t.date ? t.date.split('T')[0] : '';
             if (t.type === 'Stock Out') {
@@ -3421,6 +3502,8 @@ const handleGeneralExport = async () => {
           let verifyOpeningStock = openingStock - stockReturnPreviousDay;
           const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
           
+          const verifyDiff = (rangeStockCount || 0) - (verifyClosingStock || 0);
+
           return [
             idx + 1,
             p.name,
@@ -3429,8 +3512,8 @@ const handleGeneralExport = async () => {
             stockReturnPreviousDay || null,
             rangeStockOut || null,
             verifyClosingStock || null,
-            rangeStockCount || null,
-            null
+            rangeStockCount,
+            verifyDiff
           ];
         });
       } else if (exportDocType === 'stock_out') {
@@ -3481,8 +3564,8 @@ const handleGeneralExport = async () => {
             <title>${title}</title>
             <style>
               @import url('https://fonts.googleapis.com/css2?family=Moul&family=Inter:wght@400;500;700;900&family=Kantumruy+Pro:wght@400;500;700;900&display=swap');
-              body { font-family: 'Kantumruy Pro', sans-serif; padding: 20px; }
-              h2 { font-family: 'Moul', serif; text-align: center; font-size: 24px; margin-bottom: 5px; }
+              body { font-family: 'Khmer OS Muol Light', 'Times New Roman', serif; padding: 20px; }
+              h2 { font-family: 'Khmer OS Muol Light', 'Times New Roman', serif; text-align: center; font-size: 24px; margin-bottom: 5px; }
               p { text-align: center; margin-bottom: 20px; font-size: 14px; }
               table { width: 100%; border-collapse: collapse; }
               th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
@@ -3493,13 +3576,27 @@ const handleGeneralExport = async () => {
           </head>
           <body>
             <h2>${title}</h2>
-            <p>កាលបរិច្ឆេទ៖ ${dateRangeText}</p>
+            <p>កាលបរិច្ឆេទ៖ ${formatHtmlText(dateRangeText)}</p>
             <table>
               <thead>
-                <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                <tr>${headers.map(h => `<th>${formatHtmlText(h)}</th>`).join('')}</tr>
               </thead>
               <tbody>
-                ${rows.map(row => `<tr>${row.map(cell => `<td>${(cell !== null && cell !== undefined && cell !== 'null' && cell !== 0 && cell !== '0') ? cell : ''}</td>`).join('')}</tr>`).join('')}
+                ${rows.map(row => `<tr>${row.map((cell, cIdx) => {
+                  let style = '';
+                  let displayVal = (cell !== null && cell !== undefined && cell !== 'null' && cell !== 0 && cell !== '0') ? cell : '';
+                  if (exportDocType === 'stock_count' && (cIdx === 7 || cIdx === 8) && cell !== null && cell !== undefined && cell !== 'null') {
+                    displayVal = cell;
+                  }
+                  if (exportDocType === 'stock_count' && cIdx === 8 && cell !== null && cell !== undefined && cell !== 'null') {
+                    displayVal = cell;
+                    const val = Number(cell);
+                    if (val === 0) style = 'background-color: #C6EFCE; color: #006100; font-weight: bold;';
+                    else if (val < 0) style = 'background-color: #FFC7CE; color: #9C0006; font-weight: bold;';
+                    else style = 'background-color: #FFEB9C; color: #9C5700; font-weight: bold;';
+                  }
+                  return `<td style="${style}">${formatHtmlText(displayVal)}</td>`;
+                }).join('')}</tr>`).join('')}
               </tbody>
             </table>
           </body>
@@ -3562,7 +3659,7 @@ const handleGeneralExport = async () => {
           
           const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
           productStockIns.forEach(r => {
-            const item = r.items.find((i) => i.productName === p.name);
+            const item = r.items.find((i) => isSameProduct(i.productName, p.name));
             if (item) {
               const dateStr = r.date ? r.date.split('T')[0] : '';
               if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) rangeStockIn += item.quantity;
@@ -3570,7 +3667,7 @@ const handleGeneralExport = async () => {
             }
           });
 
-          const productTxs = transactions.filter(t => t.productName === p.name);
+          const productTxs = transactions.filter(t => isSameProduct(t.productName, p.name));
           productTxs.forEach(t => {
             const dateStr = t.date ? t.date.split('T')[0] : '';
             const inRange = (!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate);
@@ -3638,12 +3735,13 @@ const handleGeneralExport = async () => {
           let rangeStockOut = 0;
           let rollbackStockIn = 0;
           let rollbackStockOut = 0;
-          let rollbackStockReturn = 0;
           let stockReturnPreviousDay = 0;
-          
+          let rollbackStockReturn = 0;
+          let rangeStockCount: number | null = null;
+
           const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
           productStockIns.forEach(r => {
-            const item = r.items.find((i: any) => i.productName === p.name);
+            const item = r.items.find((i: any) => isSameProduct(i.productName, p.name));
             if (item) {
               const dateStr = r.date ? r.date.split('T')[0] : '';
               if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
@@ -3653,7 +3751,16 @@ const handleGeneralExport = async () => {
             }
           });
           
-          const productTxs = transactions.filter(t => t.productName === p.name);
+          const stockCounts = warehouseStockIns.filter(r => r.type === 'count');
+          stockCounts.forEach(r => {
+            const item = r.items.find((i: any) => isSameProduct(i.productName, p.name));
+            if (item) {
+              const dateStr = r.date ? r.date.split('T')[0] : '';
+              if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockCount = (rangeStockCount || 0) + item.quantity; }
+            }
+          });
+          
+          const productTxs = transactions.filter(t => isSameProduct(t.productName, p.name));
           productTxs.forEach(t => {
             const dateStr = t.date ? t.date.split('T')[0] : '';
             if (t.type === 'Stock Out') {
@@ -3675,6 +3782,8 @@ const handleGeneralExport = async () => {
           let verifyOpeningStock = openingStock - stockReturnPreviousDay;
           const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
           
+          const verifyDiff = (rangeStockCount || 0) - (verifyClosingStock || 0);
+
           return [
             idx + 1,
             p.name,
@@ -3683,8 +3792,8 @@ const handleGeneralExport = async () => {
             stockReturnPreviousDay || null,
             rangeStockOut || null,
             verifyClosingStock || null,
-            null,
-            null
+            rangeStockCount,
+            verifyDiff
           ];
         });
       } else if (exportDocType === 'stock_out') {
@@ -3724,12 +3833,31 @@ const handleGeneralExport = async () => {
         ]);
       }
 
-      ws.addRow([title]);
-      ws.addRow(headers);
+      const tRow = ws.addRow([title]); tRow.eachCell(c => formatExcelCellFont(c, 14, { bold: true }));
+      const hRow = ws.addRow(headers); hRow.eachCell(c => formatExcelCellFont(c, 10, { bold: true }));
       rows.forEach(r => {
-        const processedRow = r.map(c => (c !== null && c !== undefined && c !== 'null' && c !== 0 && c !== '0') ? c : '');
-        ws.addRow(processedRow);
+        const processedRow = r.map((c, idx) => {
+          if (exportDocType === 'stock_count' && (idx === 7 || idx === 8)) {
+            return (c !== null && c !== undefined && c !== 'null') ? c : '';
+          }
+          return (c !== null && c !== undefined && c !== 'null' && c !== 0 && c !== '0') ? c : '';
+        });
+        const rObj = ws.addRow(processedRow); rObj.eachCell((cell) => formatExcelCellFont(cell));
       });
+      
+      if (exportDocType === 'stock_count') {
+        ws.addConditionalFormatting({
+          ref: `I3:I${ws.rowCount}`,
+          rules: [
+            // @ts-ignore
+            { type: 'cellIs', operator: 'equal', formulae: ['0'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFC6EFCE' } }, font: { color: { argb: 'FF006100' } } } },
+            // @ts-ignore
+            { type: 'cellIs', operator: 'lessThan', formulae: ['0'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFFC7CE' } }, font: { color: { argb: 'FF9C0006' } } } },
+            // @ts-ignore
+            { type: 'cellIs', operator: 'greaterThan', formulae: ['0'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFFEB9C' } }, font: { color: { argb: 'FF9C5700' } } } }
+          ]
+        });
+      }
 
       // Format Columns nicely
       ws.columns.forEach((col) => {
@@ -3859,7 +3987,7 @@ const handleExportSelectedUserStockExcel = async () => {
         if (pName === 'WURKZ ICE') pName = 'WICE';
         if (pName === 'W ORD') pName = 'WURKZ ORD';
         if (pName === 'D ORD') pName = 'DAZZ ORD';
-        if (pName === 'CBC ORD') pName = 'CED ORD';
+        
 
         if (!groupedMap[pName]) {
           groupedMap[pName] = { stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0 };
@@ -4011,14 +4139,14 @@ const handleExportSelectedUserStockExcel = async () => {
             right: { style: 'thin', color: { argb: 'FF002060' } }
           };
 
-          let fontStyle: Partial<ExcelJS.Font> = { name: 'Khmer OS Siemreap', size: 11, color: { argb: 'FF002060' } };
+          let fontStyle: Partial<ExcelJS.Font> = { name: 'Khmer OS Muol Light', size: 11, color: { argb: 'FF002060' } };
           let alignStyle: Partial<ExcelJS.Alignment> = { vertical: 'middle', horizontal: 'center', wrapText: true };
 
           if (rowNumber === 1) {
             fontStyle = { name: 'Khmer OS Muol Light', size: 14, color: { argb: 'FF002060' }, bold: true };
             borderStyle = {};
           } else if (rowNumber === 2) {
-            fontStyle = { name: 'Khmer OS Siemreap', size: 11, color: { argb: 'FF002060' }, bold: true };
+            fontStyle = { name: 'Khmer OS Muol Light', size: 11, color: { argb: 'FF002060' }, bold: true };
             alignStyle = { vertical: 'middle', horizontal: 'left' };
             borderStyle = { bottom: { style: 'dotted', color: { argb: 'FF002060' } } };
           } else if (rowNumber === 3) {
@@ -4026,9 +4154,9 @@ const handleExportSelectedUserStockExcel = async () => {
           } else if (rowNumber > 3) {
             if (colNumber === 2 || colNumber === 3) {
               alignStyle = { vertical: 'middle', horizontal: 'left', wrapText: true };
-              fontStyle = { name: 'Khmer OS Siemreap', size: 11, color: { argb: 'FF002060' }, bold: true };
+              fontStyle = { name: 'Khmer OS Muol Light', size: 11, color: { argb: 'FF002060' }, bold: true };
             } else if (colNumber === 1) {
-               fontStyle = { name: 'Khmer OS Siemreap', size: 11, color: { argb: 'FF002060' }, bold: true };
+               fontStyle = { name: 'Khmer OS Muol Light', size: 11, color: { argb: 'FF002060' }, bold: true };
             }
           }
 
