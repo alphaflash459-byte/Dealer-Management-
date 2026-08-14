@@ -3106,7 +3106,15 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                 selectedInvoiceDetail.items[0]?.type === 'Stock Sold' ? 'text-emerald-600' : 
                                 selectedInvoiceDetail.items[0]?.type === 'Stock Out' ? 'text-rose-600' : 'text-amber-600'
                               }`}>
-                              {item.quantity}
+                              {selectedInvoiceDetail.items[0]?.type === 'Stock Sold' 
+                                ? (item.soldQty !== undefined ? item.soldQty : Math.max(0, item.quantity - (item.promoQty || 0) - (item.exchangedQty || 0)))
+                                : item.quantity}
+                              {item.promoQty && item.promoQty > 0 ? (
+                                <span className="text-amber-500 ml-1 font-bold" title="ថែម">+{item.promoQty}</span>
+                              ) : null}
+                              {item.exchangedQty && item.exchangedQty > 0 ? (
+                                <span className="text-blue-500 ml-1 font-bold" title="ដូរ">+{item.exchangedQty} (ដូរ)</span>
+                              ) : null}
                             </span>
                           </div>
 

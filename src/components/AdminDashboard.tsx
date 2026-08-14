@@ -165,6 +165,26 @@ export const formatHtmlText = (str: string | number) => {
   }).join('');
 };
 
+const isSameProduct = (n1: string, n2: string) => {
+  let a = n1; let b = n2;
+  if (a === 'WURKZ ICE') a = 'WICE';
+  if (a === 'W ORD') a = 'WURKZ ORD';
+  if (a === 'D ORD') a = 'DAZZ ORD';
+  if (a === 'EXP ORD' || a === 'EXP 330 ORD') a = 'EXP330 ORD';
+  if (a === 'EXP 300') a = 'EXP300';
+  if (a === 'EXP 330') a = 'EXP330';
+  
+  if (b === 'WURKZ ICE') b = 'WICE';
+  if (b === 'W ORD') b = 'WURKZ ORD';
+  if (b === 'D ORD') b = 'DAZZ ORD';
+  if (b === 'EXP ORD' || b === 'EXP 330 ORD') b = 'EXP330 ORD';
+  if (b === 'EXP 300') b = 'EXP300';
+  if (b === 'EXP 330') b = 'EXP330';
+  
+  if (a === b) return true;
+  return a.replace(/\s+/g, '') === b.replace(/\s+/g, '');
+};
+
 export default function AdminDashboard({ currentUser, users, setUsers, transactions, products, stockOrders, activeTab, isAIScannerModalOpen, setIsAIScannerModalOpen }: AdminDashboardProps) {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFileType, setExportFileType] = useState<'pdf' | 'excel'>('excel');
@@ -2575,7 +2595,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         if (item) {
           const dateStr = r.date ? r.date.split('T')[0] : '';
           if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
-          if (filterTxStartDate && dateStr >= filterTxStartDate) {
+          if (!filterTxStartDate || dateStr >= filterTxStartDate) {
             rollbackStockIn += item.quantity;
           }
         }
@@ -2595,11 +2615,11 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         const dateStr = t.date ? t.date.split('T')[0] : '';
         if (t.type === 'Stock Out') {
           if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockOut += t.quantity; }
-          if (filterTxStartDate && dateStr >= filterTxStartDate) {
+          if (!filterTxStartDate || dateStr >= filterTxStartDate) {
             rollbackStockOut += t.quantity;
           }
         } else if (t.type === 'Stock Return') {
-          if (filterTxStartDate && dateStr >= filterTxStartDate) {
+          if (!filterTxStartDate || dateStr >= filterTxStartDate) {
             rollbackStockReturn += t.quantity;
           }
           if (previousDayStr && dateStr === previousDayStr) {
@@ -2773,7 +2793,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         if (item) {
           const dateStr = r.date ? r.date.split('T')[0] : '';
           if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) rangeStockIn += item.quantity;
-          if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockIn += item.quantity;
+          if (!filterTxStartDate || dateStr >= filterTxStartDate) rollbackStockIn += item.quantity;
         }
       });
       
@@ -2784,13 +2804,14 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         
         if (t.type === 'Stock Out') {
           if (inRange) rangeStockOut += t.quantity;
-          if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockOut += t.quantity;
+          if (!filterTxStartDate || dateStr >= filterTxStartDate) rollbackStockOut += t.quantity;
         } else if (t.type === 'Stock Return') {
           if (inRange) rangeStockReturn += t.quantity;
-          if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockReturn += t.quantity;
+          if (!filterTxStartDate || dateStr >= filterTxStartDate) rollbackStockReturn += t.quantity;
         } else if (t.type === 'Stock Sold') {
           if (inRange) {
-            rangeStockSold += t.soldQty || t.quantity;
+            const soldOnly = t.soldQty !== undefined ? t.soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - (t.exchangedQty || 0));
+            rangeStockSold += soldOnly;
             rangeStockExchanged += t.exchangedQty || 0;
             rangeStockPromo += t.promoQty || 0;
           }
@@ -3292,25 +3313,7 @@ const handleExportLostExcessExcel = async () => {
   };
 const handleGeneralExport = async () => {
 
-      const isSameProduct = (n1: string, n2: string) => {
-        let a = n1; let b = n2;
-        if (a === 'WURKZ ICE') a = 'WICE';
-        if (a === 'W ORD') a = 'WURKZ ORD';
-        if (a === 'D ORD') a = 'DAZZ ORD';
-        if (a === 'EXP ORD' || a === 'EXP 330 ORD') a = 'EXP330 ORD';
-        if (a === 'EXP 300') a = 'EXP300';
-        if (a === 'EXP 330') a = 'EXP330';
-        
-        if (b === 'WURKZ ICE') b = 'WICE';
-        if (b === 'W ORD') b = 'WURKZ ORD';
-        if (b === 'D ORD') b = 'DAZZ ORD';
-        if (b === 'EXP ORD' || b === 'EXP 330 ORD') b = 'EXP330 ORD';
-        if (b === 'EXP 300') b = 'EXP300';
-        if (b === 'EXP 330') b = 'EXP330';
-        
-        if (a === b) return true;
-        return a.replace(/\s+/g, '') === b.replace(/\s+/g, '');
-      };
+
 
     if (exportDocType === 'reports') {
       if (exportFileType === 'pdf') {
@@ -3383,7 +3386,7 @@ const handleGeneralExport = async () => {
             if (item) {
               const dateStr = r.date ? r.date.split('T')[0] : '';
               if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) rangeStockIn += item.quantity;
-              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockIn += item.quantity;
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) rollbackStockIn += item.quantity;
             }
           });
 
@@ -3394,13 +3397,14 @@ const handleGeneralExport = async () => {
               
             if (t.type === 'Stock Out') {
               if (inRange) rangeStockOut += t.quantity;
-              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockOut += t.quantity;
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) rollbackStockOut += t.quantity;
             } else if (t.type === 'Stock Return') {
               if (inRange) rangeStockReturn += t.quantity;
-              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockReturn += t.quantity;
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) rollbackStockReturn += t.quantity;
             } else if (t.type === 'Stock Sold') {
               if (inRange) {
-                rangeStockSold += t.soldQty || t.quantity;
+                const soldOnly = t.soldQty !== undefined ? t.soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - (t.exchangedQty || 0));
+                rangeStockSold += soldOnly;
                 rangeStockExchanged += t.exchangedQty || 0;
                 rangeStockPromo += t.promoQty || 0;
               }
@@ -3465,7 +3469,7 @@ const handleGeneralExport = async () => {
             if (item) {
               const dateStr = r.date ? r.date.split('T')[0] : '';
               if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
-              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) {
                 rollbackStockIn += item.quantity;
               }
             }
@@ -3485,11 +3489,11 @@ const handleGeneralExport = async () => {
             const dateStr = t.date ? t.date.split('T')[0] : '';
             if (t.type === 'Stock Out') {
               if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockOut += t.quantity; }
-              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) {
                 rollbackStockOut += t.quantity;
               }
             } else if (t.type === 'Stock Return') {
-              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) {
                 rollbackStockReturn += t.quantity;
               }
               if (previousDayStr && dateStr === previousDayStr) {
@@ -3536,7 +3540,7 @@ const handleGeneralExport = async () => {
           new Date(tx.date).toLocaleDateString('en-GB'),
           users.find(u => u.id === tx.userId)?.username || tx.userId,
           tx.productName,
-          tx.soldQty || tx.quantity,
+          tx.soldQty !== undefined ? tx.soldQty : Math.max(0, tx.quantity - (tx.promoQty || 0) - (tx.exchangedQty || 0)),
           tx.promoQty || 0,
           tx.exchangedQty || 0
         ]);
@@ -3663,7 +3667,7 @@ const handleGeneralExport = async () => {
             if (item) {
               const dateStr = r.date ? r.date.split('T')[0] : '';
               if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) rangeStockIn += item.quantity;
-              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockIn += item.quantity;
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) rollbackStockIn += item.quantity;
             }
           });
 
@@ -3674,13 +3678,14 @@ const handleGeneralExport = async () => {
               
             if (t.type === 'Stock Out') {
               if (inRange) rangeStockOut += t.quantity;
-              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockOut += t.quantity;
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) rollbackStockOut += t.quantity;
             } else if (t.type === 'Stock Return') {
               if (inRange) rangeStockReturn += t.quantity;
-              if (filterTxStartDate && dateStr >= filterTxStartDate) rollbackStockReturn += t.quantity;
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) rollbackStockReturn += t.quantity;
             } else if (t.type === 'Stock Sold') {
               if (inRange) {
-                rangeStockSold += t.soldQty || t.quantity;
+                const soldOnly = t.soldQty !== undefined ? t.soldQty : Math.max(0, t.quantity - (t.promoQty || 0) - (t.exchangedQty || 0));
+                rangeStockSold += soldOnly;
                 rangeStockExchanged += t.exchangedQty || 0;
                 rangeStockPromo += t.promoQty || 0;
               }
@@ -3745,7 +3750,7 @@ const handleGeneralExport = async () => {
             if (item) {
               const dateStr = r.date ? r.date.split('T')[0] : '';
               if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockIn += item.quantity; }
-              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) {
                 rollbackStockIn += item.quantity;
               }
             }
@@ -3765,11 +3770,11 @@ const handleGeneralExport = async () => {
             const dateStr = t.date ? t.date.split('T')[0] : '';
             if (t.type === 'Stock Out') {
               if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockOut += t.quantity; }
-              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) {
                 rollbackStockOut += t.quantity;
               }
             } else if (t.type === 'Stock Return') {
-              if (filterTxStartDate && dateStr >= filterTxStartDate) {
+              if (!filterTxStartDate || dateStr >= filterTxStartDate) {
                 rollbackStockReturn += t.quantity;
               }
               if (previousDayStr && dateStr === previousDayStr) {
@@ -3816,7 +3821,7 @@ const handleGeneralExport = async () => {
           new Date(tx.date).toLocaleDateString('en-GB'),
           users.find(u => u.id === tx.userId)?.username || tx.userId,
           tx.productName,
-          tx.soldQty || tx.quantity,
+          tx.soldQty !== undefined ? tx.soldQty : Math.max(0, tx.quantity - (tx.promoQty || 0) - (tx.exchangedQty || 0)),
           tx.promoQty || 0,
           tx.exchangedQty || 0
         ]);
@@ -5416,9 +5421,12 @@ const handleExportSelectedUserStockExcel = async () => {
                             {inv.items.map((item: any, idx: number) => (
                               <div key={idx} className="h-6 flex items-center justify-center">
                                 <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] sm:text-xs ">
-                                  {item.quantity}
+                                  {item.soldQty !== undefined ? item.soldQty : Math.max(0, item.quantity - (item.promoQty || 0) - (item.exchangedQty || 0))}
                                   {item.promoQty && item.promoQty > 0 ? (
-                                    <span className="text-amber-500 ml-1 font-bold">+{item.promoQty}</span>
+                                    <span className="text-amber-500 ml-1 font-bold" title="ថែម">+{item.promoQty}</span>
+                                  ) : null}
+                                  {item.exchangedQty && item.exchangedQty > 0 ? (
+                                    <span className="text-blue-500 ml-1 font-bold" title="ដូរ">+{item.exchangedQty} (ដូរ)</span>
                                   ) : null}
                                 </span>
                               </div>
@@ -5838,9 +5846,9 @@ const handleExportSelectedUserStockExcel = async () => {
                   let rollbackStockOut = 0;
                   let rollbackStockReturn = 0;
                   
-                  warehouseStockIns.forEach((record: any) => {
+                  warehouseStockIns.filter(r => r.type !== 'count').forEach((record: any) => {
                     const dateStr = record.date ? record.date.split('T')[0] : '';
-                    const item = record.items?.find((i: any) => i.productName === product.name);
+                    const item = record.items?.find((i: any) => isSameProduct(i.productName, product.name));
                     if (item && item.quantity) {
                       const qty = Number(item.quantity);
                       const matchStart = !filterTxStartDate || dateStr >= filterTxStartDate;
@@ -5848,21 +5856,14 @@ const handleExportSelectedUserStockExcel = async () => {
                       if (matchStart && matchEnd) {
                         rangeStockIn += qty;
                       }
-                      if (filterTxStartDate && dateStr >= filterTxStartDate) {
-                        rollbackStockIn += qty;
-                      } else if (!filterTxStartDate) {
+                      if (!filterTxStartDate || dateStr >= filterTxStartDate) {
                         rollbackStockIn += qty;
                       }
                     }
                   });
                   
-                  managedTransactions.forEach(t => {
-                    let tName = t.productName;
-                    if (tName === 'WURKZ ICE') tName = 'WICE';
-                    if (tName === 'W ORD') tName = 'WURKZ ORD';
-                    if (tName === 'D ORD') tName = 'DAZZ ORD';
-                    
-                    if (tName === product.name) {
+                  transactions.forEach(t => {
+                    if (isSameProduct(t.productName, product.name)) {
                       const dateStr = t.date ? t.date.split('T')[0] : '';
                       const matchStart = !filterTxStartDate || dateStr >= filterTxStartDate;
                       const matchEnd = !filterTxEndDate || dateStr <= filterTxEndDate;
@@ -5877,10 +5878,7 @@ const handleExportSelectedUserStockExcel = async () => {
                            rangeStockExchanged += (t.exchangedQty || 0);
                         }
                       }
-                      if (filterTxStartDate && dateStr >= filterTxStartDate) {
-                        if (t.type === 'Stock Out') rollbackStockOut += t.quantity;
-                        if (t.type === 'Stock Return') rollbackStockReturn += t.quantity;
-                      } else if (!filterTxStartDate) {
+                      if (!filterTxStartDate || dateStr >= filterTxStartDate) {
                         if (t.type === 'Stock Out') rollbackStockOut += t.quantity;
                         if (t.type === 'Stock Return') rollbackStockReturn += t.quantity;
                       }
