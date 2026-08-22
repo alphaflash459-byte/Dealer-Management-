@@ -2741,7 +2741,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       
       const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
       let verifyOpeningStock: number | null = countPreviousDay;
-      const effectiveOpeningStock = verifyOpeningStock !== null ? verifyOpeningStock : (openingStock - stockReturnPreviousDay);
+      const effectiveOpeningStock = verifyOpeningStock !== null ? verifyOpeningStock : 0;
       const verifyClosingStock = effectiveOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
       
       const verifyDiff = (rangeStockCount || 0) - verifyClosingStock;
@@ -2754,7 +2754,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         rangeStockIn || null,
         stockReturnPreviousDay || null,
         rangeStockOut || null,
-        verifyClosingStock || null,
+        verifyClosingStock,
         rangeStockCount !== null ? rangeStockCount : null,
         verifyDiff
       ]);
