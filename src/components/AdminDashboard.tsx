@@ -2696,6 +2696,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       let stockReturnPreviousDay = 0;
       
       let rangeStockCount: number | null = null;
+      let countPreviousDay: number | null = null;
       const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
       productStockIns.forEach(r => {
         const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName || i.productName.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
@@ -2714,6 +2715,9 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         if (item) {
           const dateStr = r.date ? r.date.split('T')[0] : '';
           if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockCount = (rangeStockCount || 0) + item.quantity; }
+          if (previousDayStr && dateStr === previousDayStr) {
+            countPreviousDay = (countPreviousDay || 0) + item.quantity;
+          }
         }
       });
       
@@ -2736,7 +2740,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       });
       
       const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
-      let verifyOpeningStock = openingStock - stockReturnPreviousDay;
+      let verifyOpeningStock = countPreviousDay !== null ? countPreviousDay : (openingStock - stockReturnPreviousDay);
       const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
       
       const verifyDiff = (rangeStockCount || 0) - (verifyClosingStock || 0);

@@ -1,0 +1,23 @@
+--- src/components/AdminDashboard.tsx
++++ src/components/AdminDashboard.tsx
+@@ -2710,10 +2710,13 @@
+       
+       const stockCounts = warehouseStockIns.filter(r => r.type === 'count');
++      let latestCountDate = '';
+       stockCounts.forEach(r => {
+         const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName || i.productName.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
+         if (item) {
+           const dateStr = r.date ? r.date.split('T')[0] : '';
+           if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { rangeStockCount = (rangeStockCount || 0) + item.quantity; }
+-          if (previousDayStr && dateStr === previousDayStr) {
+-            countPreviousDay = (countPreviousDay || 0) + item.quantity;
++          if (filterTxStartDate && dateStr < filterTxStartDate) {
++            if (!latestCountDate || dateStr > latestCountDate) {
++              latestCountDate = dateStr;
++              countPreviousDay = item.quantity;
++            } else if (dateStr === latestCountDate) {
++              countPreviousDay = (countPreviousDay || 0) + item.quantity;
++            }
+           }
+         }
+       });
