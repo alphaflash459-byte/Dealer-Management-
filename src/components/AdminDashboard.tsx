@@ -2740,21 +2740,22 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       });
       
       const openingStock = currentStock - rollbackStockIn + rollbackStockOut - rollbackStockReturn;
-      let verifyOpeningStock = countPreviousDay !== null ? countPreviousDay : (openingStock - stockReturnPreviousDay);
-      const verifyClosingStock = verifyOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
+      let verifyOpeningStock: number | null = countPreviousDay;
+      const effectiveOpeningStock = verifyOpeningStock !== null ? verifyOpeningStock : (openingStock - stockReturnPreviousDay);
+      const verifyClosingStock = effectiveOpeningStock + rangeStockIn + stockReturnPreviousDay - rangeStockOut;
       
-      const verifyDiff = (rangeStockCount || 0) - (verifyClosingStock || 0);
+      const verifyDiff = (rangeStockCount || 0) - verifyClosingStock;
 
       const addedRow = ws.addRow([
         toKhmerNumeralLocal(rowIndex++),
         p.khmerName,
         p.code,
-        verifyOpeningStock || null,
+        verifyOpeningStock !== null ? verifyOpeningStock : null,
         rangeStockIn || null,
         stockReturnPreviousDay || null,
         rangeStockOut || null,
         verifyClosingStock || null,
-        rangeStockCount,
+        rangeStockCount !== null ? rangeStockCount : null,
         verifyDiff
       ]);
       
