@@ -2030,13 +2030,13 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
       return `
         <tr style="border-bottom: 1px solid #000;">
-          <td style="padding: 4px 8px; text-align: left;">
+          <td style="padding: 2px 4px; text-align: left;">
             <div style="font-weight: 700; color: #1e293b; font-size: 13px;">${formatHtmlText(item.productName)}</div>
             ${promoInfo}
           </td>
-          <td style="padding: 4px 8px; text-align: center; font-weight: 800; color: #059669; font-size: 13px;">${item.quantity}</td>
-          <td style="padding: 4px 8px; text-align: right; color: #475569; font-size: 13px;">$${item.price !== undefined ? item.price.toFixed(2) : '0.00'}</td>
-          <td style="padding: 4px 8px; text-align: right; font-weight: 800; color: #4f46e5; font-size: 13px;">$${subtotal.toFixed(2)}</td>
+          <td style="padding: 2px 4px; text-align: center; font-weight: 800; color: #059669; font-size: 13px;">${item.quantity}</td>
+          <td style="padding: 2px 4px; text-align: right; color: #475569; font-size: 13px;">$${item.price !== undefined ? item.price.toFixed(2) : '0.00'}</td>
+          <td style="padding: 2px 4px; text-align: right; font-weight: 800; color: #4f46e5; font-size: 13px;">$${subtotal.toFixed(2)}</td>
         </tr>
       `;
     }).join('');
@@ -2051,7 +2051,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               font-family: 'Khmer OS Muol Light', 'Times New Roman', serif;
               color: #1e293b;
               margin: 0;
-              padding: 40px;
+              padding: 10px;
               background-color: #ffffff;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
@@ -2061,7 +2061,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               margin: 0 auto;
               border: 1px solid #000 !important;
               border-radius: 24px;
-              padding: 40px;
+              padding: 10px;
               box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
             }
             .header {
@@ -2119,7 +2119,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               font-size: 11px;
               font-weight: 700;
               text-transform: uppercase;
-              padding: 4px 8px;
+              padding: 2px 4px;
               border-bottom: 1px solid #000;
             }
             .total-row {
@@ -2162,7 +2162,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               padding-top: 8px;
             }
             @media print {
-              @page { size: A4 landscape; margin: 10mm; }
+              @page { size: A4 landscape; margin: 5mm; }
+              body { transform: scale(0.85); transform-origin: top center; }
               body {
                 padding: 0;
                 background-color: #ffffff;
@@ -2322,7 +2323,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       if (userGrouped.length === 0) return ''; // No data for this user
 
       const hasAnySalesActivity = userGrouped.some(p => (p.totalSoldQty + p.stockReturn) > 0);
-      const rowsHtml = userGrouped.map(p => {
+      const rowsHtml = userGrouped.map((p, index) => {
         const diff = p.stockOut - (p.stockSold + p.stockExchanged + p.stockPromo + p.stockReturn);
         let statusText = `ត្រឹមត្រូវ`;
         let statusColor = "color: #059669; background-color: #ecfdf5; padding: 4px 10px; border-radius: 8px; font-size: 11px; display: inline-block;";
@@ -2340,28 +2341,30 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
         return `
           <tr style="border-bottom: 1px solid #000;">
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${formatHtmlText(p.productFullName)}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #64748b;">${formatHtmlText(p.productName)}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #e11d48; text-align: center;">${p.stockOut || ''}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #059669; text-align: center;">${p.stockSold || ''}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #8b5cf6; text-align: center;">${p.stockExchanged || ''}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #f59e0b; text-align: center;">${p.stockPromo || ''}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #4f46e5; text-align: center;">${p.stockReturn || ''}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: right;"><span style="${statusColor}">${formatHtmlText(statusText)}</span></td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; text-align: center; color: #1e293b;">${index + 1}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; text-align: left; color: #1e293b;">${formatHtmlText(p.productFullName)}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; text-align: left; color: #64748b;">${formatHtmlText(p.productName)}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; color: #e11d48; text-align: center;">${p.stockOut || ''}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; color: #059669; text-align: center;">${p.stockSold || ''}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; color: #8b5cf6; text-align: center;">${p.stockExchanged || ''}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; color: #f59e0b; text-align: center;">${p.stockPromo || ''}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; color: #4f46e5; text-align: center;">${p.stockReturn || ''}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; text-align: right;"><span style="${statusColor}">${formatHtmlText(statusText)}</span></td>
           </tr>
         `;
       }).join('');
-      const rowsPerPage = 19; const emptyRowCount = rowsPerPage - (userGrouped.length % rowsPerPage);
-      const emptyRowsHtml = emptyRowCount === 19 && userGrouped.length > 0 ? '' : Array.from({ length: emptyRowCount }).map(() => `
+      const rowsPerPage = 18; const emptyRowCount = rowsPerPage - (userGrouped.length % rowsPerPage);
+      const emptyRowsHtml = emptyRowCount === 18 && userGrouped.length > 0 ? '' : Array.from({ length: emptyRowCount }).map(() => `
         <tr style="border-bottom: 1px solid #000;">
-          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
-          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
-          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
-          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
-          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
-          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
-          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
-          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 2px 4px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 2px 4px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 2px 4px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 2px 4px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 2px 4px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 2px 4px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 2px 4px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 2px 4px;">&nbsp;</td>
+          <td style="border: 1px solid #000; padding: 2px 4px;">&nbsp;</td>
         </tr>
       `).join('');
       const finalRowsHtml = rowsHtml + emptyRowsHtml;
@@ -2388,6 +2391,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           <table>
             <thead>
               <tr>
+                <th style="border: 1px solid #000; text-align: center; width: 40px;">ល.រ</th>
                 <th style="border: 1px solid #000; text-align: left;">ឈ្មោះទំនិញពេញ</th>
                 <th style="border: 1px solid #000; text-align: left;">ឈ្មោះទំនិញកាត់</th>
                 <th style="border: 1px solid #000; text-align: center;">ស្តុកឡើង</th>
@@ -2444,12 +2448,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
             body {
               font-family: 'Khmer OS Muol Light', 'Times New Roman', serif;
               color: #334155;
-              padding: 40px;
+              padding: 10px;
               line-height: 1.5;
             }
             .page-break {
               page-break-after: always;
-              margin-bottom: 60px;
+              margin-bottom: 20px;
             }
             .page-break:last-of-type {
               page-break-after: auto;
@@ -2485,7 +2489,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               margin-bottom: -1px;
               font-size: 13px;
               border: 1px solid #000 !important;
-              padding: 4px 8px;
+              padding: 2px 4px;
               border-radius: 8px 8px 0 0;
               background-color: #f8fafc;
               -webkit-print-color-adjust: exact;
@@ -2520,7 +2524,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               background-color: #f8fafc;
               color: #475569;
               font-weight: 700;
-              padding: 4px 8px;
+              padding: 2px 4px;
               border-bottom: 1px solid #000;
               font-size: 13px;
             }
@@ -2537,7 +2541,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
               font-weight: 500;
             }
             @media print {
-              @page { size: A4 landscape; margin: 10mm; }
+              @page { size: A4 landscape; margin: 5mm; }
+              body { transform: scale(0.85); transform-origin: top center; }
               body {
                 padding: 0;
               }
@@ -3318,17 +3323,17 @@ const handleExportLostExcessExcel = async () => {
 
           let dateTd = '';
           if (k === mIdxPdf) {
-             dateTd = `<td rowspan="${span}" style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: center; vertical-align: middle;">${p.specificDates}</td>`;
+             dateTd = `<td rowspan="${span}" style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; text-align: center; vertical-align: middle;">${p.specificDates}</td>`;
           }
 
           rowsHtml += `
           <tr style="border-bottom: 1px solid #000;">
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: center;">${k + 1}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; text-align: center;">${k + 1}</td>
             ${dateTd}
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${formatHtmlText(p.productFullName)}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #64748b;">${formatHtmlText(p.productName)}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #e11d48; text-align: center;">${lost}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #d97706; text-align: center;">${excess}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; text-align: left; color: #1e293b;">${formatHtmlText(p.productFullName)}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; text-align: left; color: #64748b;">${formatHtmlText(p.productName)}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; color: #e11d48; text-align: center;">${lost}</td>
+            <td style="border: 1px solid #000; padding: 2px 4px; font-weight: bold; color: #d97706; text-align: center;">${excess}</td>
           </tr>
         `;
         }
