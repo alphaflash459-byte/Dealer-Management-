@@ -167,14 +167,14 @@ export const formatHtmlText = (str: string | number) => {
 
 const isSameProduct = (n1: string, n2: string) => {
   let a = n1; let b = n2;
-  if (a === 'WURKZ ICE') a = 'WICE';
+  
   if (a === 'W ORD') a = 'WURKZ ORD';
   if (a === 'D ORD') a = 'DAZZ ORD';
   if (a === 'EXP ORD' || a === 'EXP 330 ORD') a = 'EXP330 ORD';
   if (a === 'EXP 300') a = 'EXP300';
   if (a === 'EXP 330') a = 'EXP330';
   
-  if (b === 'WURKZ ICE') b = 'WICE';
+  
   if (b === 'W ORD') b = 'WURKZ ORD';
   if (b === 'D ORD') b = 'DAZZ ORD';
   if (b === 'EXP ORD' || b === 'EXP 330 ORD') b = 'EXP330 ORD';
@@ -185,8 +185,81 @@ const isSameProduct = (n1: string, n2: string) => {
   return a.replace(/\s+/g, '') === b.replace(/\s+/g, '');
 };
 
+
+
+const DEFAULT_EXPORT_PRODUCTS = [
+  { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
+  { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
+  { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
+  { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
+  { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
+  { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
+  { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
+  { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
+  { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
+  { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
+  { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
+  { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
+  { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
+  { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
+  { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
+  { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
+  { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
+  { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
+  { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
+  { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
+  { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
+  { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
+  { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
+  { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
+  { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
+  { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
+  { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
+  { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
+  { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
+];
+
 export default function AdminDashboard({ currentUser, users, setUsers, transactions, products, stockOrders, activeTab, isAIScannerModalOpen, setIsAIScannerModalOpen }: AdminDashboardProps) {
+  const systemExportProducts = products.map(p => ({ khmerName: p.fullName || p.name, code: p.name }));
+
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isExcelChoiceModalOpen, setIsExcelChoiceModalOpen] = useState(false);
+  const [excelChoiceItems, setExcelChoiceItems] = useState<{khmerName: string, code: string, selected: boolean}[]>([]);
+  useEffect(() => { 
+  if (products.length > 0 && excelChoiceItems.length === 0) {
+    const savedStr = localStorage.getItem('excelChoiceProductsOrder');
+    if (savedStr) {
+      try {
+        const savedList = JSON.parse(savedStr);
+        const productMap = new Map(products.map(p => [p.name, p]));
+        let combined: {khmerName: string, code: string, selected: boolean}[] = [];
+        savedList.forEach((savedItem: any) => {
+          if (productMap.has(savedItem.code)) {
+            const p = productMap.get(savedItem.code)!;
+            combined.push({
+              khmerName: p.fullName || p.name,
+              code: savedItem.code,
+              selected: savedItem.selected
+            });
+            productMap.delete(savedItem.code);
+          }
+        });
+        productMap.forEach(p => {
+          combined.push({
+            khmerName: p.fullName || p.name,
+            code: p.name,
+            selected: true
+          });
+        });
+        setExcelChoiceItems(combined);
+      } catch (e) {
+        setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true })));
+      }
+    } else {
+      setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true }))); 
+    }
+  } 
+}, [products]);
   const [exportFileType, setExportFileType] = useState<'pdf' | 'excel'>('excel');
   const [exportDocType, setExportDocType] = useState<string>('warehouse');
   const [exportUserId, setExportUserId] = useState<string>('all');
@@ -233,6 +306,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [newCarPlate, setNewCarPlate] = useState('');
   const [newSalesArea, setNewSalesArea] = useState('');
   const [newProductName, setNewProductName] = useState('');
+  const [newProductFullName, setNewProductFullName] = useState('');
   const [newProductតម្លៃ, setNewProductតម្លៃ] = useState('');
   const [newProductPromoBuy, setNewProductPromoBuy] = useState('');
   const [newProductPromoGet, setNewProductPromoGet] = useState('');
@@ -241,6 +315,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   // Product កែប្រែ States
   const [productToកែប្រែ, setProductToកែប្រែ] = useState<Product | null>(null);
   const [editProductName, setកែប្រែProductName] = useState('');
+  const [editProductFullName, setកែប្រែProductFullName] = useState('');
   const [editProductតម្លៃ, setកែប្រែProductតម្លៃ] = useState('');
   const [editProductPromoBuy, setកែប្រែProductPromoBuy] = useState('');
   const [editProductPromoGet, setកែប្រែProductPromoGet] = useState('');
@@ -1124,6 +1199,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     const newProduct: Product = {
       id: `prod-${Date.now()}`,
       name: newProductName.trim(),
+      fullName: newProductFullName.trim() || undefined,
       price: newProductតម្លៃ ? Number(newProductតម្លៃ) : undefined,
       promoBuyQty: firstPromo ? firstPromo.buyQty : (newProductPromoBuy ? Number(newProductPromoBuy) : undefined),
       promoGetQty: firstPromo ? firstPromo.getQty : (newProductPromoGet ? Number(newProductPromoGet) : undefined),
@@ -1135,6 +1211,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     try {
       await setDoc(doc(db, 'products', newProduct.id), cleanUndefined(newProduct));
       setNewProductName('');
+      setNewProductFullName('');
       setNewProductតម្លៃ('');
       setNewProductPromoBuy('');
       setNewProductPromoGet('');
@@ -1165,6 +1242,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       const updatedProduct: Product = {
         ...productToកែប្រែ,
         name: editProductName.trim(),
+        fullName: editProductFullName.trim() || undefined,
         price: editProductតម្លៃ ? Number(editProductតម្លៃ) : undefined,
         promoBuyQty: firstPromo ? firstPromo.buyQty : (editProductPromoBuy ? Number(editProductPromoBuy) : undefined),
         promoGetQty: firstPromo ? firstPromo.getQty : (editProductPromoGet ? Number(editProductPromoGet) : undefined),
@@ -2207,6 +2285,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       const groupedMap: {
         [productName: string]: {
           productName: string;
+          productFullName: string;
           stockOut: number;
           stockSold: number;
           stockExchanged: number;
@@ -2216,11 +2295,12 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         }
       } = {};
       products.forEach(p => {
-        groupedMap[p.name] = { productName: p.name, stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0, totalSoldQty: 0 };
+        groupedMap[p.name] = { productName: p.name, productFullName: p.fullName || p.name, stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0, totalSoldQty: 0 };
       });
       userTxs.forEach(t => {
         if (!groupedMap[t.productName]) {
-          groupedMap[t.productName] = { productName: t.productName, stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0, totalSoldQty: 0 };
+          const product = products.find(p => p.name === t.productName);
+          groupedMap[t.productName] = { productName: t.productName, productFullName: product?.fullName || t.productName, stockOut: 0, stockSold: 0, stockExchanged: 0, stockPromo: 0, stockReturn: 0, totalSoldQty: 0 };
         }
         const group = groupedMap[t.productName];
         if (t.type === 'Stock Out') group.stockOut += t.quantity;
@@ -2260,7 +2340,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
 
         return `
           <tr style="border-bottom: 1px solid #000;">
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${formatHtmlText(p.productName)}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${formatHtmlText(p.productFullName)}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #64748b;">${formatHtmlText(p.productName)}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #e11d48; text-align: center;">${p.stockOut || ''}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #059669; text-align: center;">${p.stockSold || ''}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #8b5cf6; text-align: center;">${p.stockExchanged || ''}</td>
@@ -2273,6 +2354,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       const rowsPerPage = 19; const emptyRowCount = rowsPerPage - (userGrouped.length % rowsPerPage);
       const emptyRowsHtml = emptyRowCount === 19 && userGrouped.length > 0 ? '' : Array.from({ length: emptyRowCount }).map(() => `
         <tr style="border-bottom: 1px solid #000;">
+          <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
           <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
           <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
           <td style="border: 1px solid #000; padding: 4px 8px;">&nbsp;</td>
@@ -2306,7 +2388,8 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
           <table>
             <thead>
               <tr>
-                <th style="border: 1px solid #000; text-align: left;">ឈ្មោះទំនិញ</th>
+                <th style="border: 1px solid #000; text-align: left;">ឈ្មោះទំនិញពេញ</th>
+                <th style="border: 1px solid #000; text-align: left;">ឈ្មោះទំនិញកាត់</th>
                 <th style="border: 1px solid #000; text-align: center;">ស្តុកឡើង</th>
                 <th style="border: 1px solid #000; text-align: center;">ស្តុកលក់</th>
                 <th style="border: 1px solid #000; text-align: center;">ប្ដូរប្រវិល</th>
@@ -2490,7 +2573,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   
   
   
-  const handleExportVerifyStockExcel = async (existingWorkbook?: ExcelJS.Workbook) => {
+  const handleExportVerifyStockExcel = async (existingWorkbook?: ExcelJS.Workbook, customProductsList?: {khmerName: string, code: string}[], autoFilter: boolean = false) => {
     const workbook = existingWorkbook || new ExcelJS.Workbook();
     const ws = workbook.addWorksheet('ស្តុករាប់បញ្ជាក់', {
       pageSetup: {
@@ -2502,7 +2585,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     ws.pageSetup.fitToPage = true;
     ws.pageSetup.fitToWidth = 1;
     ws.pageSetup.fitToHeight = 1;
-    ws.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
+    ws.headerFooter = { oddFooter: '&L&K002060&"Khmer OS Muol Light"ក្រវិល&C&K002060&"Khmer OS Muol Light"បាញ់លុយ' };
     
     let dateRangeText = "ទាំងអស់";
     if (filterTxStartDate) {
@@ -2518,7 +2601,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     }
     
     ws.addRow([`របាយការណ៍ស្តុករាប់បញ្ជាក់ ( ${dateRangeText} )`, null, null, null, null, null, null, null, null, null]);
-    ws.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកក្នុងឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកឡើងឡាន", "ស្តុកសល់", "ស្តុករាប់", "បញ្ជាក់"]);
+    ws.addRow(["ល.រ", "ឈ្មោះទំនិញពេញ", "ឈ្មោះទំនិញកាត់", "ស្តុកក្នុងឃ្លាំង", "ស្តុកចូល", "ស្តុកលើឡាន", "ស្តុកឡើងឡាន", "ស្តុកសល់", "ស្តុករាប់", "បញ្ជាក់"]);
     
     let previousDayStr = '';
     if (filterTxStartDate) {
@@ -2536,43 +2619,62 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       return num.toString().split('').map(digit => localKhmerNumerals[parseInt(digit)]).join('');
     };
     
-    const exportProductsListFixed = [
-      { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
-      { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
-      { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
-      { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
-      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
-      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
-      { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
-      { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
-      { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
-      { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
-      { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
-      { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
-      { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
-    ];
-    
-    exportProductsListFixed.forEach((p) => {
+    const exportProductsListFixed = Array.isArray(customProductsList) ? customProductsList : DEFAULT_EXPORT_PRODUCTS;
+    let userExportList1 = exportProductsListFixed;
+    if (autoFilter) {
+      userExportList1 = exportProductsListFixed.filter(p => {
+        let dbName = p.code;
+        if (dbName === 'WICE') dbName = 'WURKZ ICE';
+        if (dbName === 'WURKZ ORD') dbName = 'W ORD';
+        if (dbName === 'DAZZ ORD') dbName = 'D ORD';
+        if (dbName === 'EXP330 ORD') dbName = 'EXP ORD';
+        if (dbName === 'EXP300') dbName = 'EXP 300';
+        if (dbName === 'EXP330') dbName = 'EXP 330';
+        
+        let hasActivity = false;
+        
+        const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
+        productStockIns.forEach(r => {
+          const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName || i.productName.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
+          if (item) {
+             const dateStr = r.date ? r.date.split('T')[0] : '';
+             if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { hasActivity = true; }
+          }
+        });
+        
+        const stockCounts = warehouseStockIns.filter(r => r.type === 'count');
+        stockCounts.forEach(r => {
+          const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName || i.productName.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
+          if (item) {
+             const dateStr = r.date ? r.date.split('T')[0] : '';
+             if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { hasActivity = true; }
+          }
+        });
+        
+        const productTxs = managedTransactions.filter(t => {
+          let txPName = t.productName;
+          if (txPName === 'WURKZ ICE') txPName = 'WICE';
+          if (txPName === 'W ORD') txPName = 'WURKZ ORD';
+          if (txPName === 'D ORD') txPName = 'DAZZ ORD';
+          return txPName === p.code || txPName === dbName || txPName.replace(/\s+/g, '') === p.code.replace(/\s+/g, '');
+        });
+        productTxs.forEach(t => {
+          const txDateStr = t.date ? t.date.split('T')[0] : '';
+          if ((!filterTxStartDate || txDateStr >= filterTxStartDate) && (!filterTxEndDate || txDateStr <= filterTxEndDate)) { hasActivity = true; }
+        });
+        
+        return hasActivity;
+      });
+    }
+
+    userExportList1.forEach((p) => {
       let dbName = p.code;
       if (dbName === 'WICE') dbName = 'WURKZ ICE';
       if (dbName === 'WURKZ ORD') dbName = 'W ORD';
       if (dbName === 'DAZZ ORD') dbName = 'D ORD';
+      
+      
+      
       if (dbName === 'EXP330 ORD') dbName = 'EXP ORD';
       if (dbName === 'EXP300') dbName = 'EXP 300';
       if (dbName === 'EXP330') dbName = 'EXP 330';
@@ -2670,7 +2772,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     }
     
     ws.columns = [
-      { width: 10 }, { width: 41 }, { width: 17 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }
+      { width: 10 }, { width: 41 }, { width: 25 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }
     ];
     
     ws.eachRow((row, rowNumber) => {
@@ -2684,7 +2786,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         } else {
           cell.border = borderStyle; cell.alignment = { vertical: 'middle', horizontal: (colNumber === 2 || colNumber === 3) ? 'left' : 'center' };
           const fontStyle = { size: 12, color: { argb: 'FF002060' }, bold: true };
-          if (colNumber === 2) {
+          if (colNumber === 2 || colNumber === 3) {
             cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
           } else {
             if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
@@ -2703,7 +2805,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     }
   };
 
-  const handleExportTotalStockExcel = async (existingWorkbook?: ExcelJS.Workbook) => {
+  const handleExportTotalStockExcel = async (existingWorkbook?: ExcelJS.Workbook, customProductsList?: {khmerName: string, code: string}[], autoFilter: boolean = false) => {
     const workbook = existingWorkbook || new ExcelJS.Workbook();
     const ws = workbook.addWorksheet('ទិន្នន័យស្តុកសរុប', {
       pageSetup: {
@@ -2715,7 +2817,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     ws.pageSetup.fitToPage = true;
     ws.pageSetup.fitToWidth = 1;
     ws.pageSetup.fitToHeight = 1;
-    ws.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
+    ws.headerFooter = { oddFooter: '&L&K002060&"Khmer OS Muol Light"ក្រវិល&C&K002060&"Khmer OS Muol Light"បាញ់លុយ' };
     
     let dateRangeText = "ទាំងអស់";
     if (filterTxStartDate) {
@@ -2731,7 +2833,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     }
     
     ws.addRow([`របាយការណ៍ស្តុកសរុប ( ${dateRangeText} )`, null, null, null, null, null, null, null, null, null, null]);
-    ws.addRow(["ល.រ", "ឈ្មោះទំនិញ", "កូដសម្គាល់", "ស្តុកដើមគ្រា", "ស្តុកចូល", "ស្តុកឡើងឡាន", "ស្តុកត្រឡប់", "ចំនួនលក់", "ដូរក្រវិល", "ចំនួនថែម", "ស្តុកសល់"]);
+    ws.addRow(["ល.រ", "ឈ្មោះទំនិញពេញ", "ឈ្មោះទំនិញកាត់", "ស្តុកដើមគ្រា", "ស្តុកចូល", "ស្តុកឡើងឡាន", "ស្តុកត្រឡប់", "ចំនួនលក់", "ដូរក្រវិល", "ចំនួនថែម", "ស្តុកសល់"]);
     
     let rowIndex = 1;
     const localKhmerNumerals = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
@@ -2739,43 +2841,53 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       return num.toString().split('').map(digit => localKhmerNumerals[parseInt(digit)]).join('');
     };
     
-    const exportProductsList = [
-      { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
-      { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
-      { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
-      { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
-      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
-      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
-      { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
-      { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
-      { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
-      { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
-      { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
-      { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
-      { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
-    ];
-    
-    exportProductsList.forEach(p => {
+    const exportProductsList = Array.isArray(customProductsList) ? customProductsList : DEFAULT_EXPORT_PRODUCTS;
+    let userExportList2 = exportProductsList;
+    if (autoFilter) {
+      userExportList2 = exportProductsList.filter(p => {
+        let dbName = p.code;
+        if (dbName === 'WICE') dbName = 'WURKZ ICE';
+        if (dbName === 'WURKZ ORD') dbName = 'W ORD';
+        if (dbName === 'DAZZ ORD') dbName = 'D ORD';
+        if (dbName === 'EXP330 ORD') dbName = 'EXP ORD';
+        if (dbName === 'EXP300') dbName = 'EXP 300';
+        if (dbName === 'EXP330') dbName = 'EXP 330';
+        
+        let hasActivity = false;
+        
+        const productStockIns = warehouseStockIns.filter(r => r.type !== 'count');
+        productStockIns.forEach(r => {
+          const item = r.items.find((i: any) => i.productName === p.code || i.productName === dbName || i.productName.replace(/\s+/g, '') === p.code.replace(/\s+/g, ''));
+          if (item) {
+             const dateStr = r.date ? r.date.split('T')[0] : '';
+             if ((!filterTxStartDate || dateStr >= filterTxStartDate) && (!filterTxEndDate || dateStr <= filterTxEndDate)) { hasActivity = true; }
+          }
+        });
+        
+        const productTxs = managedTransactions.filter(t => {
+          let txPName = t.productName;
+          if (txPName === 'WURKZ ICE') txPName = 'WICE';
+          if (txPName === 'W ORD') txPName = 'WURKZ ORD';
+          if (txPName === 'D ORD') txPName = 'DAZZ ORD';
+          return txPName === p.code || txPName === dbName || txPName.replace(/\s+/g, '') === p.code.replace(/\s+/g, '');
+        });
+        productTxs.forEach(t => {
+          const txDateStr = t.date ? t.date.split('T')[0] : '';
+          if ((!filterTxStartDate || txDateStr >= filterTxStartDate) && (!filterTxEndDate || txDateStr <= filterTxEndDate)) { hasActivity = true; }
+        });
+        
+        return hasActivity;
+      });
+    }
+
+    userExportList2.forEach(p => {
       let dbName = p.code;
       if (dbName === 'WICE') dbName = 'WURKZ ICE';
       if (dbName === 'WURKZ ORD') dbName = 'W ORD';
       if (dbName === 'DAZZ ORD') dbName = 'D ORD';
+      
+      
+      
       if (dbName === 'EXP330 ORD') dbName = 'EXP ORD';
       if (dbName === 'EXP300') dbName = 'EXP 300';
       if (dbName === 'EXP330') dbName = 'EXP 330';
@@ -2841,7 +2953,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     ws.getRow(2).height = 35;
     for (let i = 3; i <= ws.rowCount; i++) ws.getRow(i).height = 20;
     
-    ws.columns = [ { width: 10 }, { width: 41 }, { width: 17 }, { width: 20 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 } ];
+    ws.columns = [ { width: 10 }, { width: 41 }, { width: 25 }, { width: 20 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 } ];
     
     ws.eachRow((row, rowNumber) => {
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -2854,7 +2966,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         } else {
           cell.border = borderStyle; cell.alignment = { vertical: 'middle', horizontal: (colNumber === 2 || colNumber === 3) ? 'left' : 'center' };
           const fontStyle: any = { size: 12, color: { argb: 'FF002060' }, bold: true };
-          if (colNumber === 2) {
+          if (colNumber === 2 || colNumber === 3) {
             cell.font = { ...fontStyle, name: 'Khmer OS Muol Light', size: 11 };
           } else {
             if (cell.value != null && typeof cell.value === 'string' && /[\u1780-\u17FF\u19E0-\u19FF]/.test(cell.value)) {
@@ -2899,37 +3011,7 @@ const handleExportLostExcessExcel = async () => {
       dateRangeText = `${formatDate(filterTxEndDate)}`;
     }
 
-    const exportProductsList = [
-      { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
-      { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
-      { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
-      { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
-      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
-      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
-      { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
-      { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
-      { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
-      { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
-      { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
-      { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
-      { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
-    ];
+    const exportProductsList = DEFAULT_EXPORT_PRODUCTS;
 
     const workbook = new ExcelJS.Workbook();
     let hasData = false;
@@ -2959,6 +3041,9 @@ const handleExportLostExcessExcel = async () => {
         if (pName === 'WURKZ ICE') pName = 'WICE';
         if (pName === 'W ORD') pName = 'WURKZ ORD';
         if (pName === 'D ORD') pName = 'DAZZ ORD';
+        
+        
+        
         
 
         const txDate = t.date ? t.date.split('T')[0] : 'Unknown Date';
@@ -3202,8 +3287,10 @@ const handleExportLostExcessExcel = async () => {
               let displayDate = date;
               const p = date.split('-');
               if (p.length === 3) displayDate = `${p[2]}/${p[1]}/${p[0]}`;
+              const productObj = products.find(prod => prod.name === pName);
               userGrouped.push({
                  productName: pName,
+                 productFullName: productObj?.fullName || pName,
                  diff: diff,
                  specificDates: displayDate
               });
@@ -3238,7 +3325,8 @@ const handleExportLostExcessExcel = async () => {
           <tr style="border-bottom: 1px solid #000;">
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: center;">${k + 1}</td>
             ${dateTd}
-            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${formatHtmlText(p.productName)}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #1e293b;">${formatHtmlText(p.productFullName)}</td>
+            <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; text-align: left; color: #64748b;">${formatHtmlText(p.productName)}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #e11d48; text-align: center;">${lost}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-weight: bold; color: #d97706; text-align: center;">${excess}</td>
           </tr>
@@ -3257,7 +3345,8 @@ const handleExportLostExcessExcel = async () => {
               <tr>
                 <th style="width: 50px;">ល.រ</th>
                 <th>កាលបរិច្ឆេទ</th>
-                <th>ឈ្មោះទំនិញ</th>
+                <th>ឈ្មោះទំនិញពេញ</th>
+                <th>ឈ្មោះទំនិញកាត់</th>
                 <th style="width: 80px;">ចំនួនបាត់</th>
                 <th style="width: 80px;">ចំនួនលើស</th>
               </tr>
@@ -3340,37 +3429,7 @@ const handleGeneralExport = async () => {
       let headers: string[] = [];
       let rows: any[][] = [];
 
-      const exportProductsList = [
-        { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
-        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
-        { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
-        { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
-        { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
-        { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
-        { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
-        { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
-        { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
-        { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
-        { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
-        { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
-        { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
-        { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
-        { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
-        { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
-        { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
-        { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
-        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
-        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
-        { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
-        { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
-        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
-        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
-        { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
-        { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
-        { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
-        { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
-        { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
-      ];
+      const exportProductsList = DEFAULT_EXPORT_PRODUCTS;
       
       if (exportDocType === 'warehouse') {
         title = 'របាយការណ៍ស្តុកឃ្លាំង';
@@ -3621,37 +3680,7 @@ const handleGeneralExport = async () => {
       let headers: string[] = [];
       let rows: any[][] = [];
 
-      const exportProductsList = [
-        { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
-        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
-        { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
-        { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
-        { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
-        { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
-        { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
-        { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
-        { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
-        { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
-        { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
-        { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
-        { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
-        { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
-        { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
-        { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
-        { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
-        { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
-        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
-        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
-        { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
-        { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
-        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
-        { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
-        { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
-        { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
-        { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
-        { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
-        { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
-      ];
+      const exportProductsList = DEFAULT_EXPORT_PRODUCTS;
       
       if (exportDocType === 'warehouse') {
         title = 'របាយការណ៍ស្តុកឃ្លាំង';
@@ -3903,7 +3932,7 @@ const handleGeneralExport = async () => {
     
     setIsExportModalOpen(false);
   };
-const handleExportSelectedUserStockExcel = async () => {
+const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerName: string, code: string}[], autoFilter: boolean = false) => {
     let dateRangeText = "ទាំងអស់";
     if (filterTxStartDate) {
       const formatDate = (dateStr: string) => {
@@ -3925,37 +3954,7 @@ const handleExportSelectedUserStockExcel = async () => {
       dateRangeText = `${formatDate(filterTxEndDate)}`;
     }
 
-    const exportProductsList = [
-      { khmerName: "ស្រាបៀរកម្ពុជា (មានរង្វាន់)", code: "CBC" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងកម្ពុជា អត់រង្វាន់", code: "CED ORD" },
-      { khmerName: "ស្រាបៀរកម្ពុជាស (មានរង្វាន់)", code: "CBL" },
-      { khmerName: "ស្រាបៀរកម្ពុជាស (អត់រង្វាន់)", code: "CBL ORD" },
-      { khmerName: "ស្រាបៀរជបស", code: "CBLP" },
-      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ(មានរង្វាន់)", code: "CBB" },
-      { khmerName: "ស្រាបៀរកម្ពុជាទឹកខ្មៅ (អត់រង្វាន់)", code: "CBB ORD" },
-      { khmerName: "ស្រាបៀរជបទឹកខ្មៅ", code: "CBBP" },
-      { khmerName: "ភេសជ្ជៈកូឡា 250ml", code: "COLA250" },
-      { khmerName: "ភេសជ្ជៈកូឡា 330ml", code: "COLA330" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 300ml", code: "IZE300" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 500ml", code: "IZE500" },
-      { khmerName: "ភេសជ្ជៈអាយស៍ដប 1.5l", code: "IZE1.5" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (មានកេស)", code: "WATER350" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 350ml (អត់កេស)", code: "WATERN350" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (មានកេស)", code: "WATER500" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 500ml (អត់កេស)", code: "WATERN500" },
-      { khmerName: "ទឹកសុទ្ធកម្ពុជា 1.5l", code: "WATER1.5" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក", code: "WURKZ" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើកអាយស៍", code: "WICE" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង 330ml", code: "EXP330" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសដប 300ml", code: "EXP300" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងវើក អត់រង្វាន់", code: "WURKZ ORD" },
-      { khmerName: "ភេសជ្ជៈប៉ូវកម្លាំងគ្រាប់កំប៉ុង", code: "CED" },
-      { khmerName: "ភេសជ្ជៈបំពោកជាតិទឹកដប 500ml", code: "CSD500" },
-      { khmerName: "ភេសជ្ជៈដាស់ អត់រង្វាន់", code: "DAZZ ORD" },
-      { khmerName: "ភេសជ្ជៈដាស់", code: "DAZZ" },
-      { khmerName: "ស្រាបៀរកម្ពុជា4.4 (មានរង្វាន់)", code: "CB4.4" },
-      { khmerName: "ភេសជ្ជៈអិចប្រេសកំប៉ុង អត់រង្វាន់", code: "EXP330 ORD" }
-    ];
+    const exportProductsList = Array.isArray(customProductsList) ? customProductsList : DEFAULT_EXPORT_PRODUCTS;
 
     const workbook = new ExcelJS.Workbook();
     let hasData = false;
@@ -3992,6 +3991,9 @@ const handleExportSelectedUserStockExcel = async () => {
         if (pName === 'WURKZ ICE') pName = 'WICE';
         if (pName === 'W ORD') pName = 'WURKZ ORD';
         if (pName === 'D ORD') pName = 'DAZZ ORD';
+        
+        
+        
         
 
         if (!groupedMap[pName]) {
@@ -4040,12 +4042,12 @@ const handleExportSelectedUserStockExcel = async () => {
       ws.pageSetup.fitToWidth = 1;
       ws.pageSetup.fitToHeight = 1;
       
-      ws.headerFooter = { oddFooter: '&L&"Khmer OS Muol Light"ក្រវិល&C&"Khmer OS Muol Light"បាញ់លុយ' };
+      ws.headerFooter = { oddFooter: '&L&K002060&"Khmer OS Muol Light"ក្រវិល&C&K002060&"Khmer OS Muol Light"បាញ់លុយ' };
       
       hasData = true;
 
       // Add Data
-      ws.addRow([`របាយការណ៍លក់ប្រចាំថ្ងៃ ( ${user.username || ''} )`, null, null, null, null, null, null, null, null]);
+      ws.addRow([`របាយការណ៍លក់ប្រចាំថ្ងៃ ( ${user.username || ''} )`, null, null, null, null, null, null, null, null, null]);
       ws.addRow([
         `ឈ្មោះអ្នកលក់៖ ${user.username || ""}`,
         null,
@@ -4055,12 +4057,13 @@ const handleExportSelectedUserStockExcel = async () => {
         null,
         `ស្លាកលេខឡាន៖ ${user.carPlate || ''}`,
         null,
+        null,
         null
       ]);
       ws.addRow([
         "ល.រ",
-        "ឈ្មោះទំនិញ",
-        "កូដសម្គាល់",
+        "ឈ្មោះទំនិញពេញ",
+        "ឈ្មោះទំនិញកាត់",
         "ចំនួន",
         "ចំនួនលក់",
         "ដូរប្រវិល",
@@ -4075,7 +4078,14 @@ const handleExportSelectedUserStockExcel = async () => {
       });
 
       let rowIndex = 1;
-      exportProductsList.forEach((item) => {
+      let userExportList = exportProductsList;
+      if (autoFilter) {
+        userExportList = exportProductsList.filter(item => {
+          const pData = groupedMap[item.code];
+          return pData && (pData.stockOut > 0 || pData.stockSold > 0 || pData.stockExchanged > 0 || pData.stockPromo > 0 || pData.stockReturn > 0);
+        });
+      }
+      userExportList.forEach((item) => {
         const pData = groupedMap[item.code];
         let remark = null;
         if (pData.stockOut > 0 || pData.stockSold > 0 || pData.stockExchanged > 0 || pData.stockPromo > 0 || pData.stockReturn > 0) {
@@ -4122,13 +4132,13 @@ const handleExportSelectedUserStockExcel = async () => {
       // Column Widths
       ws.columns = [
         { width: 10 },  // ល.រ
-        { width: 41 }, // ឈ្មោះទំនិញ
-        { width: 17 }, // កូដសម្គាល់
+        { width: 41 }, // ឈ្មោះទំនិញពេញ
+        { width: 20 }, // ឈ្មោះទំនិញកាត់
         { width: 16 }, // ចំនួន
         { width: 16 }, // ចំនួនលក់
         { width: 16 }, // ដូរប្រវិល
         { width: 16 }, // ចំនួនថែម
-        { width: 16 }, // ចំនួនសល់
+        { width: 16 }, // ស្តុកត្រឡប់
         { width: 16 }  // ផ្សេងៗ
       ];
 
@@ -4225,8 +4235,8 @@ const handleExportSelectedUserStockExcel = async () => {
       }
     }
     
-    await handleExportVerifyStockExcel(workbook);
-    await handleExportTotalStockExcel(workbook);
+    await handleExportVerifyStockExcel(workbook, customProductsList, autoFilter);
+    await handleExportTotalStockExcel(workbook, customProductsList, autoFilter);
 
     const fileName = `របាយការណ៍ស្តុកលក់_${dateRangeText.replace(/\//g, '-')}.xlsx`;
 
@@ -4817,9 +4827,10 @@ const handleExportSelectedUserStockExcel = async () => {
             <table className="w-full text-left border-collapse ">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                   <tr className="text-slate-400 text-[9px] sm:text-[10px] md:text-xs uppercase font-bold tracking-wider">
-                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញ</th>
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញពេញ</th>
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100">ឈ្មោះទំនិញកាត់</th>
                     <th className="px-2 md:px-4 py-2.5 border-b border-slate-100 text-right">តម្លៃ ($)</th>
-                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100 text-center">កម្មវិធីប្រម៉ូសិន ទិញនិងថែម</th>
+                    <th className="px-2 md:px-4 py-2.5 border-b border-slate-100 text-center">ប្រម៉ូសិន</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
@@ -4829,27 +4840,19 @@ const handleExportSelectedUserStockExcel = async () => {
                       className="hover:bg-slate-50 transition-colors cursor-pointer"
                       onClick={() => setSelectedProductDetail(product)}
                     >
-                      <td className="px-2 md:px-4 py-2 font-bold text-slate-800">{product.name}</td>
+                      <td className="px-2 md:px-4 py-2 font-bold text-slate-800">{product.fullName || '-'}</td>
+                      <td className="px-2 md:px-4 py-2 font-bold text-slate-600">{product.name}</td>
                       <td className="px-2 md:px-4 py-2 text-right font-black text-indigo-600">
                         {product.price !== undefined && product.price !== null ? `$${Number(product.price).toFixed(2)}` : '-'}
                       </td>
                       <td className="px-2 md:px-4 py-2 text-center">
                         {product.promotions && product.promotions.length > 0 ? (
-                          <div className="flex flex-wrap gap-1 justify-center max-w-[200px] mx-auto">
-                            {product.promotions.slice(0, 2).map((promo, idx) => (
-                              <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 ">
-                                ទិញ {promo.buyQty} ថែម {promo.getQty}
-                              </span>
-                            ))}
-                            {product.promotions.length > 2 && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200 ">
-                                ច្រើនទៀត
-                              </span>
-                            )}
-                          </div>
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            {product.promotions.length} ឈុត
+                          </span>
                         ) : product.promoBuyQty && product.promoGetQty ? (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
-                            ទិញ {product.promoBuyQty} ថែម {product.promoGetQty}
+                            1 ឈុត
                           </span>
                         ) : (
                           <span className="text-slate-400 font-bold">-</span>
@@ -4859,7 +4862,7 @@ const handleExportSelectedUserStockExcel = async () => {
                   ))}
                   {getFilteredProducts().length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-6 py-12 text-center text-slate-400 font-medium">គ្មានទិន្នន័យ</td>
+                      <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-medium">គ្មានទិន្នន័យ</td>
                     </tr>
                   )}
                 </tbody>
@@ -4922,22 +4925,22 @@ const handleExportSelectedUserStockExcel = async () => {
                 </div>
               )}
               <button
-                onClick={handleExportSelectedUserStockExcel}
-                className="flex-1 flex justify-center items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition cursor-pointer whitespace-nowrap"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span>នាំចេញ Excel</span>
-              </button>
-              <button
                 onClick={handleExportSelectedUserStockPDF}
                 className="flex-1 flex justify-center items-center space-x-1.5 bg-rose-500 hover:bg-rose-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-rose-500/20 active:scale-95 transition cursor-pointer whitespace-nowrap"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                 </svg>
-                <span>នាំចេញ PDF</span>
+                <span>Export PDF</span>
+              </button>
+              <button
+                onClick={() => setIsExcelChoiceModalOpen(true)}
+                className="flex-1 flex justify-center items-center space-x-1.5 bg-blue-500 hover:bg-blue-600 text-white text-[10px] sm:text-xs px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl font-bold shadow-md shadow-blue-500/20 active:scale-95 transition cursor-pointer whitespace-nowrap"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Excel Choice</span>
               </button>
             </div>
           </div>
@@ -7034,14 +7037,24 @@ const handleExportSelectedUserStockExcel = async () => {
             </div>
             <form onSubmit={handleបង្កើតProduct} className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះទំនិញ</label>
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះទំនិញពេញ</label>
+                <input
+                  type="text"
+                  value={newProductFullName}
+                  onChange={e => setNewProductFullName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
+                  placeholder="បញ្ចូលឈ្មោះទំនិញពេញ"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះទំនិញកាត់</label>
                 <input
                   type="text"
                   value={newProductName}
                   onChange={e => setNewProductName(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                   required
-                  placeholder="បញ្ចូលឈ្មោះទំនិញ"
+                  placeholder="បញ្ចូលកូដទំនិញ"
                 />
               </div>
 
@@ -7165,14 +7178,24 @@ const handleExportSelectedUserStockExcel = async () => {
             </div>
             <form onSubmit={handleUpdateProduct} className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះទំនិញ</label>
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះទំនិញពេញ</label>
+                <input
+                  type="text"
+                  value={editProductFullName}
+                  onChange={e => setកែប្រែProductFullName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
+                  placeholder="បញ្ចូលឈ្មោះទំនិញពេញ"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] md:text-xs font-bold text-slate-500 px-1">ឈ្មោះទំនិញកាត់</label>
                 <input
                   type="text"
                   value={editProductName}
                   onChange={e => setកែប្រែProductName(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800"
                   required
-                  placeholder="បញ្ចូលឈ្មោះទំនិញ"
+                  placeholder="បញ្ចូលកូដទំនិញ"
                 />
               </div>
 
@@ -7775,8 +7798,12 @@ const handleExportSelectedUserStockExcel = async () => {
 
             <div className="py-5 space-y-4">
               <div className="grid grid-cols-3 gap-2 items-center">
-                <span className="text-xs font-bold text-slate-400">ឈ្មោះទំនិញ</span>
-                <span className="col-span-2 text-sm font-black text-slate-800">{selectedProductDetail.name}</span>
+                <span className="text-xs font-bold text-slate-400">ឈ្មោះទំនិញពេញ</span>
+                <span className="col-span-2 text-sm font-black text-slate-800">{selectedProductDetail.fullName || '-'}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 items-center">
+                <span className="text-xs font-bold text-slate-400">ឈ្មោះទំនិញកាត់</span>
+                <span className="col-span-2 text-sm font-black text-slate-600">{selectedProductDetail.name}</span>
               </div>
               <div className="grid grid-cols-3 gap-2 items-center">
                 <span className="text-xs font-bold text-slate-400">តម្លៃ ($)</span>
@@ -7812,6 +7839,7 @@ const handleExportSelectedUserStockExcel = async () => {
                 onClick={() => {
                   setProductToកែប្រែ(selectedProductDetail);
                   setកែប្រែProductName(selectedProductDetail.name);
+                  setកែប្រែProductFullName(selectedProductDetail.fullName || '');
                   setកែប្រែProductតម្លៃ(selectedProductDetail.price !== undefined ? String(selectedProductDetail.price) : '');
                   setកែប្រែProductPromoBuy(selectedProductDetail.promoBuyQty !== undefined ? String(selectedProductDetail.promoBuyQty) : '');
                   setកែប្រែProductPromoGet(selectedProductDetail.promoGetQty !== undefined ? String(selectedProductDetail.promoGetQty) : '');
@@ -8574,46 +8602,46 @@ const handleExportSelectedUserStockExcel = async () => {
             {/* Modal Body */}
             <div className="p-5 sm:p-6 overflow-y-auto space-y-4 custom-scroll">
               {/* Header Metadata Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-100">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-500">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-100">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500">
                     {editingFullInvoice.type === 'Stock Sold' ? 'ឈ្មោះអតិថិជន' : editingFullInvoice.type === 'Stock Out' ? 'អ្នកប្រគល់' : 'អ្នកទទួល'}
                   </label>
                   <input
                     type="text"
                     value={editingFullInvoice.customerName}
                     onChange={e => setEditingFullInvoice({ ...editingFullInvoice, customerName: e.target.value })}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-amber-400"
-                    placeholder="ឈ្មោះអតិថិជន..."
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-amber-400 transition"
+                    placeholder={editingFullInvoice.type === 'Stock Sold' ? 'ឈ្មោះអតិថិជន...' : 'AI Scan'}
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-500">ទីតាំង</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500">ទីតាំង</label>
                   <input
                     type="text"
                     value={editingFullInvoice.location}
                     onChange={e => setEditingFullInvoice({ ...editingFullInvoice, location: e.target.value })}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-amber-400"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-amber-400 transition"
                     placeholder="ទីតាំង..."
                   />
                 </div>
 
-                <div className="sm:col-span-2 space-y-1">
-                  <label className="text-[11px] font-bold text-slate-500">កាលបរិច្ឆេទ</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500">កាលបរិច្ឆេទ</label>
                   <input
                     type="date"
                     value={editingFullInvoice.date ? editingFullInvoice.date.split('T')[0] : ''}
                     onChange={e => setEditingFullInvoice({ ...editingFullInvoice, date: e.target.value })}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-amber-400"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none focus:border-amber-400 transition"
                   />
                 </div>
               </div>
 
               {/* Item Rows Table */}
               <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                <div className="flex justify-between items-center px-1">
+                  <h4 className="text-sm font-black text-slate-700 tracking-wider">
                     បញ្ជីទំនិញក្នុងវិក្កយបត្រ ({editingFullInvoice.items.length})
                   </h4>
                   <button
@@ -8634,16 +8662,25 @@ const handleExportSelectedUserStockExcel = async () => {
                         ]
                       });
                     }}
-                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black rounded-xl transition flex items-center space-x-1 cursor-pointer"
+                    className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-sm font-bold rounded-full transition flex items-center space-x-1.5 cursor-pointer"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
                     </svg>
-                    <span>+ ថែមទំនិញ</span>
+                    <span>ថែមទំនិញ</span>
                   </button>
                 </div>
 
                 <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+                  <div className="flex items-center gap-2 sm:gap-4 w-full bg-slate-50 px-2 sm:px-4 py-2 sm:py-3 border-b border-slate-100 text-[10px] sm:text-xs font-bold text-slate-500">
+                    <div className="flex-1 min-w-0">ឈ្មោះទំនិញ</div>
+                    <div className="w-16 sm:w-24 shrink-0 text-center">បរិមាណ</div>
+                    {editingFullInvoice.type === 'Stock Sold' && (
+                      <div className="w-16 sm:w-24 shrink-0 text-right">តម្លៃ ($)</div>
+                    )}
+                    <div className="w-8 sm:w-9 shrink-0"></div>
+                  </div>
+  
                   <div className="divide-y divide-slate-100">
                     {editingFullInvoice.items.map((item, idx) => {
                       const qtyNum = parseFloat(String(item.quantity)) || 0;
@@ -8653,11 +8690,10 @@ const handleExportSelectedUserStockExcel = async () => {
                         ? calculatePromoQtyWithតម្លៃCheck(prodObj, qtyNum, prNum)
                         : 0;
                       return (
-                        <div key={idx} className="p-2 sm:p-3 bg-slate-50/50 hover:bg-slate-50 transition space-y-1.5">
-                          <div className="flex items-end gap-1.5 sm:gap-2 w-full">
+                        <div key={idx} className="px-2 py-3 sm:p-4 hover:bg-slate-50 transition flex flex-col space-y-2">
+                          <div className="flex flex-row items-center gap-2 sm:gap-4 w-full">
                             {/* Product selection */}
-                            <div className="flex-1 min-w-0">
-                              <label className="text-[10px] font-bold text-slate-400 block sm:hidden mb-1">ឈ្មោះទំនិញ</label>
+                            <div className="flex-1 min-w-0 flex flex-col">
                               <select
                                 value={item.productName}
                                 onChange={e => {
@@ -8672,7 +8708,7 @@ const handleExportSelectedUserStockExcel = async () => {
                                   };
                                   setEditingFullInvoice({ ...editingFullInvoice, items: updated });
                                 }}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-amber-400 truncate"
+                                className="w-full bg-white border border-slate-200 rounded-lg sm:rounded-xl px-2 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-slate-800 outline-none focus:border-amber-400 truncate"
                               >
                                 {products.map(p => (
                                   <option key={p.id} value={p.name}>
@@ -8681,9 +8717,9 @@ const handleExportSelectedUserStockExcel = async () => {
                                 ))}
                               </select>
                             </div>
+                            
                             {/* Quantity */}
-                            <div className="w-16 sm:w-24 shrink-0">
-                              <label className="text-[10px] font-bold text-slate-400 block sm:hidden mb-1">បរិមាណ</label>
+                            <div className="w-16 sm:w-24 shrink-0 flex flex-col">
                               <input
                                 type="number"
                                 min="1"
@@ -8693,14 +8729,14 @@ const handleExportSelectedUserStockExcel = async () => {
                                   updated[idx] = { ...updated[idx], quantity: e.target.value };
                                   setEditingFullInvoice({ ...editingFullInvoice, items: updated });
                                 }}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-black text-center text-slate-800 outline-none focus:border-amber-400"
+                                className="w-full bg-white border border-slate-200 rounded-lg sm:rounded-xl px-1 sm:px-2 py-2 sm:py-2.5 text-xs sm:text-sm font-black text-center text-slate-800 outline-none focus:border-amber-400"
                                 placeholder="ចំនួន"
                               />
                             </div>
+                            
                             {/* Price (if Stock Sold) */}
                             {editingFullInvoice.type === 'Stock Sold' && (
-                              <div className="w-16 sm:w-24 shrink-0">
-                                <label className="text-[10px] font-bold text-slate-400 block sm:hidden mb-1">តម្លៃ ($)</label>
+                              <div className="w-16 sm:w-24 shrink-0 flex flex-col">
                                 <input
                                   type="number"
                                   step="0.01"
@@ -8711,20 +8747,14 @@ const handleExportSelectedUserStockExcel = async () => {
                                     updated[idx] = { ...updated[idx], price: e.target.value };
                                     setEditingFullInvoice({ ...editingFullInvoice, items: updated });
                                   }}
-                                  className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold text-right text-slate-800 outline-none focus:border-amber-400"
+                                  className="w-full bg-white border border-slate-200 rounded-lg sm:rounded-xl px-1 sm:px-2 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-right text-slate-800 outline-none focus:border-amber-400"
                                   placeholder="តម្លៃ"
                                 />
                               </div>
                             )}
-                            {/* Subtotal & Delete button */}
-                            <div className="flex items-center gap-1.5 shrink-0 mb-0.5">
-                              {editingFullInvoice.type === 'Stock Sold' && (
-                                <div className="hidden sm:block text-right w-16">
-                                  <span className="text-xs font-black text-indigo-600">
-                                    ${(qtyNum * prNum).toFixed(2)}
-                                  </span>
-                                </div>
-                              )}
+
+                            {/* Delete button (Aligned to bottom of inputs) */}
+                            <div className="shrink-0 w-8 sm:w-9 flex justify-end">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -8735,21 +8765,32 @@ const handleExportSelectedUserStockExcel = async () => {
                                   const updated = editingFullInvoice.items.filter((_, i) => i !== idx);
                                   setEditingFullInvoice({ ...editingFullInvoice, items: updated });
                                 }}
-                                className="p-1.5 hover:bg-rose-100 text-rose-500 rounded-lg transition cursor-pointer"
+                                className="p-1.5 sm:p-2 hover:bg-rose-100 text-rose-500 rounded-xl transition cursor-pointer"
                                 title="លុបទំនិញនេះ"
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                               </button>
                             </div>
                           </div>
-                          {/* Promo display if computedPromo > 0 */}
-                          {computedPromo > 0 && (
-                            <div className="text-[10px] font-black text-emerald-600 pl-1">
-                              🎁 ថែមឥតគិតថ្លៃ: +{computedPromo}
-                            </div>
-                          )}
+                          
+                          {/* Subtotal & Promo */}
+                          <div className="flex justify-between items-center w-full">
+                            {computedPromo > 0 ? (
+                              <div className="text-[11px] font-black text-emerald-600 pl-1">
+                                🎁 ថែមឥតគិតថ្លៃ: +{computedPromo}
+                              </div>
+                            ) : <div></div>}
+                            
+                            {editingFullInvoice.type === 'Stock Sold' && (
+                               <div className="text-right">
+                                 <span className="text-xs font-black text-indigo-600">
+                                   ${(qtyNum * prNum).toFixed(2)}
+                                 </span>
+                               </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -8774,11 +8815,11 @@ const handleExportSelectedUserStockExcel = async () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 sm:p-6 pt-3 border-t border-slate-100 flex space-x-3 shrink-0">
+            <div className="p-4 sm:p-6 pt-4 border-t border-slate-100 flex space-x-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setEditingFullInvoice(null)}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm py-2.5 rounded-2xl transition cursor-pointer"
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm py-3 rounded-full transition cursor-pointer"
               >
                 បោះបង់
               </button>
@@ -8786,13 +8827,13 @@ const handleExportSelectedUserStockExcel = async () => {
                 type="button"
                 disabled={loading}
                 onClick={handleSaveFullInvoice}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs sm:text-sm py-2.5 rounded-2xl shadow-lg shadow-amber-500/20 transition disabled:opacity-70 cursor-pointer flex items-center justify-center space-x-1.5"
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm py-3 rounded-full shadow-lg shadow-amber-500/20 transition disabled:opacity-70 cursor-pointer flex items-center justify-center space-x-2"
               >
                 {loading ? (
                   <span>កំពុងរក្សាទុក...</span>
                 ) : (
                   <>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                     <span>រក្សាទុកវិក្កយបត្រ</span>
@@ -9382,6 +9423,194 @@ const handleExportSelectedUserStockExcel = async () => {
         document.body
       )}
 
-    </div>
+    
+      {/* Excel Choice Modal */}
+      {isExcelChoiceModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-6 pb-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10 shrink-0">
+              <h2 className="text-lg font-black text-slate-800">ជ្រើសរើសទំនិញសម្រាប់ Excel</h2>
+              <button
+                onClick={() => setIsExcelChoiceModalOpen(false)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="p-4 flex flex-col space-y-4 overflow-y-auto custom-scroll flex-1 bg-slate-50/50">
+              <p className="text-xs text-slate-500 font-bold px-2 mb-2">ចុច បន្ថែម ទំនិញដែលអ្នកចង់បង្ហាញក្នុង Excel។ ចុចព្រួញឡើង/ចុះដើម្បីរៀបលំដាប់។</p>
+              
+              <div className="flex flex-col space-y-4">
+                {/* Selected Items Section */}
+                {excelChoiceItems.some(i => i.selected) ? (
+                  <div className="flex flex-col space-y-2">
+                    {excelChoiceItems.map((item, idx) => {
+                      if (!item.selected) return null;
+                      const lastSelectedIdx = excelChoiceItems.filter(i => i.selected).length - 1;
+                      
+                      return (
+                        <div key={item.code} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm transition hover:shadow-md">
+                          <div className="flex-1 flex items-center justify-between">
+                            <span className="font-bold text-sm text-slate-800">{item.code}</span>
+                            <div className="flex items-center gap-1 sm:gap-2">
+                              <div className="flex items-center bg-slate-50 border border-slate-100 rounded-lg p-0.5">
+                                <button
+                                  onClick={() => {
+                                    if (idx === 0) return;
+                                    const copy = [...excelChoiceItems];
+                                    const temp = copy[idx - 1];
+                                    copy[idx - 1] = copy[idx];
+                                    copy[idx] = temp;
+                                    setExcelChoiceItems(copy);
+                                  }}
+                                  disabled={idx === 0 || !excelChoiceItems[idx - 1].selected}
+                                  className={`p-1.5 rounded-md transition ${idx === 0 || !excelChoiceItems[idx - 1].selected ? 'text-slate-300' : 'text-slate-500 hover:bg-white hover:text-slate-700 hover:shadow-sm'}`}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                                  </svg>
+                                </button>
+                                <div className="w-px h-4 bg-slate-200 mx-0.5"></div>
+                                <button
+                                  onClick={() => {
+                                    if (idx === excelChoiceItems.length - 1) return;
+                                    const copy = [...excelChoiceItems];
+                                    const temp = copy[idx + 1];
+                                    copy[idx + 1] = copy[idx];
+                                    copy[idx] = temp;
+                                    setExcelChoiceItems(copy);
+                                  }}
+                                  disabled={idx === excelChoiceItems.length - 1 || !excelChoiceItems[idx + 1].selected}
+                                  className={`p-1.5 rounded-md transition ${idx === excelChoiceItems.length - 1 || !excelChoiceItems[idx + 1].selected ? 'text-slate-300' : 'text-slate-500 hover:bg-white hover:text-slate-700 hover:shadow-sm'}`}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  const copy = [...excelChoiceItems];
+                                  const removedItem = copy.splice(idx, 1)[0];
+                                  removedItem.selected = false;
+                                  copy.push(removedItem);
+                                  setExcelChoiceItems(copy);
+                                }}
+                                className="text-[11px] bg-rose-50 text-rose-500 font-bold px-3 py-1.5 rounded-lg hover:bg-rose-100 transition ml-1"
+                              >
+                                ដកចេញ
+                              </button>
+                            </div>
+                          </div>
+                          
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-center bg-white/50 min-h-[120px]">
+                    <span className="text-slate-400 text-sm font-bold">មិនទាន់មានទិន្នន័យ។ សូមជ្រើសរើសទំនិញដើម្បីតម្រៀប។</span>
+                  </div>
+                )}
+
+                {/* Unselected Items Section */}
+                {excelChoiceItems.some(i => !i.selected) && (
+                  <div className="flex flex-col items-center justify-center pt-2 mt-4">
+                    <div className="relative w-full max-w-sm">
+                      <select
+                        className="w-full appearance-none bg-emerald-50 text-emerald-600 font-bold text-sm py-3 pl-4 pr-10 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer shadow-sm text-center"
+                        value=""
+                        onChange={(e) => {
+                          const selectedCode = e.target.value;
+                          if (!selectedCode) return;
+                          
+                          const copy = [...excelChoiceItems];
+                          const idx = copy.findIndex(i => i.code === selectedCode);
+                          if (idx !== -1) {
+                            const addedItem = copy.splice(idx, 1)[0];
+                            addedItem.selected = true;
+                            
+                            let insertIdx = 0;
+                            for (let i = 0; i < copy.length; i++) {
+                                if (copy[i].selected) {
+                                   insertIdx = i + 1;
+                                }
+                            }
+                            copy.splice(insertIdx, 0, addedItem);
+                            setExcelChoiceItems(copy);
+                          }
+                        }}
+                      >
+                        <option value="" disabled>+ ជ្រើសរើសទំនិញដើម្បីតម្រៀប</option>
+                        {excelChoiceItems.map((item) => {
+                          if (item.selected) return null;
+                          return (
+                            <option key={item.code} value={item.code}>
+                              {item.code}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 bg-white border-t border-slate-100 flex items-center space-x-3 shrink-0">
+              <button
+                onClick={() => {
+                  localStorage.setItem('excelChoiceProductsOrder', JSON.stringify(excelChoiceItems));
+                  alert("បានរក្សាទុកលំដាប់លំដោយដោយជោគជ័យ!");
+                }}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3.5 rounded-2xl transition shadow-lg shadow-blue-600/20"
+              >
+                រក្សាទុក
+              </button>
+                            <button
+                onClick={() => {
+                  const allProductsOrdered = excelChoiceItems.map(i => ({
+                    khmerName: i.khmerName,
+                    code: i.code
+                  }));
+                  handleExportSelectedUserStockExcel(allProductsOrdered, true);
+                  setIsExcelChoiceModalOpen(false);
+                }}
+                className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-bold text-[13px] py-3.5 rounded-2xl transition shadow-lg shadow-indigo-500/20"
+              >
+                Auto Excel
+              </button>
+              <button
+                onClick={() => {
+                  const hasSelection = excelChoiceItems.some(i => i.selected);
+                  if (!hasSelection) {
+                    alert("សូមជ្រើសរើសយ៉ាងហោចណាស់មួយទំនិញ!");
+                    return;
+                  }
+                  const customProducts = excelChoiceItems.filter(i => i.selected).map(i => ({
+                    khmerName: i.khmerName,
+                    code: i.code
+                  }));
+                  handleExportSelectedUserStockExcel(customProducts);
+                  setIsExcelChoiceModalOpen(false);
+                }}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-3.5 rounded-2xl transition shadow-lg shadow-emerald-600/20"
+              >
+                Excel
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+</div>
   );
 }

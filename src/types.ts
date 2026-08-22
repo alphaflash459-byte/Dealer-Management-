@@ -22,6 +22,7 @@ export interface PromotionTier {
 export interface Product {
   id: string;
   name: string;
+  fullName?: string;
   price?: number;
   promoBuyQty?: number;
   promoGetQty?: number;
