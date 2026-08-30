@@ -16,5 +16,8 @@ service cloud.firestore {
     match /warehouse_stock_ins/{recordId} {
       allow read, write: if true;
     }
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
   }
 }

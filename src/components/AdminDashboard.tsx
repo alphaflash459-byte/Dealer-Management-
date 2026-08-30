@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { User, Transaction, Product, StockOrder, PromotionTier, Role, TransactionType } from '../types';
-import { doc, setDoc, deleteDoc, updateDoc, deleteField, increment, collection, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, updateDoc, deleteField, increment, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -227,39 +227,44 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [excelChoiceItems, setExcelChoiceItems] = useState<{khmerName: string, code: string, selected: boolean}[]>([]);
   useEffect(() => { 
   if (products.length > 0 && excelChoiceItems.length === 0) {
-    const savedStr = localStorage.getItem('excelChoiceProductsOrder');
-    if (savedStr) {
+    const fetchSavedOrder = async () => {
       try {
-        const savedList = JSON.parse(savedStr);
-        const productMap = new Map(products.map(p => [p.name, p]));
-        let combined: {khmerName: string, code: string, selected: boolean}[] = [];
-        savedList.forEach((savedItem: any) => {
-          if (productMap.has(savedItem.code)) {
-            const p = productMap.get(savedItem.code)!;
+        const docRef = doc(db, 'settings', 'excelChoiceProductsOrder');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().items) {
+          const savedList = docSnap.data().items;
+          const productMap = new Map(products.map(p => [p.name, p]));
+          let combined: {khmerName: string, code: string, selected: boolean}[] = [];
+          savedList.forEach((savedItem: any) => {
+            if (productMap.has(savedItem.code)) {
+              const p = productMap.get(savedItem.code)!;
+              combined.push({
+                khmerName: p.fullName || p.name,
+                code: savedItem.code,
+                selected: savedItem.selected
+              });
+              productMap.delete(savedItem.code);
+            }
+          });
+          productMap.forEach(p => {
             combined.push({
               khmerName: p.fullName || p.name,
-              code: savedItem.code,
-              selected: savedItem.selected
+              code: p.name,
+              selected: true
             });
-            productMap.delete(savedItem.code);
-          }
-        });
-        productMap.forEach(p => {
-          combined.push({
-            khmerName: p.fullName || p.name,
-            code: p.name,
-            selected: true
           });
-        });
-        setExcelChoiceItems(combined);
+          setExcelChoiceItems(combined);
+        } else {
+          setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true }))); 
+        }
       } catch (e) {
+        console.error('Error fetching excel choice items:', e);
         setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true })));
       }
-    } else {
-      setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true }))); 
-    }
-  } 
-}, [products]);
+    };
+    fetchSavedOrder();
+  }
+ }, [products]);
   const [exportFileType, setExportFileType] = useState<'pdf' | 'excel'>('excel');
   const [exportDocType, setExportDocType] = useState<string>('warehouse');
   const [exportUserId, setExportUserId] = useState<string>('all');
@@ -9577,9 +9582,14 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
 
             <div className="p-6 bg-white border-t border-slate-100 flex items-center space-x-3 shrink-0">
               <button
-                onClick={() => {
-                  localStorage.setItem('excelChoiceProductsOrder', JSON.stringify(excelChoiceItems));
-                  alert("បានរក្សាទុកលំដាប់លំដោយដោយជោគជ័យ!");
+                onClick={async () => {
+                  try {
+                    await setDoc(doc(db, 'settings', 'excelChoiceProductsOrder'), { items: excelChoiceItems });
+                    alert('បានរក្សាទុកលំដាប់លំដោយដោយជោគជ័យ!');
+                  } catch (err) {
+                    console.error('Error saving excel choice order:', err);
+                    alert('មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យ។');
+                  }
                 }}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3.5 rounded-2xl transition shadow-lg shadow-blue-600/20"
               >

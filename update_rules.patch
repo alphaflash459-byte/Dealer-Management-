@@ -1,0 +1,11 @@
+--- firestore.rules
++++ firestore.rules
+@@ -16,5 +16,8 @@
+     match /warehouse_stock_ins/{recordId} {
+       allow read, write: if true;
+     }
++    match /settings/{settingId} {
++      allow read, write: if true;
++    }
+   }
+ }

@@ -1,0 +1,77 @@
+--- src/components/AdminDashboard.tsx
++++ src/components/AdminDashboard.tsx
+@@ -226,34 +226,39 @@
+   const [isExcelChoiceModalOpen, setIsExcelChoiceModalOpen] = useState(false);
+   const [excelChoiceItems, setExcelChoiceItems] = useState<{khmerName: string, code: string, selected: boolean}[]>([]);
+ 
+   useEffect(() => { 
+   if (products.length > 0 && excelChoiceItems.length === 0) {
+-    const savedStr = localStorage.getItem('excelChoiceProductsOrder');
+-    if (savedStr) {
+-      try {
+-        const savedList = JSON.parse(savedStr);
+-        const productMap = new Map(products.map(p => [p.name, p]));
+-        let combined: {khmerName: string, code: string, selected: boolean}[] = [];
+-        savedList.forEach((savedItem: any) => {
+-          if (productMap.has(savedItem.code)) {
+-            const p = productMap.get(savedItem.code)!;
+-            combined.push({
+-              khmerName: p.fullName || p.name,
+-              code: savedItem.code,
+-              selected: savedItem.selected
+-            });
+-            productMap.delete(savedItem.code);
+-          }
+-        });
+-        productMap.forEach(p => {
+-          combined.push({
+-            khmerName: p.fullName || p.name,
+-            code: p.name,
+-            selected: true
+-          });
+-        });
+-        setExcelChoiceItems(combined);
+-      } catch (e) {
+-        setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true })));
+-      }
+-    } else {
+-      setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true }))); 
+-    }
++    const fetchSavedOrder = async () => {
++      try {
++        const docRef = doc(db, 'settings', 'excelChoiceProductsOrder');
++        const docSnap = await getDoc(docRef);
++        if (docSnap.exists() && docSnap.data().items) {
++          const savedList = docSnap.data().items;
++          const productMap = new Map(products.map(p => [p.name, p]));
++          let combined: {khmerName: string, code: string, selected: boolean}[] = [];
++          savedList.forEach((savedItem: any) => {
++            if (productMap.has(savedItem.code)) {
++              const p = productMap.get(savedItem.code)!;
++              combined.push({
++                khmerName: p.fullName || p.name,
++                code: savedItem.code,
++                selected: savedItem.selected
++              });
++              productMap.delete(savedItem.code);
++            }
++          });
++          productMap.forEach(p => {
++            combined.push({
++              khmerName: p.fullName || p.name,
++              code: p.name,
++              selected: true
++            });
++          });
++          setExcelChoiceItems(combined);
++        } else {
++          setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true }))); 
++        }
++      } catch (e) {
++        console.error("Error fetching excel choice items:", e);
++        setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true })));
++      }
++    };
++    fetchSavedOrder();
+   }
+  }, [products]);

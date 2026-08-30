@@ -1,0 +1,7 @@
+              <button
+                onClick={() => {
+                  localStorage.setItem('excelChoiceProductsOrder', JSON.stringify(excelChoiceItems));
+                  alert("បានរក្សាទុកលំដាប់លំដោយដោយជោគជ័យ!");
+                }}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3.5 rounded-2xl transition shadow-lg shadow-blue-600/20"
+              >
