@@ -691,7 +691,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         body: JSON.stringify({ 
           image: stockInImage, 
           targetType: 'Stock In',
-          productNames: products.map(p => p.name)
+          productNames: orderedProducts.map(p => p.name)
         })
       });
       
@@ -1747,7 +1747,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         body: JSON.stringify({
            image: manualAddImage,
            targetType: aiScannerType,
-          productNames: products.map(p => p.name)
+          productNames: orderedProducts.map(p => p.name)
         })
       });
       let result;
@@ -1860,7 +1860,7 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
         body: JSON.stringify({ 
           image: aiScannerImage, 
           targetType: aiScannerType,
-          productNames: products.map(p => p.name)
+          productNames: orderedProducts.map(p => p.name)
         })
       });
       
@@ -3463,7 +3463,7 @@ const handleGeneralExport = async () => {
       if (exportDocType === 'warehouse') {
         title = 'របាយការណ៍ស្តុកឃ្លាំង';
         headers = ['ល.រ', 'មុខទំនិញ', 'ស្តុកដើមគ្រា', 'ស្តុកចូល', 'ស្តុកឡើងឡាន', 'ស្តុកត្រឡប់', 'ចំនួនលក់', 'ដូរក្រវិល', 'ចំនួនថែម', 'ស្តុកសល់'];
-        rows = products.map((p, idx) => {
+        rows = orderedProducts.map((p, idx) => {
           const currentStock = p.warehouseStock || 0;
           let rangeStockIn = 0, rangeStockOut = 0, rangeStockReturn = 0, rangeStockSold = 0, rangeStockExchanged = 0, rangeStockPromo = 0;
           let rollbackStockIn = 0, rollbackStockOut = 0, rollbackStockReturn = 0;
@@ -3518,7 +3518,8 @@ const handleGeneralExport = async () => {
       } else if (exportDocType === 'stock_in') {
         title = 'របាយការណ៍ស្តុកចូល';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រគល់', 'ទំនិញ', 'បរិមាណ'];
-        const stockIns = warehouseStockIns.filter(r => r.type !== 'count');
+        const orderedNames = new Set(orderedProducts.map(p => p.name));
+        const stockIns = warehouseStockIns.filter(r => r.type !== 'count').map(r => ({...r, items: r.items.filter(i => orderedNames.has(i.productName))})).filter(r => r.items.length > 0);
         rows = stockIns.map((r, idx) => [
           idx + 1,
           r.date,
@@ -3540,7 +3541,7 @@ const handleGeneralExport = async () => {
           previousDayStr = `${year}-${month}-${day}`;
         }
         
-        rows = products.map((p, idx) => {
+        rows = orderedProducts.map((p, idx) => {
           const currentStock = p.warehouseStock || 0;
           
           let rangeStockIn = 0;
@@ -3611,7 +3612,8 @@ const handleGeneralExport = async () => {
       } else if (exportDocType === 'stock_out') {
         title = 'របាយការណ៍ស្តុកឡើងឡាន';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណ'];
-        const outs = filteredTransactions.filter(tx => tx.type === 'Stock Out');
+        const orderedNames = new Set(orderedProducts.map(p => p.name));
+        const outs = filteredTransactions.filter(tx => tx.type === 'Stock Out' && orderedNames.has(tx.productName));
         rows = outs.map((tx, idx) => [
           idx + 1,
           new Date(tx.date).toLocaleDateString('en-GB'),
@@ -3622,7 +3624,8 @@ const handleGeneralExport = async () => {
       } else if (exportDocType === 'stock_sold') {
         title = 'របាយការណ៍ស្តុកលក់';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណលក់', 'ថែម', 'ដូរ'];
-        const solds = filteredTransactions.filter(tx => tx.type === 'Stock Sold');
+        const orderedNames = new Set(orderedProducts.map(p => p.name));
+        const solds = filteredTransactions.filter(tx => tx.type === 'Stock Sold' && orderedNames.has(tx.productName));
         rows = solds.map((tx, idx) => [
           idx + 1,
           new Date(tx.date).toLocaleDateString('en-GB'),
@@ -3635,7 +3638,8 @@ const handleGeneralExport = async () => {
       } else if (exportDocType === 'stock_return') {
         title = 'របាយការណ៍ស្តុកត្រឡប់';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណ'];
-        const returns = filteredTransactions.filter(tx => tx.type === 'Stock Return');
+        const orderedNames = new Set(orderedProducts.map(p => p.name));
+        const returns = filteredTransactions.filter(tx => tx.type === 'Stock Return' && orderedNames.has(tx.productName));
         rows = returns.map((tx, idx) => [
           idx + 1,
           new Date(tx.date).toLocaleDateString('en-GB'),
@@ -3714,7 +3718,7 @@ const handleGeneralExport = async () => {
       if (exportDocType === 'warehouse') {
         title = 'របាយការណ៍ស្តុកឃ្លាំង';
         headers = ['ល.រ', 'មុខទំនិញ', 'ស្តុកដើមគ្រា', 'ស្តុកចូល', 'ស្តុកឡើងឡាន', 'ស្តុកត្រឡប់', 'ចំនួនលក់', 'ដូរក្រវិល', 'ចំនួនថែម', 'ស្តុកសល់'];
-        rows = products.map((p, idx) => {
+        rows = orderedProducts.map((p, idx) => {
           const currentStock = p.warehouseStock || 0;
           let rangeStockIn = 0, rangeStockOut = 0, rangeStockReturn = 0, rangeStockSold = 0, rangeStockExchanged = 0, rangeStockPromo = 0;
           let rollbackStockIn = 0, rollbackStockOut = 0, rollbackStockReturn = 0;
@@ -3769,7 +3773,8 @@ const handleGeneralExport = async () => {
       } else if (exportDocType === 'stock_in') {
         title = 'របាយការណ៍ស្តុកចូល';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រគល់', 'ទំនិញ', 'បរិមាណ'];
-        const stockIns = warehouseStockIns.filter(r => r.type !== 'count');
+        const orderedNames = new Set(orderedProducts.map(p => p.name));
+        const stockIns = warehouseStockIns.filter(r => r.type !== 'count').map(r => ({...r, items: r.items.filter(i => orderedNames.has(i.productName))})).filter(r => r.items.length > 0);
         rows = stockIns.map((r, idx) => [
           idx + 1,
           r.date,
@@ -3791,7 +3796,7 @@ const handleGeneralExport = async () => {
           previousDayStr = `${year}-${month}-${day}`;
         }
         
-        rows = products.map((p, idx) => {
+        rows = orderedProducts.map((p, idx) => {
           const currentStock = p.warehouseStock || 0;
           
           let rangeStockIn = 0;
@@ -3862,7 +3867,8 @@ const handleGeneralExport = async () => {
       } else if (exportDocType === 'stock_out') {
         title = 'របាយការណ៍ស្តុកឡើងឡាន';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណ'];
-        const outs = filteredTransactions.filter(tx => tx.type === 'Stock Out');
+        const orderedNames = new Set(orderedProducts.map(p => p.name));
+        const outs = filteredTransactions.filter(tx => tx.type === 'Stock Out' && orderedNames.has(tx.productName));
         rows = outs.map((tx, idx) => [
           idx + 1,
           new Date(tx.date).toLocaleDateString('en-GB'),
@@ -3873,7 +3879,8 @@ const handleGeneralExport = async () => {
       } else if (exportDocType === 'stock_sold') {
         title = 'របាយការណ៍ស្តុកលក់';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណលក់', 'ថែម', 'ដូរ'];
-        const solds = filteredTransactions.filter(tx => tx.type === 'Stock Sold');
+        const orderedNames = new Set(orderedProducts.map(p => p.name));
+        const solds = filteredTransactions.filter(tx => tx.type === 'Stock Sold' && orderedNames.has(tx.productName));
         rows = solds.map((tx, idx) => [
           idx + 1,
           new Date(tx.date).toLocaleDateString('en-GB'),
@@ -3886,7 +3893,8 @@ const handleGeneralExport = async () => {
       } else if (exportDocType === 'stock_return') {
         title = 'របាយការណ៍ស្តុកត្រឡប់';
         headers = ['ល.រ', 'កាលបរិច្ឆេទ', 'អ្នកប្រើប្រាស់', 'ទំនិញ', 'បរិមាណ'];
-        const returns = filteredTransactions.filter(tx => tx.type === 'Stock Return');
+        const orderedNames = new Set(orderedProducts.map(p => p.name));
+        const returns = filteredTransactions.filter(tx => tx.type === 'Stock Return' && orderedNames.has(tx.productName));
         rows = returns.map((tx, idx) => [
           idx + 1,
           new Date(tx.date).toLocaleDateString('en-GB'),
@@ -4291,6 +4299,8 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
 
   // Filtered transactions for Admin tab
   const filteredTransactions = managedTransactions.filter(t => {
+    const orderedNames = new Set(orderedProducts.map(p => p.name));
+    if (!orderedNames.has(t.productName)) return false;
     const matchUser = filterTxUserId === 'all' || t.userId === filterTxUserId;
     
     const txDateStr = t.date ? t.date.split('T')[0] : '';
@@ -4315,7 +4325,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
     } = {};
 
     // First populate with all active products in the system so we cover all products
-    products.forEach(p => {
+    orderedProducts.forEach(p => {
       groupedMap[p.name] = {
         productName: p.name,
         stockOut: 0,
@@ -4329,17 +4339,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
 
     // Process filtered transactions
     filteredTransactions.forEach(t => {
-      if (!groupedMap[t.productName]) {
-        groupedMap[t.productName] = {
-          productName: t.productName,
-          stockOut: 0,
-          stockSold: 0,
-          stockExchanged: 0,
-          stockPromo: 0,
-          stockReturn: 0,
-          totalSoldQty: 0
-        };
-      }
+      if (!groupedMap[t.productName]) return;
       
       const group = groupedMap[t.productName];
       if (t.type === 'Stock Out') {
@@ -4359,10 +4359,10 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
       }
     });
 
-    // Convert to array and filter out products with zero activity in the filtered range
-    return Object.values(groupedMap)
-      .filter(p => p.stockOut > 0 || p.totalSoldQty > 0 || p.stockPromo > 0 || p.stockReturn > 0)
-      .sort((a, b) => a.productName.localeCompare(b.productName));
+    // Return in the exact order of orderedProducts, filtered by activity
+    return orderedProducts
+      .map(p => groupedMap[p.name])
+      .filter(p => p && (p.stockOut > 0 || p.totalSoldQty > 0 || p.stockPromo > 0 || p.stockReturn > 0));
   })();
 
   const handleSaveReport = async () => {
@@ -4538,7 +4538,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
     const productNames = new Set<string>();
 
     if (dashboardMetric === 'warehouse') {
-      products.forEach(p => {
+      orderedProducts.forEach(p => {
         if (dashboardFilterProduct !== 'all' && p.name !== dashboardFilterProduct) return;
         const qty = p.warehouseStock || 0;
         if (qty > 0) {
@@ -4669,7 +4669,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                 className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-[10px] sm:text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
               >
                 <option value="all">ទាំងអស់</option>
-                {products.map(p => (
+                {orderedProducts.map(p => (
                   <option key={p.id} value={p.name}>{p.name}</option>
                 ))}
               </select>
@@ -5867,7 +5867,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-[10px] sm:text-[11px] md:text-xs">
-                {products.map(product => {
+                {orderedProducts.map(product => {
                   let rangeStockIn = 0;
                   let rangeStockOut = 0;
                   let rangeStockReturn = 0;
@@ -6070,8 +6070,8 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                                   onChange={(e) => updateStockInRow(idx, 'productName', e.target.value)}
                                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:border-sky-400 outline-none transition cursor-pointer truncate"
                                 >
-                                  {products.map(p => (
-                                    <option key={p.id} value={p.name}>{p.name}</option>
+                                  {orderedProducts.map(p => (
+                                  <option key={p.id} value={p.name}>{p.name}</option>
                                   ))}
                                 </select>
                               </td>
@@ -6811,7 +6811,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                                 className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs focus:border-sky-400 outline-none font-bold text-slate-700 cursor-pointer"
                               >
                                 {item.actualProduct ? null : <option value={item.productName}>{item.productName} (មិនមានក្នុងស្តុក)</option>}
-                                {products.map(p => (
+                                {orderedProducts.map(p => (
                                   <option key={p.id} value={p.name}>{p.name}</option>
                                 ))}
                               </select>
@@ -7960,8 +7960,8 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                             required
                           >
                             <option value="">-- ទំនិញ --</option>
-                            {products.map(p => (
-                              <option key={p.id} value={p.name}>
+                            {orderedProducts.map(p => (
+                                  <option key={p.id} value={p.name}>
                                 {p.name}
                               </option>
                             ))}
@@ -8161,8 +8161,8 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition outline-none font-bold text-slate-800 cursor-pointer"
                       required
                     >
-                      {products.map(p => (
-                        <option key={p.id} value={p.name}>
+                      {orderedProducts.map(p => (
+                                  <option key={p.id} value={p.name}>
                           {p.name}
                         </option>
                       ))}
@@ -8739,7 +8739,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                                 }}
                                 className="w-full bg-white border border-slate-200 rounded-lg sm:rounded-xl px-2 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-slate-800 outline-none focus:border-amber-400 truncate"
                               >
-                                {products.map(p => (
+                                {orderedProducts.map(p => (
                                   <option key={p.id} value={p.name}>
                                     {p.name}
                                   </option>
@@ -9036,8 +9036,8 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                       required
                     >
                       <option value="" disabled>-- ជ្រើសរើសទំនិញ --</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.name}>
+                      {orderedProducts.map(p => (
+                                  <option key={p.id} value={p.name}>
                           {p.name}
                         </option>
                       ))}
@@ -9363,8 +9363,8 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                               }}
                               className="w-full bg-transparent border-none px-2 py-1 text-sm font-bold text-slate-700 focus:ring-0 outline-none cursor-pointer truncate"
                             >
-                              {products.map(p => (
-                                <option key={p.id} value={p.name}>{p.name}</option>
+                              {orderedProducts.map(p => (
+                                  <option key={p.id} value={p.name}>{p.name}</option>
                               ))}
                             </select>
                           </div>

@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { User, Transaction, TransactionType, Product, StockOrder } from '../types';
-import { doc, setDoc, deleteDoc, updateDoc, deleteField, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, deleteField, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export function cleanUndefined<T extends object>(obj: T): T {
@@ -122,6 +122,61 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
     const dd = String(today.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
+  const [excelChoiceItems, setExcelChoiceItems] = useState<{khmerName: string, code: string, selected: boolean}[]>([]);
+  useEffect(() => {
+   if (products.length > 0 && excelChoiceItems.length === 0) {
+    const fetchSavedOrder = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'excelChoiceProductsOrder');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().items) {
+          const savedList = docSnap.data().items;
+          const productMap = new Map(products.map(p => [p.name, p]));
+          let combined = [];
+          savedList.forEach((savedItem) => {
+            if (productMap.has(savedItem.code)) {
+              const p = productMap.get(savedItem.code);
+              combined.push({
+                khmerName: p.fullName || p.name,
+                code: savedItem.code,
+                selected: savedItem.selected
+              });
+              productMap.delete(savedItem.code);
+            }
+          });
+          productMap.forEach(p => {
+            combined.push({
+              khmerName: p.fullName || p.name,
+              code: p.name,
+              selected: true
+            });
+          });
+          setExcelChoiceItems(combined);
+        } else {
+          setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true }))); 
+        }
+      } catch (e) {
+        console.error('Error fetching excel choice items:', e);
+        setExcelChoiceItems(products.map(p => ({ khmerName: p.fullName || p.name, code: p.name, selected: true })));
+      }
+    };
+    fetchSavedOrder();
+  }
+ }, [products]);
+
+  const orderedProducts = useMemo(() => {
+    const addedNames = new Set();
+    const ordered = [];
+    excelChoiceItems.forEach(eci => {
+      const p = products.find(prod => prod.name === eci.code);
+      if (eci.selected && p && !addedNames.has(p.name)) {
+        ordered.push(p);
+        addedNames.add(p.name);
+      }
+    });
+    return ordered;
+  }, [products, excelChoiceItems]);
+
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [quickAddModalConfig, setQuickAddModalConfig] = useState<{
@@ -1291,6 +1346,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
 
   const filteredReportTransactions = transactions.filter(t => {
     if (t.userId !== currentUser.id) return false;
+    const orderedNames = new Set(orderedProducts.map(p => p.name));
+    if (!orderedNames.has(t.productName)) return false;
     if (filterStartDate) {
       const start = new Date(filterStartDate);
       start.setHours(0, 0, 0, 0);
@@ -1599,7 +1656,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
   };
 
   const handleExportPDF = () => {
-    const activeProducts = products.map(product => {
+    const activeProducts = orderedProducts.map(product => {
       const loaded = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Out').reduce((sum, t) => sum + t.quantity, 0);
       const stockSoldTxs = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Sold');
       const soldTotal = stockSoldTxs.reduce((sum, t) => sum + t.quantity, 0);
@@ -2072,7 +2129,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-[10px] sm:text-xs md:text-sm">
                       {(() => {
-                        const activeProducts = products.map(product => {
+                        const activeProducts = orderedProducts.map(product => {
                           const loaded = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Out').reduce((sum, t) => sum + t.quantity, 0);
                           const stockSoldTxs = filteredReportTransactions.filter(t => t.productName === product.name && t.type === 'Stock Sold');
                           const soldTotal = stockSoldTxs.reduce((sum, t) => sum + t.quantity, 0);
@@ -2664,7 +2721,7 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                     required
                   >
                     <option value="" disabled>-- ជ្រើសរើសទំនិញ --</option>
-                    {products.map(p => (
+                    {orderedProducts.map(p => (
                       <option key={p.id} value={p.name}>
                         {p.name}
                       </option>
@@ -3330,8 +3387,8 @@ export default function UserDashboard({ currentUser, transactions, setTransactio
                                 }}
                                 className="w-full bg-white border border-slate-200 rounded-lg sm:rounded-xl px-2 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-slate-800 outline-none focus:border-amber-400 truncate"
                               >
-                                {products.map(p => (
-                                  <option key={p.id} value={p.name}>
+                                {orderedProducts.map(p => (
+                      <option key={p.id} value={p.name}>
                                     {p.name}
                                   </option>
                                 ))}
