@@ -265,6 +265,20 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
     fetchSavedOrder();
   }
  }, [products]);
+
+  const orderedProducts = useMemo(() => {
+    const addedNames = new Set<string>();
+    const ordered = [];
+    excelChoiceItems.forEach(eci => {
+      const p = products.find(prod => prod.name === eci.code);
+      if (eci.selected && p && !addedNames.has(p.name)) {
+        ordered.push(p);
+        addedNames.add(p.name);
+      }
+    });
+    return ordered;
+  }, [products, excelChoiceItems]);
+
   const [exportFileType, setExportFileType] = useState<'pdf' | 'excel'>('excel');
   const [exportDocType, setExportDocType] = useState<string>('warehouse');
   const [exportUserId, setExportUserId] = useState<string>('all');
@@ -6013,7 +6027,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                       type="button"
                       onClick={() => {
                         const existingNames = new Set(stockInItems.map(i => i.productName));
-                        const newItems = products
+                        const newItems = orderedProducts
                           .filter(p => !existingNames.has(p.name))
                           .map(p => ({ productName: p.name, quantity: '' }));
                         setQuickAddItems(newItems);
@@ -6214,7 +6228,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                             }}
                             className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition truncate"
                           >
-                            {products.map(p => (
+                            {orderedProducts.map(p => (
                               <option key={p.id} value={p.name}>{p.name}</option>
                             ))}
                           </select>
@@ -6466,7 +6480,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                             }}
                             className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition truncate"
                           >
-                            {products.map(p => (
+                            {orderedProducts.map(p => (
                               <option key={p.id} value={p.name}>{p.name}</option>
                             ))}
                           </select>
@@ -6723,7 +6737,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                   <button
                     type="button"
                     onClick={() => {
-                      const items = products.map(p => ({
+                      const items = orderedProducts.map(p => ({
                         id: Date.now().toString() + Math.random().toString(),
                         productName: p.name,
                         quantity: 0,
