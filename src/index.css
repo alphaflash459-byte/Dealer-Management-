@@ -39,3 +39,19 @@ body {
     padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
   }
 }
+
+/* Hide number input arrows */
+input[type="number"]::-webkit-inner-spin-button, 
+input[type="number"]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Ensure inputs are not hidden behind sticky headers when focused via keyboard navigation */
+input, select {
+  scroll-margin-top: 65px;
+  scroll-margin-bottom: 65px;
+}

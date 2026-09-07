@@ -8,7 +8,110 @@ import UserDashboard from './components/UserDashboard';
 import { onSnapshot, setDoc, doc } from 'firebase/firestore';
 import { usersCollection, transactionsCollection, productsCollection, stockOrdersCollection, db } from './lib/firebase';
 
+
+function useSpatialNavigation() {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName !== 'INPUT' && target.tagName !== 'SELECT') return;
+      
+      const input = target as HTMLInputElement;
+
+      // Prevent default ArrowUp/ArrowDown on number inputs to avoid changing the value
+      if (input.type === 'number' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+      }
+
+      // We handle ArrowLeft and ArrowRight as well.
+      // Many users want Left/Right to jump between columns in a grid when typing numbers.
+      // If the input is type="number", we can't get cursor position, so let's just allow jumping 
+      // with Left/Right. If they want to move cursor, they can use mouse.
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (input.type === 'number' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+            e.preventDefault();
+        } else if (input.type !== 'number' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && input.tagName === 'INPUT') {
+            // For text inputs, let them move the cursor
+            return;
+        }
+
+        const inputs = Array.from(
+          document.querySelectorAll('input:not([disabled]):not([readonly]):not([type="hidden"]), select:not([disabled])')
+        ).filter(el => {
+          const rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        });
+
+        const currentIndex = inputs.indexOf(input);
+        if (currentIndex === -1) return;
+
+        let nextInput: HTMLInputElement | HTMLSelectElement | null = null;
+        const currentRect = input.getBoundingClientRect();
+
+        if (e.key === 'ArrowDown') {
+          let bestCandidate = null;
+          let minScore = Infinity;
+          for (let i = currentIndex + 1; i < inputs.length; i++) {
+            const rect = inputs[i].getBoundingClientRect();
+            if (rect.top >= currentRect.bottom - 8) {
+              const overlapX = Math.min(currentRect.right, rect.right) - Math.max(currentRect.left, rect.left);
+              const dx = Math.abs(rect.left - currentRect.left);
+              
+              if (overlapX > 0 || dx < 50) {
+                 const dy = rect.top - currentRect.bottom;
+                 // Score heavily weights Y distance, but uses X distance as a tie-breaker
+                 const score = dy * 1000 + dx;
+                 if (score < minScore) {
+                     minScore = score;
+                     bestCandidate = inputs[i];
+                 }
+              }
+            }
+          }
+          nextInput = bestCandidate as HTMLInputElement | HTMLSelectElement | null;
+        } else if (e.key === 'ArrowUp') {
+          let bestCandidate = null;
+          let minScore = Infinity;
+          for (let i = currentIndex - 1; i >= 0; i--) {
+            const rect = inputs[i].getBoundingClientRect();
+            if (rect.bottom <= currentRect.top + 8) {
+              const overlapX = Math.min(currentRect.right, rect.right) - Math.max(currentRect.left, rect.left);
+              const dx = Math.abs(rect.left - currentRect.left);
+              
+              if (overlapX > 0 || dx < 50) {
+                 const dy = currentRect.top - rect.bottom;
+                 const score = dy * 1000 + dx;
+                 if (score < minScore) {
+                     minScore = score;
+                     bestCandidate = inputs[i];
+                 }
+              }
+            }
+          }
+          nextInput = bestCandidate as HTMLInputElement | HTMLSelectElement | null;
+        } else if (e.key === 'ArrowRight') {
+           nextInput = inputs[currentIndex + 1] as HTMLInputElement | HTMLSelectElement;
+        } else if (e.key === 'ArrowLeft') {
+           nextInput = inputs[currentIndex - 1] as HTMLInputElement | HTMLSelectElement;
+        }
+
+        if (nextInput) {
+          nextInput.focus();
+          if (nextInput.tagName === 'INPUT') {
+            (nextInput as HTMLInputElement).select();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+}
+
 export default function App() {
+  useSpatialNavigation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
