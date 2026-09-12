@@ -62,3 +62,15 @@ export interface StockOrder {
   deliveredAt?: string;
   deliveredBy?: string;
 }
+
+export interface PalletConfig {
+  layout: {
+    leftRows: number;
+    rightRows: number;
+    depth: number;
+    maxHeight: number;
+  };
+  capacities: {
+    [productName: string]: number; // Quantity of this product per pallet
+  };
+}

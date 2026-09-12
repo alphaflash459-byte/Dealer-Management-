@@ -225,6 +225,28 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExcelChoiceModalOpen, setIsExcelChoiceModalOpen] = useState(false);
   const [excelChoiceItems, setExcelChoiceItems] = useState<{khmerName: string, code: string, selected: boolean}[]>([]);
+  
+  const [isPalletConfigModalOpen, setIsPalletConfigModalOpen] = useState(false);
+  const [isPalletMapModalOpen, setIsPalletMapModalOpen] = useState(false);
+  const [palletConfig, setPalletConfig] = useState<any>({
+    layout: { leftRows: 0, rightRows: 0, depth: 0, maxHeight: 0, leftDepth: 0, rightDepth: 0, leftMaxHeight: 0, rightMaxHeight: 0 },
+    capacities: {}
+  });
+
+  useEffect(() => {
+    const fetchPalletConfig = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'palletConfig');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setPalletConfig(docSnap.data());
+        }
+      } catch (e) {
+        console.error('Error fetching pallet config:', e);
+      }
+    };
+    fetchPalletConfig();
+  }, []);
   useEffect(() => { 
   if (products.length > 0 && excelChoiceItems.length === 0) {
     const fetchSavedOrder = async () => {
@@ -2589,6 +2611,444 @@ export default function AdminDashboard({ currentUser, users, setUsers, transacti
       </html>
     `;
     
+    printWindow.document.write(documentContent);
+    printWindow.document.close();
+  };
+
+  const getLatestActualStock = (p: Product): number => {
+    // 1. Check latest stock count from warehouseStockIns (type === 'count')
+    const countRecords = warehouseStockIns.filter(r => r.type === 'count');
+    let latestCountFromRecord: number | null = null;
+    let latestRecordTime = 0;
+
+    for (const record of countRecords) {
+      const item = record.items?.find((i: any) => isSameProduct(i.productName, p.name));
+      if (item && item.quantity !== undefined && item.quantity !== null && item.quantity !== '') {
+        const time = record.createdAt ? new Date(record.createdAt).getTime() : (record.date ? new Date(record.date).getTime() : 0);
+        if (latestCountFromRecord === null || time > latestRecordTime) {
+          latestCountFromRecord = Number(item.quantity);
+          latestRecordTime = time;
+        }
+      }
+    }
+
+    const productTakeTime = p.lastStockTake ? new Date(p.lastStockTake).getTime() : 0;
+
+    // 2. If product has actualStock directly and it is at least as recent as the count record
+    if (p.actualStock !== undefined && p.actualStock !== null) {
+      if (latestCountFromRecord === null || productTakeTime >= latestRecordTime) {
+        return Number(p.actualStock);
+      }
+    }
+
+    // 3. If there is a record from stock counts
+    if (latestCountFromRecord !== null) {
+      return latestCountFromRecord;
+    }
+
+    // 4. If product.actualStock exists
+    if (p.actualStock !== undefined && p.actualStock !== null) {
+      return Number(p.actualStock);
+    }
+
+    // 5. Fallback to warehouseStock if no physical count was ever recorded
+    return p.warehouseStock || 0;
+  };
+
+  const handleExportPalletMapPDF = () => {
+    const config = palletConfig || { layout: { leftRows: 0, rightRows: 0, depth: 0, maxHeight: 0, leftDepth: 0, rightDepth: 0, leftMaxHeight: 0, rightMaxHeight: 0 }, capacities: {} };
+    const { leftRows = 0, rightRows = 0, depth = 0, maxHeight = 0, leftDepth = 0, rightDepth = 0, leftMaxHeight = 0, rightMaxHeight = 0 } = config.layout || {};
+
+    const actualLeftDepth = leftDepth > 0 ? leftDepth : depth;
+    const actualRightDepth = rightDepth > 0 ? rightDepth : depth;
+    const actualLeftHeight = leftMaxHeight > 0 ? leftMaxHeight : maxHeight;
+    const actualRightHeight = rightMaxHeight > 0 ? rightMaxHeight : maxHeight;
+
+    if (leftRows === 0 && rightRows === 0) {
+      alert("សូមកំណត់ទំហំឃ្លាំង (បាឡែត) ជាមុនសិន!");
+      return;
+    }
+
+    const colorHexPalette = [
+      { tailwind: 'bg-rose-500', hex: '#f43f5e' },
+      { tailwind: 'bg-blue-500', hex: '#3b82f6' },
+      { tailwind: 'bg-emerald-500', hex: '#10b981' },
+      { tailwind: 'bg-amber-500', hex: '#f59e0b' },
+      { tailwind: 'bg-purple-500', hex: '#a855f7' },
+      { tailwind: 'bg-cyan-500', hex: '#06b6d4' },
+      { tailwind: 'bg-pink-500', hex: '#ec4899' },
+      { tailwind: 'bg-orange-500', hex: '#f97316' },
+      { tailwind: 'bg-indigo-500', hex: '#6366f1' },
+      { tailwind: 'bg-teal-500', hex: '#14b8a6' }
+    ];
+
+    let palletsNeeded: { product: string, count: number, color: string, hex: string, capacity: number, stock: number }[] = [];
+    let unassignedList: { product: string, reason: string }[] = [];
+
+    products.forEach((p, idx) => {
+      // Use latest actual stock in warehouse (ស្តុកជាក់ស្ដែងចុងក្រោយ)
+      const stock = getLatestActualStock(p);
+      if (stock > 0) {
+        const capacity = config.capacities?.[p.name] || 0;
+        if (capacity > 0) {
+          const colorObj = colorHexPalette[idx % colorHexPalette.length];
+          palletsNeeded.push({
+            product: p.name,
+            count: Math.ceil(stock / capacity),
+            color: colorObj.tailwind,
+            hex: colorObj.hex,
+            capacity,
+            stock
+          });
+        } else {
+          unassignedList.push({ product: p.name, reason: 'មិនទាន់កំណត់ចំនួន/បាឡែត' });
+        }
+      }
+    });
+
+    const stockOutTotals: Record<string, number> = {};
+    products.forEach(p => stockOutTotals[p.name] = 0);
+    transactions.forEach(tx => {
+      if (tx.type === 'Stock Out' && stockOutTotals[tx.productName] !== undefined) {
+        stockOutTotals[tx.productName] += tx.quantity;
+      }
+    });
+
+    palletsNeeded.sort((a, b) => {
+      const outA = stockOutTotals[a.product] || 0;
+      const outB = stockOutTotals[b.product] || 0;
+      if (outB !== outA) return outB - outA;
+      return b.count - a.count;
+    });
+
+    const leftMatrix: any[][][] = Array(leftRows).fill(null).map(() => Array(actualLeftDepth).fill(null).map(() => []));
+    const rightMatrix: any[][][] = Array(rightRows).fill(null).map(() => Array(actualRightDepth).fill(null).map(() => []));
+
+    let availableRows: {side: string, r: number}[] = [];
+    for (let r = 0; r < rightRows; r++) availableRows.push({side: 'right', r});
+    for (let r = 0; r < leftRows; r++) availableRows.push({side: 'left', r});
+
+    let allSlots: { side: string, r: number, d: number, stack: any[], maxH: number }[] = [];
+    for (let row of availableRows) {
+      const targetMatrix = row.side === 'left' ? leftMatrix : rightMatrix;
+      if (row.side === 'left') {
+        for (let d = actualLeftDepth - 1; d >= 0; d--) {
+          allSlots.push({ side: row.side, r: row.r, d: d, stack: targetMatrix[row.r][d], maxH: actualLeftHeight });
+        }
+      } else {
+        for (let d = 0; d < actualRightDepth; d++) {
+          allSlots.push({ side: row.side, r: row.r, d: d, stack: targetMatrix[row.r][d], maxH: actualRightHeight });
+        }
+      }
+    }
+
+    let unplacedPallets = 0;
+    let currentSlotIdx = 0;
+
+    for (let p of palletsNeeded) {
+      let pCount = p.count;
+      if (currentSlotIdx < allSlots.length && allSlots[currentSlotIdx].stack.length > 0) {
+        currentSlotIdx++;
+      }
+
+      while (pCount > 0) {
+        if (currentSlotIdx >= allSlots.length) {
+          unplacedPallets += pCount;
+          break;
+        }
+        let slot = allSlots[currentSlotIdx];
+        let amountToPlace = pCount % slot.maxH;
+        if (amountToPlace === 0) amountToPlace = slot.maxH;
+        amountToPlace = Math.min(amountToPlace, pCount, slot.maxH - slot.stack.length);
+
+        while (amountToPlace > 0) {
+          slot.stack.push({ product: p.product, color: p.color, hex: p.hex });
+          pCount--;
+          amountToPlace--;
+        }
+        currentSlotIdx++;
+      }
+    }
+
+    const now = new Date();
+    const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const totalNeededCount = palletsNeeded.reduce((s, p) => s + p.count, 0);
+
+    const renderMatrixHtml = (matrix: any[][][], side: string, sideMaxH: number) => {
+      if (matrix.length === 0) return '';
+      return `
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+          <div style="text-align: center; font-weight: bold; color: #475569; font-size: 13px; padding-bottom: 4px; border-bottom: 2px solid #cbd5e1;">
+            ${side === 'left' ? '← ផ្នែកខាងឆ្វេង (Left Wing)' : 'ផ្នែកខាងស្តាំ (Right Wing) →'}
+          </div>
+          ${matrix.map((row, rIdx) => `
+            <div style="display: flex; gap: 6px; padding: 6px; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; align-items: center;">
+              <div style="width: 44px; text-align: center; font-size: 11px; font-weight: 800; color: #64748b; background: #f8fafc; padding: 4px 2px; border-radius: 4px; border: 1px solid #e2e8f0; flex-shrink: 0;">
+                ជួរ ${rIdx + 1}
+              </div>
+              <div style="display: flex; gap: 4px; flex: 1;">
+                ${row.map((stack) => {
+                  if (stack.length === 0) {
+                    return `
+                      <div style="flex: 1; min-width: 46px; height: 50px; border: 1.5px dashed #cbd5e1; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: #f8fafc; color: #94a3b8; font-size: 10px; font-weight: 700;">
+                        ទំនេរ
+                      </div>
+                    `;
+                  }
+                  const topItem = stack[0];
+                  return `
+                    <div style="flex: 1; min-width: 46px; height: 50px; border: 1.5px solid #000000; border-radius: 6px; position: relative; overflow: hidden; background-color: ${topItem.hex || '#6366f1'}; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                      <div style="color: #ffffff; font-size: 10px; font-weight: 900; text-align: center; line-height: 1.2; padding: 2px; text-shadow: 0 1px 2px rgba(0,0,0,0.6); word-break: break-word;">
+                        ${formatHtmlText(topItem.product)}
+                      </div>
+                      <div style="position: absolute; top: 0; right: 0; background: rgba(15, 23, 42, 0.9); color: #ffffff; font-size: 8px; font-weight: 800; padding: 1px 4px; border-bottom-left-radius: 4px;">
+                        ${stack.length}/${sideMaxH}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    };
+
+    const leftHtml = renderMatrixHtml(leftMatrix, 'left', actualLeftHeight);
+    const rightHtml = renderMatrixHtml(rightMatrix, 'right', actualRightHeight);
+    const aisleHtml = (leftRows > 0 || rightRows > 0) ? `
+      <div style="width: 44px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 8px; flex-shrink: 0; min-height: 140px;">
+        <span style="writing-mode: vertical-rl; transform: rotate(180deg); color: #64748b; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;">
+          ផ្លូវដើរ (Aisle)
+        </span>
+      </div>
+    ` : '';
+
+    const summaryItemsHtml = palletsNeeded.map(p => `
+      <div style="display: flex; align-items: center; gap: 8px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 20px; padding: 4px 12px; font-size: 11px;">
+        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: ${p.hex}; border: 1px solid #94a3b8;"></span>
+        <span style="font-weight: 700; color: #1e293b;">${formatHtmlText(p.product)}:</span>
+        <span style="font-weight: 900; color: #0f172a;">${p.count} បាឡែត</span>
+        <span style="color: #64748b; font-size: 10px;">(ស្តុកជាក់ស្ដែង: ${p.stock?.toLocaleString()} កេស / @${p.capacity})</span>
+      </div>
+    `).join('');
+
+    const documentContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>ទីតាំង និងការរៀបចំបាឡែតឃ្លាំង (Smart Pallet Map)</title>
+          <meta charset="utf-8">
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700;900&family=Moul&display=swap');
+            * {
+              box-sizing: border-box;
+            }
+            body {
+              font-family: 'Kantumruy Pro', 'Khmer OS Siemreap', Arial, sans-serif;
+              color: #1e293b;
+              margin: 0;
+              padding: 12px;
+              background-color: #f8fafc;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .no-print {
+              margin-bottom: 12px;
+            }
+            .header-container {
+              background: #ffffff;
+              border: 1px solid #cbd5e1;
+              border-radius: 12px;
+              padding: 14px 20px;
+              margin-bottom: 12px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            }
+            .header-title {
+              font-size: 18px;
+              font-weight: 900;
+              color: #0f172a;
+              margin: 0 0 4px 0;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .header-subtitle {
+              font-size: 11px;
+              color: #64748b;
+              margin: 0;
+              font-weight: 600;
+            }
+            .header-meta {
+              text-align: right;
+              font-size: 11px;
+              color: #475569;
+            }
+            .map-container {
+              background: #e2e8f0;
+              border: 1.5px solid #cbd5e1;
+              border-radius: 14px;
+              padding: 14px;
+              display: flex;
+              gap: 12px;
+              align-items: stretch;
+              justify-content: center;
+              margin-bottom: 12px;
+            }
+            .summary-container {
+              background: #ffffff;
+              border: 1px solid #cbd5e1;
+              border-radius: 12px;
+              padding: 14px 18px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            }
+            .summary-title {
+              font-size: 13px;
+              font-weight: 800;
+              color: #334155;
+              margin-bottom: 10px;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            }
+            .alert-box {
+              padding: 8px 12px;
+              border-radius: 8px;
+              font-size: 11px;
+              font-weight: bold;
+              margin-bottom: 10px;
+            }
+            .alert-danger {
+              background: #fef2f2;
+              border: 1px solid #fecaca;
+              color: #dc2626;
+            }
+            .alert-warning {
+              background: #fffbeb;
+              border: 1px solid #fef3c7;
+              color: #d97706;
+            }
+            @media print {
+              @page {
+                size: A4 landscape;
+                margin: 6mm;
+              }
+              body {
+                background: #ffffff !important;
+                padding: 0;
+              }
+              .no-print {
+                display: none !important;
+              }
+              .map-container {
+                background: #f1f5f9 !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print" style="background: #ffffff; padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="font-weight: 800; color: #1e293b; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+              <span>🗺️ ទិដ្ឋភាពបោះពុម្ព (Print Preview): ទីតាំង និងការរៀបចំបាឡែត</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="window.print()" style="background: #4f46e5; color: white; border: none; padding: 6px 16px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                <span>បោះពុម្ព / ទាញយក PDF</span>
+              </button>
+              <button onclick="window.close()" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer;">
+                បិទ
+              </button>
+            </div>
+          </div>
+
+          <div class="header-container">
+            <div>
+              <h1 class="header-title">🗺️ ទីតាំង និងការរៀបចំបាឡែតឃ្លាំង (Smart Pallet Map)</h1>
+              <p class="header-subtitle">ប្រព័ន្ធរៀបចំដោយស្វ័យប្រវត្តិតាមចំនួនទំនិញក្នុងឃ្លាំងជាក់ស្ដែងចុងក្រោយ (Latest Actual Stock)</p>
+            </div>
+            <div class="header-meta">
+              <div><strong>កាលបរិច្ឆេទ៖</strong> ${formattedDate}</div>
+              <div style="margin-top: 2px;"><strong>សរុបបាឡែត៖</strong> ${totalNeededCount} បាឡែត (${palletsNeeded.length} មុខទំនិញ)</div>
+              <div style="margin-top: 2px; font-size: 10px; color: #64748b;">
+                ឆ្វេង: ${leftRows}ជួរ x ${actualLeftDepth}បាឡែត (កម្ពស់ ${actualLeftHeight}) | ស្តាំ: ${rightRows}ជួរ x ${actualRightDepth}បាឡែត (កម្ពស់ ${actualRightHeight})
+              </div>
+            </div>
+          </div>
+
+          <div class="map-container">
+            ${leftHtml}
+            ${aisleHtml}
+            ${rightHtml}
+          </div>
+
+          <div class="summary-container">
+            <div class="summary-title">
+              <span>📊 សេចក្តីសង្ខេបបាឡែតតាមចំនួនស្តុកជាក់ស្ដែង (Pallet Breakdown by Actual Stock)</span>
+            </div>
+
+            ${unplacedPallets > 0 ? `
+              <div class="alert-box alert-danger">
+                ⚠️ ឃ្លាំងពេញ! មានទំនិញស្មើនឹង ${unplacedPallets} បាឡែត ដែលមិនមានកន្លែងទុកដាក់។ សូមបន្ថែមទំហំឃ្លាំង!
+              </div>
+            ` : ''}
+
+            ${unassignedList.length > 0 ? `
+              <div class="alert-box alert-warning">
+                ⚠️ ទំនិញមិនបានរៀបចំ (អត់បានកំណត់ចំនួន/បាឡែត): ${unassignedList.map(u => u.product).join(', ')}
+              </div>
+            ` : ''}
+
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              ${summaryItemsHtml}
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 400);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+      const frameDoc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (frameDoc) {
+        frameDoc.open();
+        frameDoc.write(documentContent);
+        frameDoc.close();
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 2000);
+        }, 500);
+        return;
+      } else {
+        alert("សូមអនុញ្ញាតឲ្យបើក Pop-up ដើម្បីទាញយក PDF");
+        return;
+      }
+    }
+
     printWindow.document.write(documentContent);
     printWindow.document.close();
   };
@@ -5776,7 +6236,7 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
           
           {/* Header */}
           <div className="mb-3 border-b border-slate-100 pb-2 shrink-0">
-            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 w-full">
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2 w-full">
               <button
                 type="button"
                 onClick={() => setIsStockInHistoryOpen(true)}
@@ -5807,6 +6267,16 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
                 className="flex-1 flex justify-center items-center space-x-1 bg-sky-600 hover:bg-sky-700 text-white text-[10px] sm:text-xs font-black px-1 sm:px-3 py-2 rounded-xl shadow-md shadow-sky-600/10 active:scale-95 transition cursor-pointer whitespace-nowrap"
               >
                 <span>ស្តុកចូល</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPalletConfigModalOpen(true)}
+                className="flex-1 flex justify-center items-center space-x-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] sm:text-xs px-1 sm:px-3 py-2 rounded-xl font-bold shadow-md shadow-amber-500/20 active:scale-95 transition cursor-pointer whitespace-nowrap"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+                <span>បាឡែត</span>
               </button>
               <button
                 type="button"
@@ -9645,6 +10115,475 @@ const handleExportSelectedUserStockExcel = async (customProductsList?: {khmerNam
         </div>,
         document.body
       )}
+
+
+            {/* Pallet Map Modal */}
+      {isPalletMapModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[110] p-2 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-100 w-full max-w-5xl h-[95vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-200 animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="flex justify-between items-center p-4 sm:p-6 pb-4 bg-white border-b border-slate-200 shrink-0">
+              <div>
+                <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                  <span className="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center text-lg">🗺️</span>
+                  <span>ទីតាំង និងការរៀបចំបាឡែត (Smart Pallet Map)</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-1">ប្រព័ន្ធរៀបចំដោយស្វ័យប្រវត្តិតាមចំនួនទំនិញក្នុងឃ្លាំងជាក់ស្ដែងចុងក្រោយ (Latest Actual Stock)</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportPalletMapPDF}
+                  className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-700 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition active:scale-95 cursor-pointer shadow-sm border border-indigo-100"
+                  title="ទាញយកជា PDF"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span>Export PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPalletMapModalOpen(false);
+                    setIsPalletConfigModalOpen(true);
+                  }}
+                  className="p-2 hover:bg-slate-100 text-slate-500 hover:text-slate-700 rounded-xl transition cursor-pointer"
+                  title="កំណត់រចនាសម្ព័ន្ធ (Configuration)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPalletMapModalOpen(false)}
+                  className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-xl transition cursor-pointer"
+                  title="បិទ (Close)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-auto custom-scroll p-4 sm:p-6 flex flex-col items-center">
+              {(() => {
+                const config = palletConfig || { layout: { leftRows: 0, rightRows: 0, depth: 0, maxHeight: 0, leftDepth: 0, rightDepth: 0, leftMaxHeight: 0, rightMaxHeight: 0 }, capacities: {} };
+                const { leftRows = 0, rightRows = 0, depth = 0, maxHeight = 0, leftDepth = 0, rightDepth = 0, leftMaxHeight = 0, rightMaxHeight = 0 } = config.layout || {};
+                
+                // Fallbacks if distinct values are not set
+                const actualLeftDepth = leftDepth > 0 ? leftDepth : depth;
+                const actualRightDepth = rightDepth > 0 ? rightDepth : depth;
+                const actualLeftHeight = leftMaxHeight > 0 ? leftMaxHeight : maxHeight;
+                const actualRightHeight = rightMaxHeight > 0 ? rightMaxHeight : maxHeight;
+                
+                if (leftRows === 0 && rightRows === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4">
+                      <span className="text-6xl">📏</span>
+                      <p className="font-bold">សូមកំណត់ទំហំឃ្លាំង (បាឡែត) ជាមុនសិន</p>
+                    </div>
+                  );
+                }
+
+                // Calculate required pallets for each product based on latest actual stock
+                let palletsNeeded: { product: string, count: number, color: string, stock: number, capacity: number }[] = [];
+                const colors = ['bg-rose-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 'bg-cyan-500', 'bg-pink-500', 'bg-orange-500', 'bg-indigo-500', 'bg-teal-500'];
+                
+                let unassignedList: { product: string, reason: string }[] = [];
+
+                products.forEach((p, idx) => {
+                  // Use latest actual stock in warehouse (ស្តុកជាក់ស្ដែងចុងក្រោយ)
+                  const stock = getLatestActualStock(p);
+                  if (stock > 0) {
+                    const capacity = config.capacities?.[p.name] || 0;
+                    if (capacity > 0) {
+                      palletsNeeded.push({
+                        product: p.name,
+                        count: Math.ceil(stock / capacity),
+                        color: colors[idx % colors.length],
+                        stock,
+                        capacity
+                      });
+                    } else {
+                      unassignedList.push({ product: p.name, reason: 'មិនទាន់កំណត់ចំនួន/បាឡែត' });
+                    }
+                  }
+                });
+
+                // Calculate total Stock Out for each product to sort by average/total Stock Out
+                const stockOutTotals: Record<string, number> = {};
+                products.forEach(p => stockOutTotals[p.name] = 0);
+                transactions.forEach(tx => {
+                  if (tx.type === 'Stock Out' && stockOutTotals[tx.productName] !== undefined) {
+                    stockOutTotals[tx.productName] += tx.quantity;
+                  }
+                });
+
+                // Sort pallets needed: First by Stock Out amount (descending), then by current count
+                palletsNeeded.sort((a, b) => {
+                  const outA = stockOutTotals[a.product] || 0;
+                  const outB = stockOutTotals[b.product] || 0;
+                  if (outB !== outA) return outB - outA;
+                  return b.count - a.count;
+                });
+
+                // Initialize warehouse slots: Left and Right matrices [row][depth][height]
+                const leftMatrix: any[][][] = Array(leftRows).fill(null).map(() => Array(actualLeftDepth).fill(null).map(() => []));
+                const rightMatrix: any[][][] = Array(rightRows).fill(null).map(() => Array(actualRightDepth).fill(null).map(() => []));
+                
+                let currentSide = leftRows > 0 ? 'left' : 'right';
+                let currentRow = 0;
+                let currentDepth = 0;
+
+                // Dedicated rows for each product (1 Row = 1 Product Type)
+                let availableRows: {side: string, r: number}[] = [];
+                // User requested to sort from Right to Left
+                for (let r = 0; r < rightRows; r++) availableRows.push({side: 'right', r});
+                for (let r = 0; r < leftRows; r++) availableRows.push({side: 'left', r});
+
+                let allSlots: { side: string, r: number, d: number, stack: any[], maxH: number }[] = [];
+                for (let row of availableRows) {
+                  const targetMatrix = row.side === 'left' ? leftMatrix : rightMatrix;
+                  // Order slots from Aisle to Wall so that the first assigned slot is always next to the Aisle
+                  if (row.side === 'left') {
+                    // Left Aisle is at the end (depth - 1)
+                    for (let d = actualLeftDepth - 1; d >= 0; d--) {
+                      allSlots.push({ side: row.side, r: row.r, d: d, stack: targetMatrix[row.r][d], maxH: actualLeftHeight });
+                    }
+                  } else {
+                    // Right Aisle is at the start (0)
+                    for (let d = 0; d < actualRightDepth; d++) {
+                      allSlots.push({ side: row.side, r: row.r, d: d, stack: targetMatrix[row.r][d], maxH: actualRightHeight });
+                    }
+                  }
+                }
+
+                let unplacedPallets = 0;
+                let currentSlotIdx = 0;
+
+                for (let p of palletsNeeded) {
+                  let pCount = p.count;
+                  
+                  // If the current slot is partially filled (from the previous product), move to the next slot
+                  // because we don't want to mix different products in the same vertical stack.
+                  if (currentSlotIdx < allSlots.length && allSlots[currentSlotIdx].stack.length > 0) {
+                    currentSlotIdx++;
+                  }
+
+                  while (pCount > 0) {
+                    if (currentSlotIdx >= allSlots.length) {
+                      unplacedPallets += pCount;
+                      break;
+                    }
+                    
+                    let slot = allSlots[currentSlotIdx];
+                    
+                    // Determine how many to place in this slot.
+                    // If pCount doesn't perfectly divide by maxH, the remainder goes to the FIRST slot (Aisle).
+                    let amountToPlace = pCount % slot.maxH;
+                    if (amountToPlace === 0) amountToPlace = slot.maxH;
+                    
+                    // Cap the amount to what can actually fit
+                    amountToPlace = Math.min(amountToPlace, pCount, slot.maxH - slot.stack.length);
+                    
+                    while (amountToPlace > 0) {
+                      slot.stack.push({ product: p.product, color: p.color });
+                      pCount--;
+                      amountToPlace--;
+                    }
+                    
+                    // Always move to the next slot after placing our designated amount
+                    // This leaves the partial stack at the Aisle without other products piling on top.
+                    currentSlotIdx++;
+                  }
+                }
+
+                const renderMatrix = (matrix: any[][][], side: string, sideMaxH: number) => {
+                  if (matrix.length === 0) return null;
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <div className="text-center font-bold text-slate-400 text-xs mb-2">{side === 'left' ? '← ផ្នែកខាងឆ្វេង' : 'ផ្នែកខាងស្តាំ →'}</div>
+                      {matrix.map((row, rIdx) => (
+                        <div key={`${side}-r${rIdx}`} className="flex gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm items-center">
+                          <div className="w-8 text-center text-xs font-black text-slate-300">ជួរ {rIdx + 1}</div>
+                          <div className="flex gap-1">
+                            {row.map((stack, dIdx) => (
+                              <div 
+                                key={`${side}-r${rIdx}-d${dIdx}`} 
+                                className={`w-14 h-14 sm:w-20 sm:h-20 rounded-lg border-2 ${stack.length > 0 ? 'border-slate-300 bg-slate-50' : 'border-dashed border-slate-200 bg-transparent'} flex flex-col justify-end overflow-hidden relative group cursor-pointer`}
+                                title={stack.length > 0 ? `${stack.map(s => s.product).join(', ')} (${stack.length}/${sideMaxH} ជាន់)` : 'ទំនេរ'}
+                              >
+                                {stack.length === 0 && <span className="absolute inset-0 flex items-center justify-center text-slate-200 text-xs font-bold">ទំនេរ</span>}
+                                {stack.length > 0 && (
+                                  <div className={`${stack[0].color} w-full h-full opacity-90 flex items-center justify-center p-0.5 sm:p-1`}>
+                                    <div className="text-[8px] sm:text-[10px] text-white font-black text-center leading-tight break-words line-clamp-3">
+                                      {stack[0].product}
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Stack Count Badge */}
+                                {stack.length > 0 && (
+                                  <div className="absolute top-0 right-0 bg-slate-800 text-white text-[8px] font-bold px-1 rounded-bl-md z-10">
+                                    {stack.length}/{sideMaxH}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                };
+
+                return (
+                  <div className="w-full flex flex-col items-center">
+                    {/* Warehouse Map */}
+                    <div className="bg-slate-200 p-4 sm:p-8 rounded-3xl shadow-inner border border-slate-300 flex flex-col sm:flex-row gap-8 sm:gap-16 items-center sm:items-start justify-center min-w-max mx-auto">
+                      {/* Left Side */}
+                      {renderMatrix(leftMatrix, 'left', actualLeftHeight)}
+                      
+                      {/* Aisle */}
+                      {(leftRows > 0 || rightRows > 0) && (
+                        <div className="w-16 sm:w-24 h-full min-h-[300px] border-x-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-100/50 rounded-lg">
+                          <span className="transform -rotate-90 text-slate-400 font-black tracking-widest text-sm whitespace-nowrap uppercase">ផ្លូវដើរ (Aisle)</span>
+                        </div>
+                      )}
+
+                      {/* Right Side */}
+                      {renderMatrix(rightMatrix, 'right', actualRightHeight)}
+                    </div>
+
+                    {/* Summary & Legend */}
+                    <div className="mt-8 w-full max-w-4xl bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                      <h4 className="font-black text-slate-700 mb-4 flex items-center gap-2">
+                        <span className="text-xl">📊</span> សេចក្តីសង្ខេបបាឡែតតាមចំនួនស្តុកជាក់ស្ដែង (Summary by Actual Stock)
+                      </h4>
+                      
+                      {unplacedPallets > 0 && (
+                        <div className="bg-rose-50 text-rose-600 p-3 rounded-xl border border-rose-100 font-bold text-sm mb-4">
+                          ⚠️ ឃ្លាំងពេញ! មានទំនិញស្មើនឹង {unplacedPallets} បាឡែត ដែលមិនមានកន្លែងទុកដាក់។ សូមបន្ថែមទំហំឃ្លាំង!
+                        </div>
+                      )}
+                      
+                      {unassignedList.length > 0 && (
+                        <div className="bg-amber-50 text-amber-700 p-3 rounded-xl border border-amber-100 font-bold text-sm mb-4">
+                          ⚠️ ទំនិញមិនបានរៀបចំ (អត់បានកំណត់ចំនួន/បាឡែត): {unassignedList.map(u => u.product).join(', ')}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-3">
+                        {palletsNeeded.map((p, i) => (
+                          <div key={i} className="flex items-center gap-2 bg-slate-50 p-2 pr-4 rounded-full border border-slate-100">
+                            <span className={`w-4 h-4 rounded-full ${p.color} shadow-sm`}></span>
+                            <span className="text-xs font-bold text-slate-700">{p.product}:</span>
+                            <span className="text-xs font-black text-slate-900">{p.count} បាឡែត</span>
+                            <span className="text-[10px] text-slate-500 font-semibold">(ស្តុកជាក់ស្ដែង: {p.stock?.toLocaleString()} កេស)</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Pallet Config Modal */}
+      {isPalletConfigModalOpen && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center z-[110] p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-3xl max-h-[90vh] flex flex-col rounded-3xl shadow-2xl relative border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-xl font-black text-slate-800">ការកំណត់ទីតាំង និងបាឡែត (Pallet Configuration)</h3>
+                <p className="text-xs text-slate-500 font-medium">រៀបចំឃ្លាំង និងកំណត់ចំនួនទំនិញក្នុងមួយបាឡែត</p>
+              </div>
+              <button
+                onClick={() => setIsPalletConfigModalOpen(false)}
+                className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scroll space-y-6 bg-slate-50/50">
+              {/* Layout Config */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <h4 className="text-sm font-black text-slate-700 mb-4 flex items-center space-x-2">
+                  <span className="w-6 h-6 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center text-xs">📐</span>
+                  <span>ទំហំឃ្លាំង និងបាឡែត (Warehouse Layout)</span>
+                </h4>
+                <div className="space-y-6">
+                  {/* Left Side Config */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <h5 className="text-xs font-black text-slate-700 mb-3 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span> ផ្នែកខាងឆ្វេង
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">ប្រវែង (ម៉ែត្រ/ជួរ)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={palletConfig?.layout?.leftRows || ''}
+                          onChange={e => setPalletConfig({ ...palletConfig, layout: { ...palletConfig.layout, leftRows: parseInt(e.target.value) || 0 } })}
+                          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 outline-none transition"
+                        />
+                      </div>
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">បណ្តោយ (ប៉ុន្មានបាឡែត)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={palletConfig?.layout?.leftDepth || palletConfig?.layout?.depth || ''}
+                          onChange={e => setPalletConfig({ ...palletConfig, layout: { ...palletConfig.layout, leftDepth: parseInt(e.target.value) || 0 } })}
+                          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 outline-none transition"
+                        />
+                      </div>
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">កម្ពស់ (ប៉ុន្មានបាឡែត)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={palletConfig?.layout?.leftMaxHeight || palletConfig?.layout?.maxHeight || ''}
+                          onChange={e => setPalletConfig({ ...palletConfig, layout: { ...palletConfig.layout, leftMaxHeight: parseInt(e.target.value) || 0 } })}
+                          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 outline-none transition"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side Config */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <h5 className="text-xs font-black text-slate-700 mb-3 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span> ផ្នែកខាងស្តាំ
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">ប្រវែង (ម៉ែត្រ/ជួរ)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={palletConfig?.layout?.rightRows || ''}
+                          onChange={e => setPalletConfig({ ...palletConfig, layout: { ...palletConfig.layout, rightRows: parseInt(e.target.value) || 0 } })}
+                          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 outline-none transition"
+                        />
+                      </div>
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">បណ្តោយ (ប៉ុន្មានបាឡែត)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={palletConfig?.layout?.rightDepth || palletConfig?.layout?.depth || ''}
+                          onChange={e => setPalletConfig({ ...palletConfig, layout: { ...palletConfig.layout, rightDepth: parseInt(e.target.value) || 0 } })}
+                          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 outline-none transition"
+                        />
+                      </div>
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">កម្ពស់ (ប៉ុន្មានបាឡែត)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={palletConfig?.layout?.rightMaxHeight || palletConfig?.layout?.maxHeight || ''}
+                          onChange={e => setPalletConfig({ ...palletConfig, layout: { ...palletConfig.layout, rightMaxHeight: parseInt(e.target.value) || 0 } })}
+                          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 outline-none transition"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Product Capacities */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <h4 className="text-sm font-black text-slate-700 mb-4 flex items-center space-x-2">
+                  <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-xs">📦</span>
+                  <span>ចំនួនក្នុងមួយបាឡែតតាមទំនិញ (Qty per Pallet)</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {products.map(p => (
+                    <div key={p.id} className="flex justify-between items-center bg-slate-50 p-2 px-3 rounded-xl border border-slate-100 hover:border-blue-200 transition">
+                      <span className="text-[11px] sm:text-xs font-bold text-slate-700 truncate mr-2" title={p.name}>{p.name}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={palletConfig?.capacities?.[p.name] || ''}
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 0;
+                          setPalletConfig({
+                            ...palletConfig,
+                            capacities: {
+                              ...(palletConfig.capacities || {}),
+                              [p.name]: val
+                            }
+                          });
+                        }}
+                        className="w-16 sm:w-20 bg-white border border-slate-200 rounded-lg px-2 py-1 text-center text-[11px] sm:text-xs font-black text-slate-700 focus:border-blue-400 outline-none transition"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 shrink-0 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPalletConfigModalOpen(false);
+                    setIsPalletMapModalOpen(true);
+                  }}
+                  className="bg-purple-500 hover:bg-purple-600 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-md shadow-purple-500/20 active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  <span className="hidden sm:inline">មើលទីតាំងឃ្លាំង (Map)</span>
+                  <span className="sm:hidden">ទីតាំង</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportPalletMapPDF}
+                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-700 border border-indigo-200 font-bold text-xs sm:text-sm px-3.5 py-2.5 rounded-xl shadow-sm active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                  title="Export PDF ទីតាំង និងការរៀបចំបាឡែត"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span>Export PDF</span>
+                </button>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    await setDoc(doc(db, 'settings', 'palletConfig'), palletConfig);
+                    setIsPalletConfigModalOpen(false);
+                    // Optional: show a small toast or success indicator
+                  } catch (err) {
+                    console.error('Error saving pallet config:', err);
+                    alert('មានបញ្ហាក្នុងការរក្សាទុក!');
+                  }
+                }}
+                className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs sm:text-sm px-6 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 active:scale-95 transition cursor-pointer"
+              >
+                រក្សាទុក (Save)
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
 </div>
   );
 }
